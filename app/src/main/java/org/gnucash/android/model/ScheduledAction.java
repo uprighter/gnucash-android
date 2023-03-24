@@ -16,7 +16,8 @@
 package org.gnucash.android.model;
 
 import android.content.Context;
-import android.support.annotation.NonNull;
+
+import androidx.annotation.NonNull;
 
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
@@ -30,11 +31,11 @@ import java.util.Locale;
 import java.util.TimeZone;
 
 /**
-* Represents a scheduled event which is stored in the database and run at regular mPeriod
-*
-* @author Ngewi Fet <ngewif@gmail.com>
-*/
-public class ScheduledAction extends BaseModel{
+ * Represents a scheduled event which is stored in the database and run at regular mPeriod
+ *
+ * @author Ngewi Fet <ngewif@gmail.com>
+ */
+public class ScheduledAction extends BaseModel {
 
     private long mStartDate;
     private long mEndDate;
@@ -90,7 +91,7 @@ public class ScheduledAction extends BaseModel{
     private int mAdvanceNotifyDays = 0;
     private String mTemplateAccountUID;
 
-    public ScheduledAction(ActionType actionType){
+    public ScheduledAction(ActionType actionType) {
         mActionType = actionType;
         mEndDate = 0;
         mIsEnabled = true; //all actions are enabled by default
@@ -98,6 +99,7 @@ public class ScheduledAction extends BaseModel{
 
     /**
      * Returns the type of action to be performed by this scheduled action
+     *
      * @return ActionType of the scheduled action
      */
     public ActionType getActionType() {
@@ -106,6 +108,7 @@ public class ScheduledAction extends BaseModel{
 
     /**
      * Sets the {@link ActionType}
+     *
      * @param actionType Type of action
      */
     public void setActionType(ActionType actionType) {
@@ -114,6 +117,7 @@ public class ScheduledAction extends BaseModel{
 
     /**
      * Returns the GUID of the action covered by this scheduled action
+     *
      * @return GUID of action
      */
     public String getActionUID() {
@@ -122,6 +126,7 @@ public class ScheduledAction extends BaseModel{
 
     /**
      * Sets the GUID of the action being scheduled
+     *
      * @param actionUID GUID of the action
      */
     public void setActionUID(String actionUID) {
@@ -131,6 +136,7 @@ public class ScheduledAction extends BaseModel{
     /**
      * Returns the timestamp of the last execution of this scheduled action
      * <p>This is not necessarily the time when the scheduled action was due, only when it was actually last executed.</p>
+     *
      * @return Timestamp in milliseconds since Epoch
      */
     public long getLastRunTime() {
@@ -142,17 +148,18 @@ public class ScheduledAction extends BaseModel{
      * This relies on the number of executions of the scheduled action
      * <p>This is different from {@link #getLastRunTime()} which returns the date when the system last
      * run the scheduled action.</p>
+     *
      * @return Time of last schedule, or -1 if the scheduled action has never been run
      */
-    public long getTimeOfLastSchedule(){
+    public long getTimeOfLastSchedule() {
         if (mExecutionCount == 0)
-            return  -1;
+            return -1;
 
         LocalDateTime startTime = LocalDateTime.fromDateFields(new Date(mStartDate));
         int multiplier = mRecurrence.getMultiplier();
 
-        int factor = (mExecutionCount-1) * multiplier;
-        switch (mRecurrence.getPeriodType()){
+        int factor = (mExecutionCount - 1) * multiplier;
+        switch (mRecurrence.getPeriodType()) {
             case HOUR:
                 startTime = startTime.plusHours(factor);
                 break;
@@ -182,7 +189,7 @@ public class ScheduledAction extends BaseModel{
      *
      * @return Next run time in milliseconds
      */
-    public long computeNextCountBasedScheduledExecutionTime(){
+    public long computeNextCountBasedScheduledExecutionTime() {
         return computeNextScheduledExecutionTimeStartingAt(getTimeOfLastSchedule());
     }
 
@@ -207,11 +214,10 @@ public class ScheduledAction extends BaseModel{
      * It only considers when the next execution would theoretically be due.</p>
      *
      * @param startTime time in milliseconds to use as start to compute the next schedule.
-     *
      * @return Next run time in milliseconds
      */
     private long computeNextScheduledExecutionTimeStartingAt(long startTime) {
-        if (startTime <= 0){ // has never been run
+        if (startTime <= 0) { // has never been run
             return mStartDate;
         }
 
@@ -240,14 +246,13 @@ public class ScheduledAction extends BaseModel{
     /**
      * Computes the next time that this weekly scheduled action is supposed to be
      * executed starting at startTime.
-     *
+     * <p>
      * If no days of the week have been set (GnuCash desktop allows it), it will return a
      * date in the future to ensure ScheduledActionService doesn't execute it.
      *
      * @param startTime LocalDateTime to use as start to compute the next schedule.
-     *
      * @return Next run time as a LocalDateTime. A date in the future, if no days of the week
-     *      were set in the Recurrence.
+     * were set in the Recurrence.
      */
     @NonNull
     private LocalDateTime computeNextWeeklyExecutionStartingAt(LocalDateTime startTime) {
@@ -255,7 +260,7 @@ public class ScheduledAction extends BaseModel{
             return LocalDateTime.now().plusDays(1); // Just a date in the future
 
         // Look into the week of startTime for another scheduled day of the week
-        for (int dayOfWeek : mRecurrence.getByDays() ) {
+        for (int dayOfWeek : mRecurrence.getByDays()) {
             int jodaDayOfWeek = convertCalendarDayOfWeekToJoda(dayOfWeek);
             LocalDateTime candidateNextDueTime = startTime.withDayOfWeek(jodaDayOfWeek);
             if (candidateNextDueTime.isAfter(startTime))
@@ -265,7 +270,7 @@ public class ScheduledAction extends BaseModel{
         // Return the first scheduled day of the week from the next due week
         int firstScheduledDayOfWeek = convertCalendarDayOfWeekToJoda(mRecurrence.getByDays().get(0));
         return startTime.plusWeeks(mRecurrence.getMultiplier())
-                        .withDayOfWeek(firstScheduledDayOfWeek);
+                .withDayOfWeek(firstScheduledDayOfWeek);
     }
 
     /**
@@ -283,6 +288,7 @@ public class ScheduledAction extends BaseModel{
 
     /**
      * Set time of last execution of the scheduled action
+     *
      * @param nextRun Timestamp in milliseconds since Epoch
      */
     public void setLastRun(long nextRun) {
@@ -291,6 +297,7 @@ public class ScheduledAction extends BaseModel{
 
     /**
      * Returns the period of this scheduled action in milliseconds.
+     *
      * @return Period in milliseconds since Epoch
      * @deprecated Uses fixed values for time of months and years (which actually vary depending on number of days in month or leap year)
      */
@@ -300,6 +307,7 @@ public class ScheduledAction extends BaseModel{
 
     /**
      * Returns the time of first execution of the scheduled action
+     *
      * @return Start time of scheduled action in milliseconds since Epoch
      */
     public long getStartTime() {
@@ -308,6 +316,7 @@ public class ScheduledAction extends BaseModel{
 
     /**
      * Sets the time of first execution of the scheduled action
+     *
      * @param startDate Timestamp in milliseconds since Epoch
      */
     public void setStartTime(long startDate) {
@@ -319,6 +328,7 @@ public class ScheduledAction extends BaseModel{
 
     /**
      * Returns the time of last execution of the scheduled action
+     *
      * @return Timestamp in milliseconds since Epoch
      */
     public long getEndTime() {
@@ -327,11 +337,12 @@ public class ScheduledAction extends BaseModel{
 
     /**
      * Sets the end time of the scheduled action
+     *
      * @param endDate Timestamp in milliseconds since Epoch
      */
     public void setEndTime(long endDate) {
         this.mEndDate = endDate;
-        if (mRecurrence != null){
+        if (mRecurrence != null) {
             mRecurrence.setPeriodEnd(new Timestamp(mEndDate));
         }
     }
@@ -340,6 +351,7 @@ public class ScheduledAction extends BaseModel{
      * Returns the tag of this scheduled action
      * <p>The tag saves additional information about the scheduled action,
      * e.g. such as export parameters for scheduled backups</p>
+     *
      * @return Tag of scheduled action
      */
     public String getTag() {
@@ -350,6 +362,7 @@ public class ScheduledAction extends BaseModel{
      * Sets the tag of the schedules action.
      * <p>The tag saves additional information about the scheduled action,
      * e.g. such as export parameters for scheduled backups</p>
+     *
      * @param tag Tag of scheduled action
      */
     public void setTag(String tag) {
@@ -358,56 +371,63 @@ public class ScheduledAction extends BaseModel{
 
     /**
      * Returns {@code true} if the scheduled action is enabled, {@code false} otherwise
+     *
      * @return {@code true} if the scheduled action is enabled, {@code false} otherwise
      */
-    public boolean isEnabled(){
+    public boolean isEnabled() {
         return mIsEnabled;
     }
 
     /**
      * Toggles the enabled state of the scheduled action
      * Disabled scheduled actions will not be executed
+     *
      * @param enabled Flag if the scheduled action is enabled or not
      */
-    public void setEnabled(boolean enabled){
+    public void setEnabled(boolean enabled) {
         this.mIsEnabled = enabled;
     }
 
     /**
      * Returns the total number of planned occurrences of this scheduled action.
+     *
      * @return Total number of planned occurrences of this action
      */
-    public int getTotalPlannedExecutionCount(){
+    public int getTotalPlannedExecutionCount() {
         return mTotalFrequency;
     }
 
     /**
      * Sets the number of occurences of this action
+     *
      * @param plannedExecutions Number of occurences
      */
-    public void setTotalPlannedExecutionCount(int plannedExecutions){
+    public void setTotalPlannedExecutionCount(int plannedExecutions) {
         this.mTotalFrequency = plannedExecutions;
     }
 
     /**
      * Returns how many times this scheduled action has already been executed
+     *
      * @return Number of times this action has been executed
      */
-    public int getExecutionCount(){
+    public int getExecutionCount() {
         return mExecutionCount;
     }
 
     /**
      * Sets the number of times this scheduled action has been executed
+     *
      * @param executionCount Number of executions
      */
-    public void setExecutionCount(int executionCount){
+    public void setExecutionCount(int executionCount) {
         mExecutionCount = executionCount;
     }
 
     /**
      * Returns flag if transactions should be automatically created or not
      * <p>This flag is currently unused in the app. It is only included here for compatibility with GnuCash desktop XML</p>
+     *
      * @return {@code true} if the transaction should be auto-created, {@code false} otherwise
      */
     public boolean shouldAutoCreate() {
@@ -417,6 +437,7 @@ public class ScheduledAction extends BaseModel{
     /**
      * Set flag for automatically creating transaction based on this scheduled action
      * <p>This flag is currently unused in the app. It is only included here for compatibility with GnuCash desktop XML</p>
+     *
      * @param autoCreate Flag for auto creating transactions
      */
     public void setAutoCreate(boolean autoCreate) {
@@ -426,6 +447,7 @@ public class ScheduledAction extends BaseModel{
     /**
      * Check if user will be notified of creation of scheduled transactions
      * <p>This flag is currently unused in the app. It is only included here for compatibility with GnuCash desktop XML</p>
+     *
      * @return {@code true} if user will be notified, {@code false} otherwise
      */
     public boolean shouldAutoNotify() {
@@ -435,6 +457,7 @@ public class ScheduledAction extends BaseModel{
     /**
      * Sets whether to notify the user that scheduled transactions have been created
      * <p>This flag is currently unused in the app. It is only included here for compatibility with GnuCash desktop XML</p>
+     *
      * @param autoNotify Boolean flag
      */
     public void setAutoNotify(boolean autoNotify) {
@@ -444,6 +467,7 @@ public class ScheduledAction extends BaseModel{
     /**
      * Returns number of days in advance to create the transaction
      * <p>This flag is currently unused in the app. It is only included here for compatibility with GnuCash desktop XML</p>
+     *
      * @return Number of days in advance to create transaction
      */
     public int getAdvanceCreateDays() {
@@ -453,6 +477,7 @@ public class ScheduledAction extends BaseModel{
     /**
      * Set number of days in advance to create the transaction
      * <p>This flag is currently unused in the app. It is only included here for compatibility with GnuCash desktop XML</p>
+     *
      * @param advanceCreateDays Number of days
      */
     public void setAdvanceCreateDays(int advanceCreateDays) {
@@ -462,6 +487,7 @@ public class ScheduledAction extends BaseModel{
     /**
      * Returns the number of days in advance to notify of scheduled transactions
      * <p>This flag is currently unused in the app. It is only included here for compatibility with GnuCash desktop XML</p>
+     *
      * @return {@code true} if user will be notified, {@code false} otherwise
      */
     public int getAdvanceNotifyDays() {
@@ -471,6 +497,7 @@ public class ScheduledAction extends BaseModel{
     /**
      * Set number of days in advance to notify of scheduled transactions
      * <p>This flag is currently unused in the app. It is only included here for compatibility with GnuCash desktop XML</p>
+     *
      * @param advanceNotifyDays Number of days
      */
     public void setAdvanceNotifyDays(int advanceNotifyDays) {
@@ -480,6 +507,7 @@ public class ScheduledAction extends BaseModel{
     /**
      * Return the template account GUID for this scheduled action
      * <p>This method generates one if none was set</p>
+     *
      * @return String GUID of template account
      */
     public String getTemplateAccountUID() {
@@ -491,6 +519,7 @@ public class ScheduledAction extends BaseModel{
 
     /**
      * Set the template account GUID
+     *
      * @param templateAccountUID String GUID of template account
      */
     public void setTemplateAccountUID(String templateAccountUID) {
@@ -499,12 +528,13 @@ public class ScheduledAction extends BaseModel{
 
     /**
      * Returns the event schedule (start, end and recurrence)
+     *
      * @return String description of repeat schedule
      */
-    public String getRepeatString(){
+    public String getRepeatString() {
         StringBuilder ruleBuilder = new StringBuilder(mRecurrence.getRepeatString());
         Context context = GnuCashApplication.getAppContext();
-        if (mEndDate <= 0 && mTotalFrequency > 0){
+        if (mEndDate <= 0 && mTotalFrequency > 0) {
             ruleBuilder.append(", ").append(context.getString(R.string.repeat_x_times, mTotalFrequency));
         }
 
@@ -513,19 +543,20 @@ public class ScheduledAction extends BaseModel{
 
     /**
      * Creates an RFC 2445 string which describes this recurring event
-     * <p>See http://recurrance.sourceforge.net/</p>
+     * <p>See <a href="http://recurrance.sourceforge.net/">recurrance</a></p>
+     *
      * @return String describing event
      */
-    public String getRuleString(){
+    public String getRuleString() {
         String separator = ";";
 
         StringBuilder ruleBuilder = new StringBuilder(mRecurrence.getRuleString());
 
-        if (mEndDate > 0){
+        if (mEndDate > 0) {
             SimpleDateFormat df = new SimpleDateFormat("yyyyMMdd'T'HHmmss'Z'", Locale.US);
             df.setTimeZone(TimeZone.getTimeZone("UTC"));
             ruleBuilder.append("UNTIL=").append(df.format(new Date(mEndDate))).append(separator);
-        } else if (mTotalFrequency > 0){
+        } else if (mTotalFrequency > 0) {
             ruleBuilder.append("COUNT=").append(mTotalFrequency).append(separator);
         }
 
@@ -534,6 +565,7 @@ public class ScheduledAction extends BaseModel{
 
     /**
      * Return GUID of recurrence pattern for this scheduled action
+     *
      * @return {@link Recurrence} object
      */
     public Recurrence getRecurrence() {
@@ -544,11 +576,12 @@ public class ScheduledAction extends BaseModel{
      * Overloaded method for setting the recurrence of the scheduled action.
      * <p>This method allows you to specify the periodicity and the ordinal of it. For example,
      * a recurrence every fortnight would give parameters: {@link PeriodType#WEEK}, ordinal:2</p>
+     *
      * @param periodType Periodicity of the scheduled action
-     * @param ordinal Ordinal of the periodicity. If unsure, specify 1
+     * @param ordinal    Ordinal of the periodicity. If unsure, specify 1
      * @see #setRecurrence(Recurrence)
      */
-    public void setRecurrence(PeriodType periodType, int ordinal){
+    public void setRecurrence(PeriodType periodType, int ordinal) {
         Recurrence recurrence = new Recurrence(periodType);
         recurrence.setMultiplier(ordinal);
         setRecurrence(recurrence);
@@ -557,34 +590,36 @@ public class ScheduledAction extends BaseModel{
     /**
      * Sets the recurrence pattern of this scheduled action
      * <p>This also sets the start period of the recurrence object, if there is one</p>
+     *
      * @param recurrence {@link Recurrence} object
      */
     public void setRecurrence(@NonNull Recurrence recurrence) {
         this.mRecurrence = recurrence;
         //if we were parsing XML and parsed the start and end date from the scheduled action first,
         //then use those over the values which might be gotten from the recurrence
-        if (mStartDate > 0){
+        if (mStartDate > 0) {
             mRecurrence.setPeriodStart(new Timestamp(mStartDate));
         } else {
             mStartDate = mRecurrence.getPeriodStart().getTime();
         }
 
-        if (mEndDate > 0){
+        if (mEndDate > 0) {
             mRecurrence.setPeriodEnd(new Timestamp(mEndDate));
-        } else if (mRecurrence.getPeriodEnd() != null){
+        } else if (mRecurrence.getPeriodEnd() != null) {
             mEndDate = mRecurrence.getPeriodEnd().getTime();
         }
     }
 
     /**
      * Creates a ScheduledAction from a Transaction and a period
+     *
      * @param transaction Transaction to be scheduled
-     * @param period Period in milliseconds since Epoch
+     * @param period      Period in milliseconds since Epoch
      * @return Scheduled Action
      * @deprecated Used for parsing legacy backup files. Use {@link Recurrence} instead
      */
     @Deprecated
-    public static ScheduledAction parseScheduledAction(Transaction transaction, long period){
+    public static ScheduledAction parseScheduledAction(Transaction transaction, long period) {
         ScheduledAction scheduledAction = new ScheduledAction(ActionType.TRANSACTION);
         scheduledAction.mActionUID = transaction.getUID();
         Recurrence recurrence = Recurrence.fromLegacyPeriod(period);

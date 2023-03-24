@@ -15,8 +15,11 @@
  */
 package org.gnucash.android.test.unit.export;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import android.database.sqlite.SQLiteDatabase;
-import android.support.annotation.NonNull;
+
+import androidx.annotation.NonNull;
 
 import org.gnucash.android.app.GnuCashApplication;
 import org.gnucash.android.db.BookDbHelper;
@@ -48,9 +51,8 @@ import java.io.IOException;
 import java.util.List;
 import java.util.zip.ZipFile;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-@RunWith(RobolectricTestRunner.class) //package is required so that resources can be found in dev mode
+@RunWith(RobolectricTestRunner.class)
+//package is required so that resources can be found in dev mode
 @Config(sdk = 21,
         packageName = "org.gnucash.android",
         shadows = {ShadowCrashlytics.class, ShadowUserVoice.class})
@@ -73,7 +75,7 @@ public class QifExporterTest {
      * shouldn't create any file.
      */
     @Test
-    public void testWithNoTransactionsToExport_shouldNotCreateAnyFile(){
+    public void testWithNoTransactionsToExport_shouldNotCreateAnyFile() {
         ExportParams exportParameters = new ExportParams(ExportFormat.QIF);
         exportParameters.setExportStartTime(TimestampHelper.getTimestampFromEpochZero());
         exportParameters.setExportTarget(ExportParams.ExportTarget.SD_CARD);
@@ -86,12 +88,12 @@ public class QifExporterTest {
      * Test that QIF files are generated
      */
     @Test
-    public void testGenerateQIFExport(){
+    public void testGenerateQIFExport() {
         AccountsDbAdapter accountsDbAdapter = new AccountsDbAdapter(mDb);
 
         Account account = new Account("Basic Account");
         Transaction transaction = new Transaction("One transaction");
-        transaction.addSplit(new Split(Money.createZeroInstance("EUR"),account.getUID()));
+        transaction.addSplit(new Split(Money.createZeroInstance("EUR"), account.getUID()));
         account.addTransaction(transaction);
 
         accountsDbAdapter.addRecord(account);
@@ -120,7 +122,7 @@ public class QifExporterTest {
 
         Account account = new Account("Basic Account", Commodity.getInstance("EUR"));
         Transaction transaction = new Transaction("One transaction");
-        transaction.addSplit(new Split(Money.createZeroInstance("EUR"),account.getUID()));
+        transaction.addSplit(new Split(Money.createZeroInstance("EUR"), account.getUID()));
         account.addTransaction(transaction);
         accountsDbAdapter.addRecord(account);
 

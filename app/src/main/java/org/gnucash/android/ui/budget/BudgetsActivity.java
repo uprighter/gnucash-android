@@ -17,9 +17,10 @@ package org.gnucash.android.ui.budget;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.support.v4.app.FragmentManager;
-import android.support.v4.app.FragmentTransaction;
 import android.view.View;
+
+import androidx.fragment.app.FragmentManager;
+import androidx.fragment.app.FragmentTransaction;
 
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
@@ -60,9 +61,10 @@ public class BudgetsActivity extends BaseDrawerActivity {
 
     /**
      * Callback when create budget floating action button is clicked
+     *
      * @param view View which was clicked
      */
-    public void onCreateBudgetClick(View view){
+    public void onCreateBudgetClick(View view) {
         Intent addAccountIntent = new Intent(BudgetsActivity.this, FormActivity.class);
         addAccountIntent.setAction(Intent.ACTION_INSERT_OR_EDIT);
         addAccountIntent.putExtra(UxArgument.FORM_TYPE, FormActivity.FormType.BUDGET.name());
@@ -71,10 +73,11 @@ public class BudgetsActivity extends BaseDrawerActivity {
 
     /**
      * Returns a color between red and green depending on the value parameter
+     *
      * @param value Value between 0 and 1 indicating the red to green ratio
      * @return Color between red and green
      */
-    public static int getBudgetProgressColor(double value){
-        return GnuCashApplication.darken(android.graphics.Color.HSVToColor(new float[]{(float)value*120f,1f,1f}));
+    public static int getBudgetProgressColor(double value) {
+        return GnuCashApplication.darken(android.graphics.Color.HSVToColor(new float[]{(float) value * 120f, 1f, 1f}));
     }
 }

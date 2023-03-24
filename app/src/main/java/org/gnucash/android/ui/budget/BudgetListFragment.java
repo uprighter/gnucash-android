@@ -22,17 +22,6 @@ import android.content.Intent;
 import android.content.res.Configuration;
 import android.database.Cursor;
 import android.os.Bundle;
-import android.support.annotation.Nullable;
-import android.support.v4.app.Fragment;
-import android.support.v4.app.FragmentManager;
-import android.support.v4.app.FragmentTransaction;
-import android.support.v4.app.LoaderManager;
-import android.support.v4.content.Loader;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.GridLayoutManager;
-import android.support.v7.widget.LinearLayoutManager;
-import android.support.v7.widget.PopupMenu;
-import android.support.v7.widget.RecyclerView;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.MenuInflater;
@@ -43,6 +32,18 @@ import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.PopupMenu;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentManager;
+import androidx.fragment.app.FragmentTransaction;
+import androidx.loader.app.LoaderManager;
+import androidx.loader.content.Loader;
+import androidx.recyclerview.widget.GridLayoutManager;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import org.gnucash.android.R;
 import org.gnucash.android.db.DatabaseCursorLoader;
@@ -79,8 +80,10 @@ public class BudgetListFragment extends Fragment implements Refreshable,
 
     private BudgetsDbAdapter mBudgetsDbAdapter;
 
-    @BindView(R.id.budget_recycler_view) EmptyRecyclerView mRecyclerView;
-    @BindView(R.id.empty_view) Button mProposeBudgets;
+    @BindView(R.id.budget_recycler_view)
+    EmptyRecyclerView mRecyclerView;
+    @BindView(R.id.empty_view)
+    Button mProposeBudgets;
 
     @Nullable
     @Override
@@ -137,7 +140,7 @@ public class BudgetListFragment extends Fragment implements Refreshable,
         super.onResume();
         refresh();
         getActivity().findViewById(R.id.fab_create_budget).setVisibility(View.VISIBLE);
-        ((AppCompatActivity)getActivity()).getSupportActionBar().setTitle("Budgets");
+        ((AppCompatActivity) getActivity()).getSupportActionBar().setTitle("Budgets");
     }
 
     @Override
@@ -148,6 +151,7 @@ public class BudgetListFragment extends Fragment implements Refreshable,
     /**
      * This method does nothing with the GUID.
      * Is equivalent to calling {@link #refresh()}
+     *
      * @param uid GUID of relevant item to be refreshed
      */
     @Override
@@ -157,9 +161,10 @@ public class BudgetListFragment extends Fragment implements Refreshable,
 
     /**
      * Opens the budget detail fragment
+     *
      * @param budgetUID GUID of budget
      */
-    public void onClickBudget(String budgetUID){
+    public void onClickBudget(String budgetUID) {
         FragmentManager fragmentManager = getActivity().getSupportFragmentManager();
         FragmentTransaction fragmentTransaction = fragmentManager
                 .beginTransaction();
@@ -171,9 +176,10 @@ public class BudgetListFragment extends Fragment implements Refreshable,
 
     /**
      * Launches the FormActivity for editing the budget
+     *
      * @param budgetId Db record Id of the budget
      */
-    private void editBudget(long budgetId){
+    private void editBudget(long budgetId) {
         Intent addAccountIntent = new Intent(getActivity(), FormActivity.class);
         addAccountIntent.setAction(Intent.ACTION_INSERT_OR_EDIT);
         addAccountIntent.putExtra(UxArgument.FORM_TYPE, FormActivity.FormType.BUDGET.name());
@@ -183,21 +189,22 @@ public class BudgetListFragment extends Fragment implements Refreshable,
 
     /**
      * Delete the budget from the database
+     *
      * @param budgetId Database record ID
      */
-    private void deleteBudget(long budgetId){
+    private void deleteBudget(long budgetId) {
         BudgetsDbAdapter.getInstance().deleteRecord(budgetId);
         refresh();
     }
 
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (resultCode == Activity.RESULT_OK){
+        if (resultCode == Activity.RESULT_OK) {
             refresh();
         }
     }
 
-    class BudgetRecyclerAdapter extends CursorRecyclerAdapter<BudgetRecyclerAdapter.BudgetViewHolder>{
+    class BudgetRecyclerAdapter extends CursorRecyclerAdapter<BudgetRecyclerAdapter.BudgetViewHolder> {
 
         public BudgetRecyclerAdapter(Cursor cursor) {
             super(cursor);
@@ -213,7 +220,7 @@ public class BudgetListFragment extends Fragment implements Refreshable,
             AccountsDbAdapter accountsDbAdapter = AccountsDbAdapter.getInstance();
             String accountString;
             int numberOfAccounts = budget.getNumberOfAccounts();
-            if (numberOfAccounts == 1){
+            if (numberOfAccounts == 1) {
                 accountString = accountsDbAdapter.getAccountFullName(budget.getBudgetAmounts().get(0).getAccountUID());
             } else {
                 accountString = numberOfAccounts + " budgeted accounts";
@@ -237,7 +244,7 @@ public class BudgetListFragment extends Fragment implements Refreshable,
             holder.budgetAmount.setText(usedAmount);
 
             double budgetProgress = spentAmountValue.divide(budgetTotal.asBigDecimal(),
-                    commodity.getSmallestFractionDigits(), RoundingMode.HALF_EVEN)
+                            commodity.getSmallestFractionDigits(), RoundingMode.HALF_EVEN)
                     .doubleValue();
             holder.budgetIndicator.setProgress((int) (budgetProgress * 100));
 
@@ -259,13 +266,19 @@ public class BudgetListFragment extends Fragment implements Refreshable,
             return new BudgetViewHolder(v);
         }
 
-        class BudgetViewHolder extends RecyclerView.ViewHolder implements PopupMenu.OnMenuItemClickListener{
-            @BindView(R.id.primary_text)        TextView budgetName;
-            @BindView(R.id.secondary_text)      TextView accountName;
-            @BindView(R.id.budget_amount)       TextView budgetAmount;
-            @BindView(R.id.options_menu)        ImageView optionsMenu;
-            @BindView(R.id.budget_indicator)    ProgressBar budgetIndicator;
-            @BindView(R.id.budget_recurrence)   TextView budgetRecurrence;
+        class BudgetViewHolder extends RecyclerView.ViewHolder implements PopupMenu.OnMenuItemClickListener {
+            @BindView(R.id.primary_text)
+            TextView budgetName;
+            @BindView(R.id.secondary_text)
+            TextView accountName;
+            @BindView(R.id.budget_amount)
+            TextView budgetAmount;
+            @BindView(R.id.options_menu)
+            ImageView optionsMenu;
+            @BindView(R.id.budget_indicator)
+            ProgressBar budgetIndicator;
+            @BindView(R.id.budget_recurrence)
+            TextView budgetRecurrence;
             long budgetId;
 
             public BudgetViewHolder(View itemView) {
@@ -275,7 +288,7 @@ public class BudgetListFragment extends Fragment implements Refreshable,
                 optionsMenu.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
-                        android.support.v7.widget.PopupMenu popup = new android.support.v7.widget.PopupMenu(getActivity(), v);
+                        PopupMenu popup = new PopupMenu(getActivity(), v);
                         popup.setOnMenuItemClickListener(BudgetViewHolder.this);
                         MenuInflater inflater = popup.getMenuInflater();
                         inflater.inflate(R.menu.budget_context_menu, popup.getMenu());
@@ -287,7 +300,7 @@ public class BudgetListFragment extends Fragment implements Refreshable,
 
             @Override
             public boolean onMenuItemClick(MenuItem item) {
-                switch (item.getItemId()){
+                switch (item.getItemId()) {
                     case R.id.context_menu_edit_budget:
                         editBudget(budgetId);
                         return true;

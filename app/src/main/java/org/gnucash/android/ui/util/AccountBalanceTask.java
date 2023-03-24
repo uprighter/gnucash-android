@@ -21,7 +21,7 @@ import android.os.AsyncTask;
 import android.util.Log;
 import android.widget.TextView;
 
-import com.crashlytics.android.Crashlytics;
+import com.google.firebase.crashlytics.FirebaseCrashlytics;
 
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.model.Money;
@@ -40,7 +40,7 @@ public class AccountBalanceTask extends AsyncTask<String, Void, Money> {
     private final WeakReference<TextView> accountBalanceTextViewReference;
     private final AccountsDbAdapter accountsDbAdapter;
 
-    public AccountBalanceTask(TextView balanceTextView){
+    public AccountBalanceTask(TextView balanceTextView) {
         accountBalanceTextViewReference = new WeakReference<>(balanceTextView);
         accountsDbAdapter = AccountsDbAdapter.getInstance();
     }
@@ -48,7 +48,7 @@ public class AccountBalanceTask extends AsyncTask<String, Void, Money> {
     @Override
     protected Money doInBackground(String... params) {
         //if the view for which we are doing this job is dead, kill the job as well
-        if (accountBalanceTextViewReference.get() == null){
+        if (accountBalanceTextViewReference.get() == null) {
             cancel(true);
             return Money.getZeroInstance();
         }
@@ -58,16 +58,16 @@ public class AccountBalanceTask extends AsyncTask<String, Void, Money> {
             balance = accountsDbAdapter.getAccountBalance(params[0], -1, -1);
         } catch (Exception ex) {
             Log.e(LOG_TAG, "Error computing account balance ", ex);
-            Crashlytics.logException(ex);
+            FirebaseCrashlytics.getInstance().recordException(ex);
         }
         return balance;
     }
 
     @Override
     protected void onPostExecute(Money balance) {
-        if (accountBalanceTextViewReference.get() != null && balance != null){
+        if (accountBalanceTextViewReference.get() != null && balance != null) {
             final TextView balanceTextView = accountBalanceTextViewReference.get();
-            if (balanceTextView != null){
+            if (balanceTextView != null) {
                 TransactionsActivity.displayBalance(balanceTextView, balance);
             }
         }

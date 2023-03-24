@@ -15,18 +15,21 @@
  */
 package org.gnucash.android.ui.report;
 
+import static com.github.mikephil.charting.components.Legend.LegendPosition;
+
 import android.content.res.ColorStateList;
 import android.os.Build;
 import android.os.Bundle;
-import android.support.annotation.Nullable;
-import android.support.v4.app.FragmentManager;
-import android.support.v4.content.ContextCompat;
-import android.support.v4.view.ViewCompat;
-import android.support.v7.widget.AppCompatButton;
 import android.view.Menu;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
+
+import androidx.annotation.Nullable;
+import androidx.appcompat.widget.AppCompatButton;
+import androidx.core.content.ContextCompat;
+import androidx.core.view.ViewCompat;
+import androidx.fragment.app.FragmentManager;
 
 import com.github.mikephil.charting.charts.PieChart;
 import com.github.mikephil.charting.components.Legend;
@@ -54,25 +57,32 @@ import java.util.List;
 import butterknife.BindView;
 import butterknife.OnClick;
 
-import static com.github.mikephil.charting.components.Legend.LegendPosition;
-
 /**
  * Shows a summary of reports
+ *
  * @author Ngewi Fet <ngewif@gmail.com>
  */
 public class ReportsOverviewFragment extends BaseReportFragment {
 
     public static final int LEGEND_TEXT_SIZE = 14;
 
-    @BindView(R.id.btn_pie_chart) Button mPieChartButton;
-    @BindView(R.id.btn_bar_chart) Button mBarChartButton;
-    @BindView(R.id.btn_line_chart) Button mLineChartButton;
-    @BindView(R.id.btn_balance_sheet) Button mBalanceSheetButton;
+    @BindView(R.id.btn_pie_chart)
+    Button mPieChartButton;
+    @BindView(R.id.btn_bar_chart)
+    Button mBarChartButton;
+    @BindView(R.id.btn_line_chart)
+    Button mLineChartButton;
+    @BindView(R.id.btn_balance_sheet)
+    Button mBalanceSheetButton;
 
-    @BindView(R.id.pie_chart) PieChart mChart;
-    @BindView(R.id.total_assets) TextView mTotalAssets;
-    @BindView(R.id.total_liabilities) TextView mTotalLiabilities;
-    @BindView(R.id.net_worth) TextView mNetWorth;
+    @BindView(R.id.pie_chart)
+    PieChart mChart;
+    @BindView(R.id.total_assets)
+    TextView mTotalAssets;
+    @BindView(R.id.total_liabilities)
+    TextView mTotalLiabilities;
+    @BindView(R.id.net_worth)
+    TextView mNetWorth;
 
     private AccountsDbAdapter mAccountsDbAdapter;
     private Money mAssetsBalance;
@@ -173,6 +183,7 @@ public class ReportsOverviewFragment extends BaseReportFragment {
 
     /**
      * Returns {@code PieData} instance with data entries, colors and labels
+     *
      * @return {@code PieData} instance
      */
     private PieData getData() {
@@ -204,7 +215,7 @@ public class ReportsOverviewFragment extends BaseReportFragment {
 
     @Override
     protected void displayReport() {
-        if (mChartHasData){
+        if (mChartHasData) {
             mChart.animateXY(1800, 1800);
             mChart.setTouchEnabled(true);
         } else {
@@ -220,6 +231,7 @@ public class ReportsOverviewFragment extends BaseReportFragment {
 
     /**
      * Returns a data object that represents situation when no user data available
+     *
      * @return a {@code PieData} instance for situation when no user data available
      */
     private PieData getEmptyData() {
@@ -231,9 +243,9 @@ public class ReportsOverviewFragment extends BaseReportFragment {
     }
 
     @OnClick({R.id.btn_bar_chart, R.id.btn_pie_chart, R.id.btn_line_chart, R.id.btn_balance_sheet})
-    public void onClickChartTypeButton(View view){
+    public void onClickChartTypeButton(View view) {
         BaseReportFragment fragment;
-        switch (view.getId()){
+        switch (view.getId()) {
             case R.id.btn_pie_chart:
                 fragment = new PieChartFragment();
                 break;

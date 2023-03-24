@@ -28,31 +28,32 @@ import android.database.ContentObserver;
 import android.database.Cursor;
 import android.database.DataSetObserver;
 import android.os.Handler;
-import android.support.v7.widget.RecyclerView;
 import android.widget.Filter;
 import android.widget.FilterQueryProvider;
 import android.widget.Filterable;
 
+import androidx.cursoradapter.widget.CursorAdapter;
+import androidx.recyclerview.widget.RecyclerView;
+
 /**
- * Provide a {@link android.support.v7.widget.RecyclerView.Adapter} implementation with cursor
+ * Provide a {@link RecyclerView.Adapter} implementation with cursor
  * support.
- *
+ * <p>
  * Child classes only need to implement {@link #onCreateViewHolder(android.view.ViewGroup, int)} and
- * {@link #onBindViewHolderCursor(android.support.v7.widget.RecyclerView.ViewHolder, android.database.Cursor)}.
- *
+ * {@link #onBindViewHolderCursor(RecyclerView.ViewHolder, android.database.Cursor)}.
+ * <p>
  * This class does not implement deprecated fields and methods from CursorAdapter! Incidentally,
- * only {@link android.widget.CursorAdapter#FLAG_REGISTER_CONTENT_OBSERVER} is available, so the
+ * only {@link CursorAdapter#FLAG_REGISTER_CONTENT_OBSERVER} is available, so the
  * flag is implied, and only the Adapter behavior using this flag has been ported.
  *
  * @param <VH> {@inheritDoc}
- *
- * @see android.support.v7.widget.RecyclerView.Adapter
- * @see android.widget.CursorAdapter
- * @see android.widget.Filterable
+ * @see RecyclerView.Adapter
+ * @see CursorAdapter
+ * @see Filterable
  * @see CursorFilter.CursorFilterClient
  */
 public abstract class CursorRecyclerAdapter<VH
-        extends android.support.v7.widget.RecyclerView.ViewHolder> extends RecyclerView.Adapter<VH>
+        extends RecyclerView.ViewHolder> extends RecyclerView.Adapter<VH>
         implements Filterable, CursorFilter.CursorFilterClient {
     private boolean mDataValid;
     private int mRowIDColumn;
@@ -62,7 +63,7 @@ public abstract class CursorRecyclerAdapter<VH
     private CursorFilter mCursorFilter;
     private FilterQueryProvider mFilterQueryProvider;
 
-    public CursorRecyclerAdapter( Cursor cursor) {
+    public CursorRecyclerAdapter(Cursor cursor) {
         init(cursor);
     }
 
@@ -83,14 +84,14 @@ public abstract class CursorRecyclerAdapter<VH
 
     /**
      * This method will move the Cursor to the correct position and call
-     * {@link #onBindViewHolderCursor(android.support.v7.widget.RecyclerView.ViewHolder,
+     * {@link #onBindViewHolderCursor(RecyclerView.ViewHolder,
      * android.database.Cursor)}.
      *
      * @param holder {@inheritDoc}
-     * @param i {@inheritDoc}
+     * @param i      {@inheritDoc}
      */
     @Override
-    public void onBindViewHolder(VH holder, int i){
+    public void onBindViewHolder(VH holder, int i) {
         if (!mDataValid) {
             throw new IllegalStateException("this should only be called when the cursor is valid");
         }
@@ -103,11 +104,11 @@ public abstract class CursorRecyclerAdapter<VH
     /**
      * See {@link android.widget.CursorAdapter#bindView(android.view.View, android.content.Context,
      * android.database.Cursor)},
-     * {@link #onBindViewHolder(android.support.v7.widget.RecyclerView.ViewHolder, int)}
+     * {@link #onBindViewHolder(RecyclerView.ViewHolder, int)}
      *
      * @param holder View holder.
      * @param cursor The cursor from which to get the data. The cursor is already
-     * moved to the correct position.
+     *               moved to the correct position.
      */
     public abstract void onBindViewHolderCursor(VH holder, Cursor cursor);
 
@@ -136,7 +137,7 @@ public abstract class CursorRecyclerAdapter<VH
         }
     }
 
-    public Cursor getCursor(){
+    public Cursor getCursor() {
         return mCursor;
     }
 
@@ -206,24 +207,22 @@ public abstract class CursorRecyclerAdapter<VH
     /**
      * Runs a query with the specified constraint. This query is requested
      * by the filter attached to this adapter.
-     *
+     * <p>
      * The query is provided by a
      * {@link android.widget.FilterQueryProvider}.
      * If no provider is specified, the current cursor is not filtered and returned.
-     *
+     * <p>
      * After this method returns the resulting cursor is passed to {@link #changeCursor(Cursor)}
      * and the previous cursor is closed.
-     *
+     * <p>
      * This method is always executed on a background thread, not on the
      * application's main thread (or UI thread.)
-     *
+     * <p>
      * Contract: when constraint is null or empty, the original results,
      * prior to any filtering, must be returned.
      *
      * @param constraint the constraint with which the query must be filtered
-     *
      * @return a Cursor representing the results of the new query
-     *
      * @see #getFilter()
      * @see #getFilterQueryProvider()
      * @see #setFilterQueryProvider(android.widget.FilterQueryProvider)
@@ -248,7 +247,6 @@ public abstract class CursorRecyclerAdapter<VH
      * provider is null, no filtering occurs.
      *
      * @return the current filter query provider or null if it does not exist
-     *
      * @see #setFilterQueryProvider(android.widget.FilterQueryProvider)
      * @see #runQueryOnBackgroundThread(CharSequence)
      */
@@ -264,7 +262,6 @@ public abstract class CursorRecyclerAdapter<VH
      * this adapter.
      *
      * @param filterQueryProvider the filter query provider or null to remove it
-     *
      * @see #getFilterQueryProvider()
      * @see #runQueryOnBackgroundThread(CharSequence)
      */
@@ -328,8 +325,11 @@ class CursorFilter extends Filter {
 
     interface CursorFilterClient {
         CharSequence convertToString(Cursor cursor);
+
         Cursor runQueryOnBackgroundThread(CharSequence constraint);
+
         Cursor getCursor();
+
         void changeCursor(Cursor cursor);
     }
 

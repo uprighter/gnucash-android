@@ -17,23 +17,24 @@ public class StethoUtils {
      * Sets up Stetho to enable remote debugging from Chrome developer tools.
      *
      * <p>Among other things, allows access to the database and preferences.
-     * See http://facebook.github.io/stetho/#features</p>
+     * See <a href="http://facebook.github.io/stetho/#features">stetho</a></p>
      */
-    public static void install(Application application){
+    public static void install(Application application) {
         //don't initialize stetho during tests
         if (!BuildConfig.DEBUG || isRoboUnitTest())
             return;
 
         Stetho.initialize(Stetho.newInitializerBuilder(application)
-                        .enableWebKitInspector(Stetho.defaultInspectorModulesProvider(application))
-                        .build());
+                .enableWebKitInspector(Stetho.defaultInspectorModulesProvider(application))
+                .build());
     }
 
     /**
      * Returns {@code true} if the app is being run by robolectric
+     *
      * @return {@code true} if in unit testing, {@code false} otherwise
      */
-    private static boolean isRoboUnitTest(){
+    private static boolean isRoboUnitTest() {
         return "robolectric".equals(Build.FINGERPRINT);
     }
 }

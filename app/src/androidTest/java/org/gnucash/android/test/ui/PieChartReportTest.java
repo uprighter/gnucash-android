@@ -16,17 +16,25 @@
 
 package org.gnucash.android.test.ui;
 
+import static androidx.test.espresso.Espresso.onView;
+import static androidx.test.espresso.action.ViewActions.click;
+import static androidx.test.espresso.assertion.ViewAssertions.matches;
+import static androidx.test.espresso.matcher.ViewMatchers.withId;
+import static androidx.test.espresso.matcher.ViewMatchers.withText;
+import static org.assertj.core.api.Assertions.assertThat;
+
 import android.Manifest;
 import android.content.Context;
-import android.support.test.espresso.ViewAction;
-import android.support.test.espresso.action.CoordinatesProvider;
-import android.support.test.espresso.action.GeneralClickAction;
-import android.support.test.espresso.action.Press;
-import android.support.test.espresso.action.Tap;
-import android.support.test.rule.ActivityTestRule;
-import android.support.test.rule.GrantPermissionRule;
-import android.support.test.runner.AndroidJUnit4;
 import android.view.View;
+
+import androidx.test.espresso.ViewAction;
+import androidx.test.espresso.action.CoordinatesProvider;
+import androidx.test.espresso.action.GeneralClickAction;
+import androidx.test.espresso.action.Press;
+import androidx.test.espresso.action.Tap;
+import androidx.test.rule.ActivityTestRule;
+import androidx.test.rule.GrantPermissionRule;
+import androidx.test.runner.AndroidJUnit4;
 
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
@@ -60,13 +68,6 @@ import org.junit.runner.RunWith;
 
 import java.math.BigDecimal;
 import java.util.Locale;
-
-import static android.support.test.espresso.Espresso.onView;
-import static android.support.test.espresso.action.ViewActions.click;
-import static android.support.test.espresso.assertion.ViewAssertions.matches;
-import static android.support.test.espresso.matcher.ViewMatchers.withId;
-import static android.support.test.espresso.matcher.ViewMatchers.withText;
-import static org.assertj.core.api.Assertions.assertThat;
 
 @RunWith(AndroidJUnit4.class)
 public class PieChartReportTest {
@@ -103,7 +104,8 @@ public class PieChartReportTest {
     @Rule
     public ActivityTestRule<ReportsActivity> mActivityRule = new ActivityTestRule<>(ReportsActivity.class);
 
-    @Rule public GrantPermissionRule animationPermissionsRule = GrantPermissionRule.grant(Manifest.permission.SET_ANIMATION_SCALE);
+    @Rule
+    public GrantPermissionRule animationPermissionsRule = GrantPermissionRule.grant(Manifest.permission.SET_ANIMATION_SCALE);
 
     @ClassRule
     public static DisableAnimationsRule disableAnimationsRule = new DisableAnimationsRule();
@@ -115,7 +117,7 @@ public class PieChartReportTest {
     public PieChartReportTest() {
         //nothing to se here, move along
         CURRENCY = new Commodity("US Dollars", "USD", 100);
-	}
+    }
 
     @BeforeClass
     public static void prepareTestCase() throws Exception {
@@ -133,18 +135,19 @@ public class PieChartReportTest {
                 .putString(context.getString(R.string.key_default_currency), CURRENCY.getCurrencyCode())
                 .commit();
     }
-	
 
-	@Before
-	public void setUp() throws Exception {
+
+    @Before
+    public void setUp() throws Exception {
         mTransactionsDbAdapter.deleteAllRecords();
         mReportsActivity = mActivityRule.getActivity();
         assertThat(mAccountsDbAdapter.getRecordsCount()).isGreaterThan(20); //lots of accounts in the default
         onView(withId(R.id.btn_pie_chart)).perform(click());
-	}
+    }
 
     /**
      * Add a transaction for the current month in order to test the report view
+     *
      * @throws Exception
      */
     private void addTransactionForCurrentMonth() throws Exception {
@@ -162,6 +165,7 @@ public class PieChartReportTest {
 
     /**
      * Add a transactions for the previous month for testing pie chart
+     *
      * @param minusMonths Number of months prior
      */
     private void addTransactionForPreviousMonth(int minusMonths) {
@@ -222,7 +226,7 @@ public class PieChartReportTest {
         onView(withId(R.id.selected_chart_slice)).check(matches(withText(R.string.label_select_pie_slice_to_see_details)));
     }
 
-    public static ViewAction clickXY(final Position horizontal, final Position vertical){
+    public static ViewAction clickXY(final Position horizontal, final Position vertical) {
         return new GeneralClickAction(
                 Tap.SINGLE,
                 new CoordinatesProvider() {
@@ -265,7 +269,7 @@ public class PieChartReportTest {
     /**
      * Refresh reports
      */
-    private void refreshReport(){
+    private void refreshReport() {
         try {
             mActivityRule.runOnUiThread(new Runnable() {
                 @Override
@@ -273,18 +277,18 @@ public class PieChartReportTest {
                     mReportsActivity.refresh();
                 }
             });
-        } catch (Throwable t){
+        } catch (Throwable t) {
             System.err.println("Faile to refresh reports");
         }
     }
 
-	@After
-	public void tearDown() throws Exception {
-		mReportsActivity.finish();
-	}
+    @After
+    public void tearDown() throws Exception {
+        mReportsActivity.finish();
+    }
 
     @AfterClass
-    public static void cleanup(){
+    public static void cleanup() {
         BooksDbAdapter booksDbAdapter = BooksDbAdapter.getInstance();
         booksDbAdapter.setActive(oldActiveBookUID);
         booksDbAdapter.deleteRecord(testBookUID);

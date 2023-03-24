@@ -11,7 +11,7 @@ import java.util.Arrays;
 
 /**
  * Created by Ngewi on 19.04.2016.
- * Credit: https://product.reverb.com/2015/06/06/disabling-animations-in-espresso-for-android-testing/
+ * Credit: <a href="https://product.reverb.com/2015/06/06/disabling-animations-in-espresso-for-android-testing/">reverb.com</a>
  */
 public class DisableAnimationsRule implements TestRule {
     private Method mSetAnimationScalesMethod;
@@ -33,8 +33,7 @@ public class DisableAnimationsRule implements TestRule {
 
             IBinder windowManagerBinder = (IBinder) getService.invoke(null, "window");
             mWindowManagerObject = asInterface.invoke(null, windowManagerBinder);
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             throw new RuntimeException("Failed to access animation methods", e);
         }
     }
@@ -45,8 +44,11 @@ public class DisableAnimationsRule implements TestRule {
             @Override
             public void evaluate() throws Throwable {
                 setAnimationScaleFactors(0.0f);
-                try { statement.evaluate(); }
-                finally { setAnimationScaleFactors(1.0f); }
+                try {
+                    statement.evaluate();
+                } finally {
+                    setAnimationScaleFactors(1.0f);
+                }
             }
         };
     }

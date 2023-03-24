@@ -16,6 +16,8 @@
 
 package org.gnucash.android.test.unit.model;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import org.gnucash.android.model.PeriodType;
 import org.gnucash.android.model.Recurrence;
 import org.joda.time.DateTime;
@@ -23,15 +25,13 @@ import org.junit.Test;
 
 import java.sql.Timestamp;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
 /**
  * Test {@link Recurrence}s
  */
 public class RecurrenceTest {
 
     @Test
-    public void settingCount_shouldComputeCorrectEndTime(){
+    public void settingCount_shouldComputeCorrectEndTime() {
         Recurrence recurrence = new Recurrence(PeriodType.MONTH);
 
         DateTime startTime = new DateTime(2015, 10, 5, 0, 0);
@@ -46,7 +46,7 @@ public class RecurrenceTest {
      * When the end date of a recurrence is set, we should be able to correctly get the number of occurrences
      */
     @Test
-    public void testRecurrenceCountComputation(){
+    public void testRecurrenceCountComputation() {
         Recurrence recurrence = new Recurrence(PeriodType.MONTH);
 
         DateTime start = new DateTime(2015, 10, 5, 0, 0);
@@ -73,7 +73,7 @@ public class RecurrenceTest {
     /**
      * When no end period is set, getCount() should return the special value -1.
      *
-     * <p>Tests for bug https://github.com/codinguser/gnucash-android/issues/526</p>
+     * <p>Tests for bug <a href="https://github.com/codinguser/gnucash-android/issues/526">codinguser/gnucash-android#526</a></p>
      */
     @Test
     public void notSettingEndDate_shouldReturnSpecialCountValue() {

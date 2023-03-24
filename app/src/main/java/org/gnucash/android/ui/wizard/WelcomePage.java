@@ -16,7 +16,7 @@
 
 package org.gnucash.android.ui.wizard;
 
-import android.support.v4.app.Fragment;
+import androidx.fragment.app.Fragment;
 
 import com.tech.freak.wizardpager.model.ModelCallbacks;
 import com.tech.freak.wizardpager.model.Page;
@@ -26,6 +26,7 @@ import java.util.ArrayList;
 
 /**
  * Welcome page for the first run wizard
+ *
  * @author Ngewi Fet
  */
 public class WelcomePage extends Page {

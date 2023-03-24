@@ -21,16 +21,6 @@ import android.content.DialogInterface;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
-import android.support.annotation.Nullable;
-import android.support.v4.app.ListFragment;
-import android.support.v4.app.LoaderManager;
-import android.support.v4.content.ContextCompat;
-import android.support.v4.content.Loader;
-import android.support.v4.widget.SimpleCursorAdapter;
-import android.support.v7.app.ActionBar;
-import android.support.v7.app.AlertDialog;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.PopupMenu;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -42,6 +32,17 @@ import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.TextView;
+
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.PopupMenu;
+import androidx.core.content.ContextCompat;
+import androidx.cursoradapter.widget.SimpleCursorAdapter;
+import androidx.fragment.app.ListFragment;
+import androidx.loader.app.LoaderManager;
+import androidx.loader.content.Loader;
 
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
@@ -64,7 +65,7 @@ import java.sql.Timestamp;
  * Fragment for managing the books in the database
  */
 public class BookManagerFragment extends ListFragment implements
-        LoaderManager.LoaderCallbacks<Cursor>, Refreshable{
+        LoaderManager.LoaderCallbacks<Cursor>, Refreshable {
 
     private static final String LOG_TAG = "BookManagerFragment";
 
@@ -113,7 +114,7 @@ public class BookManagerFragment extends ListFragment implements
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        switch (item.getItemId()){
+        switch (item.getItemId()) {
             case R.id.menu_create_book:
                 AccountsActivity.createDefaultAccounts(GnuCashApplication.getDefaultCurrencyCode(), getActivity());
                 return true;
@@ -226,34 +227,35 @@ public class BookManagerFragment extends ListFragment implements
 
         /**
          * Opens a dialog for renaming a book
+         *
          * @param bookName Current name of the book
-         * @param bookUID GUID of the book
+         * @param bookUID  GUID of the book
          * @return {@code true}
          */
         private boolean handleMenuRenameBook(String bookName, final String bookUID) {
             AlertDialog.Builder dialogBuilder = new AlertDialog.Builder(getActivity());
             dialogBuilder.setTitle(R.string.title_rename_book)
-                .setView(R.layout.dialog_rename_book)
-                .setPositiveButton(R.string.btn_rename, new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        EditText bookTitle = (EditText) ((AlertDialog)dialog).findViewById(R.id.input_book_title);
-                        BooksDbAdapter.getInstance()
-                                .updateRecord(bookUID,
-                                        BookEntry.COLUMN_DISPLAY_NAME,
-                                        bookTitle.getText().toString().trim());
-                        refresh();
-                    }
-                })
-                .setNegativeButton(R.string.btn_cancel, new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        dialog.dismiss();
-                    }
-                });
+                    .setView(R.layout.dialog_rename_book)
+                    .setPositiveButton(R.string.btn_rename, new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            EditText bookTitle = (EditText) ((AlertDialog) dialog).findViewById(R.id.input_book_title);
+                            BooksDbAdapter.getInstance()
+                                    .updateRecord(bookUID,
+                                            BookEntry.COLUMN_DISPLAY_NAME,
+                                            bookTitle.getText().toString().trim());
+                            refresh();
+                        }
+                    })
+                    .setNegativeButton(R.string.btn_cancel, new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            dialog.dismiss();
+                        }
+                    });
             AlertDialog dialog = dialogBuilder.create();
             dialog.show();
-            ((TextView)dialog.findViewById(R.id.input_book_title)).setText(bookName);
+            ((TextView) dialog.findViewById(R.id.input_book_title)).setText(bookName);
             return true;
         }
 
@@ -283,8 +285,8 @@ public class BookManagerFragment extends ListFragment implements
             TextView statsText = (TextView) view.findViewById(R.id.secondary_text);
             statsText.setText(stats);
 
-            if (bookUID.equals(BooksDbAdapter.getInstance().getActiveBookUID())){
-                ((TextView)view.findViewById(R.id.primary_text))
+            if (bookUID.equals(BooksDbAdapter.getInstance().getActiveBookUID())) {
+                ((TextView) view.findViewById(R.id.primary_text))
                         .setTextColor(ContextCompat.getColor(getContext(), R.color.theme_primary));
             }
         }
@@ -292,10 +294,11 @@ public class BookManagerFragment extends ListFragment implements
 
     /**
      * {@link DatabaseCursorLoader} for loading the book list from the database
+     *
      * @author Ngewi Fet <ngewif@gmail.com>
      */
     private static class BooksCursorLoader extends DatabaseCursorLoader {
-        BooksCursorLoader(Context context){
+        BooksCursorLoader(Context context) {
             super(context);
         }
 

@@ -16,10 +16,15 @@
  */
 package org.gnucash.android.export.qif;
 
+import static org.gnucash.android.db.DatabaseSchema.AccountEntry;
+import static org.gnucash.android.db.DatabaseSchema.SplitEntry;
+import static org.gnucash.android.db.DatabaseSchema.TransactionEntry;
+
 import android.content.ContentValues;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
-import android.support.annotation.NonNull;
+
+import androidx.annotation.NonNull;
 
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.db.adapter.TransactionsDbAdapter;
@@ -44,33 +49,31 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 
-import static org.gnucash.android.db.DatabaseSchema.AccountEntry;
-import static org.gnucash.android.db.DatabaseSchema.SplitEntry;
-import static org.gnucash.android.db.DatabaseSchema.TransactionEntry;
-
 /**
  * Exports the accounts and transactions in the database to the QIF format
  *
  * @author Ngewi Fet <ngewif@gmail.com>
  * @author Yongxin Wang <fefe.wyx@gmail.com>
  */
-public class QifExporter extends Exporter{
+public class QifExporter extends Exporter {
 
     /**
      * Initialize the exporter
+     *
      * @param params Export options
      */
-    public QifExporter(ExportParams params){
+    public QifExporter(ExportParams params) {
         super(params, null);
         LOG_TAG = "QifExporter";
     }
 
     /**
      * Initialize the exporter
+     *
      * @param params Options for export
-     * @param db SQLiteDatabase to export
+     * @param db     SQLiteDatabase to export
      */
-    public QifExporter(ExportParams params, SQLiteDatabase db){
+    public QifExporter(ExportParams params, SQLiteDatabase db) {
         super(params, db);
         LOG_TAG = "QifExporter";
     }
@@ -111,8 +114,8 @@ public class QifExporter extends Exporter{
                     null,
                     // trans_time ASC : put transactions in time order
                     // trans_uid ASC  : put splits from the same transaction together
-                   "acct1_currency ASC, trans_time ASC, trans_uid ASC"
-                    );
+                    "acct1_currency ASC, trans_time ASC, trans_uid ASC"
+            );
 
             File file = new File(getExportCacheFilePath());
             BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file), "UTF-8"));
@@ -223,7 +226,7 @@ public class QifExporter extends Exporter{
                             precision = 6;
                             break;
                         default:
-                            throw new ExporterException(mExportParams, "split quantity has illegal denominator: "+ quantity_denom);
+                            throw new ExporterException(mExportParams, "split quantity has illegal denominator: " + quantity_denom);
                     }
                     Double quantity = 0.0;
                     if (quantity_denom != 0) {
@@ -313,9 +316,10 @@ public class QifExporter extends Exporter{
 
     /**
      * Returns the mime type for this Exporter.
+     *
      * @return MIME type as string
      */
-    public String getExportMimeType(){
+    public String getExportMimeType() {
         return "text/plain";
     }
 }

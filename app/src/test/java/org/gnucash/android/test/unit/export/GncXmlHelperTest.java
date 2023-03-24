@@ -16,15 +16,14 @@
 
 package org.gnucash.android.test.unit.export;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import org.gnucash.android.export.xml.GncXmlHelper;
 import org.gnucash.android.model.Commodity;
 import org.junit.Test;
 
 import java.math.BigDecimal;
 import java.text.ParseException;
-import java.util.Currency;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Test the helper methods used for generating GnuCash XML
@@ -50,7 +49,7 @@ public class GncXmlHelperTest {
     }
 
     @Test
-    public void testFormatSplitAmount(){
+    public void testFormatSplitAmount() {
         Commodity usdCommodity = new Commodity("US Dollars", "USD", 100);
         Commodity euroCommodity = new Commodity("Euro", "EUR", 100);
 

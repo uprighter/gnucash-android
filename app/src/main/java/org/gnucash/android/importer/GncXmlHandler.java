@@ -18,10 +18,11 @@
 package org.gnucash.android.importer;
 
 import android.database.sqlite.SQLiteDatabase;
-import android.support.annotation.NonNull;
 import android.util.Log;
 
-import com.crashlytics.android.Crashlytics;
+import androidx.annotation.NonNull;
+
+import com.google.firebase.crashlytics.FirebaseCrashlytics;
 
 import org.gnucash.android.app.GnuCashApplication;
 import org.gnucash.android.db.DatabaseHelper;
@@ -81,7 +82,7 @@ public class GncXmlHandler extends DefaultHandler {
     /**
      * ISO 4217 currency code for "No Currency"
      */
-    private static final String NO_CURRENCY_CODE    = "XXX";
+    private static final String NO_CURRENCY_CODE = "XXX";
 
     /**
      * Tag for logging
@@ -219,24 +220,24 @@ public class GncXmlHandler extends DefaultHandler {
     Recurrence mRecurrence;
     BudgetAmount mBudgetAmount;
 
-    boolean mInColorSlot        = false;
-    boolean mInPlaceHolderSlot  = false;
-    boolean mInFavoriteSlot     = false;
-    boolean mISO4217Currency    = false;
-    boolean mIsDatePosted       = false;
-    boolean mIsDateEntered      = false;
-    boolean mIsNote             = false;
+    boolean mInColorSlot = false;
+    boolean mInPlaceHolderSlot = false;
+    boolean mInFavoriteSlot = false;
+    boolean mISO4217Currency = false;
+    boolean mIsDatePosted = false;
+    boolean mIsDateEntered = false;
+    boolean mIsNote = false;
     boolean mInDefaultTransferAccount = false;
-    boolean mInExported         = false;
-    boolean mInTemplates        = false;
+    boolean mInExported = false;
+    boolean mInTemplates = false;
     boolean mInSplitAccountSlot = false;
     boolean mInCreditNumericSlot = false;
     boolean mInDebitNumericSlot = false;
-    boolean mIsScheduledStart   = false;
-    boolean mIsScheduledEnd     = false;
-    boolean mIsLastRun          = false;
-    boolean mIsRecurrenceStart  = false;
-    boolean mInBudgetSlot       = false;
+    boolean mIsScheduledStart = false;
+    boolean mIsScheduledEnd = false;
+    boolean mIsLastRun = false;
+    boolean mIsRecurrenceStart = false;
+    boolean mInBudgetSlot = false;
 
     /**
      * Saves the attribute of the slot tag
@@ -249,7 +250,7 @@ public class GncXmlHandler extends DefaultHandler {
     /**
      * Multiplier for the recurrence period type. e.g. period type of week and multiplier of 2 means bi-weekly
      */
-    int mRecurrenceMultiplier   = 1;
+    int mRecurrenceMultiplier = 1;
 
     /**
      * Flag which says to ignore template transactions until we successfully parse a split amount
@@ -265,6 +266,7 @@ public class GncXmlHandler extends DefaultHandler {
     /**
      * Used for parsing old backup files where recurrence was saved inside the transaction.
      * Newer backup files will not require this
+     *
      * @deprecated Use the new scheduled action elements instead
      */
     @Deprecated
@@ -329,7 +331,7 @@ public class GncXmlHandler extends DefaultHandler {
     @Override
     public void startElement(String uri, String localName,
                              String qualifiedName, Attributes attributes) throws SAXException {
-        switch (qualifiedName){
+        switch (qualifiedName) {
             case GncXmlHelper.TAG_ACCOUNT:
                 mAccount = new Account(""); // dummy name, will be replaced when we find name tag
                 mISO4217Currency = false;
@@ -394,7 +396,7 @@ public class GncXmlHandler extends DefaultHandler {
                 mInBudgetSlot = true;
                 break;
             case GncXmlHelper.TAG_SLOT:
-                if (mInBudgetSlot){
+                if (mInBudgetSlot) {
                     mBudgetAmount = new BudgetAmount(mBudget.getUID(), mBudgetAmountAccountUID);
                 }
                 break;
@@ -432,7 +434,7 @@ public class GncXmlHandler extends DefaultHandler {
                 mAccount.setHidden(accountType == AccountType.ROOT); //flag root account as hidden
                 break;
             case GncXmlHelper.TAG_COMMODITY_SPACE:
-                if (characterString.equals("ISO4217") || characterString.equals("CURRENCY") ) {
+                if (characterString.equals("ISO4217") || characterString.equals("CURRENCY")) {
                     mISO4217Currency = true;
                 } else {
                     // price of non-ISO4217 commodities cannot be handled
@@ -525,10 +527,10 @@ public class GncXmlHandler extends DefaultHandler {
                         mInDebitNumericSlot = true;
                         break;
                 }
-                if (mInBudgetSlot && mBudgetAmountAccountUID == null){
+                if (mInBudgetSlot && mBudgetAmountAccountUID == null) {
                     mBudgetAmountAccountUID = characterString;
                     mBudgetAmount.setAccountUID(characterString);
-                } else if (mInBudgetSlot){
+                } else if (mInBudgetSlot) {
                     mBudgetAmount.setPeriodNum(Long.parseLong(characterString));
                 }
                 break;
@@ -552,7 +554,7 @@ public class GncXmlHandler extends DefaultHandler {
                         } catch (IllegalArgumentException ex) {
                             //sometimes the color entry in the account file is "Not set" instead of just blank. So catch!
                             Log.e(LOG_TAG, "Invalid color code '" + color + "' for account " + mAccount.getName());
-                            Crashlytics.logException(ex);
+                            FirebaseCrashlytics.getInstance().recordException(ex);
                         }
                     }
                     mInColorSlot = false;
@@ -579,7 +581,7 @@ public class GncXmlHandler extends DefaultHandler {
                     handleEndOfTemplateNumericSlot(characterString, TransactionType.CREDIT);
                 } else if (mInTemplates && mInDebitNumericSlot) {
                     handleEndOfTemplateNumericSlot(characterString, TransactionType.DEBIT);
-                } else if (mInBudgetSlot){
+                } else if (mInBudgetSlot) {
                     if (mSlotTagAttribute.equals(GncXmlHelper.ATTR_VALUE_NUMERIC)) {
                         try {
                             BigDecimal bigDecimal = GncXmlHelper.parseSplitAmount(characterString);
@@ -624,10 +626,10 @@ public class GncXmlHandler extends DefaultHandler {
                         mPrice.setDate(new Timestamp(GncXmlHelper.parseDate(characterString)));
                     }
                 } catch (ParseException e) {
-                    Crashlytics.logException(e);
+                    FirebaseCrashlytics.getInstance().recordException(e);
                     String message = "Unable to parse transaction time - " + characterString;
                     Log.e(LOG_TAG, message + "\n" + e.getMessage());
-                    Crashlytics.log(message);
+                    FirebaseCrashlytics.getInstance().log(message);
                     throw new SAXException(message, e);
                 }
                 break;
@@ -655,8 +657,8 @@ public class GncXmlHandler extends DefaultHandler {
                     mValue = GncXmlHelper.parseSplitAmount(characterString).abs(); // use sign from quantity
                 } catch (ParseException e) {
                     String msg = "Error parsing split quantity - " + characterString;
-                    Crashlytics.log(msg);
-                    Crashlytics.logException(e);
+                    FirebaseCrashlytics.getInstance().log(msg);
+                    FirebaseCrashlytics.getInstance().recordException(e);
                     throw new SAXException(msg, e);
                 }
                 break;
@@ -666,8 +668,8 @@ public class GncXmlHandler extends DefaultHandler {
                     mQuantity = GncXmlHelper.parseSplitAmount(characterString).abs();
                 } catch (ParseException e) {
                     String msg = "Error parsing split quantity - " + characterString;
-                    Crashlytics.log(msg);
-                    Crashlytics.logException(e);
+                    FirebaseCrashlytics.getInstance().log(msg);
+                    FirebaseCrashlytics.getInstance().recordException(e);
                     throw new SAXException(msg, e);
                 }
                 break;
@@ -695,7 +697,7 @@ public class GncXmlHandler extends DefaultHandler {
                 if (imbSplit != null) {
                     mAutoBalanceSplits.add(imbSplit);
                 }
-                if (mInTemplates){
+                if (mInTemplates) {
                     if (!mIgnoreTemplateTransaction)
                         mTemplateTransactions.add(mTransaction);
                 } else {
@@ -742,10 +744,10 @@ public class GncXmlHandler extends DefaultHandler {
                     PeriodType periodType = PeriodType.valueOf(characterString.toUpperCase());
                     mRecurrence.setPeriodType(periodType);
                     mRecurrence.setMultiplier(mRecurrenceMultiplier);
-                } catch (IllegalArgumentException ex){ //the period type constant is not supported
+                } catch (IllegalArgumentException ex) { //the period type constant is not supported
                     String msg = "Unsupported period constant: " + characterString;
                     Log.e(LOG_TAG, msg);
-                    Crashlytics.logException(ex);
+                    FirebaseCrashlytics.getInstance().recordException(ex);
                     mIgnoreScheduledAction = true;
                 }
                 break;
@@ -767,15 +769,15 @@ public class GncXmlHandler extends DefaultHandler {
                         mIsLastRun = false;
                     }
 
-                    if (mIsRecurrenceStart && mScheduledAction != null){
+                    if (mIsRecurrenceStart && mScheduledAction != null) {
                         mRecurrence.setPeriodStart(new Timestamp(date));
                         mIsRecurrenceStart = false;
                     }
                 } catch (ParseException e) {
                     String msg = "Error parsing scheduled action date " + characterString;
                     Log.e(LOG_TAG, msg + e.getMessage());
-                    Crashlytics.log(msg);
-                    Crashlytics.logException(e);
+                    FirebaseCrashlytics.getInstance().log(msg);
+                    FirebaseCrashlytics.getInstance().recordException(e);
                     throw new SAXException(msg, e);
                 }
                 break;
@@ -787,7 +789,7 @@ public class GncXmlHandler extends DefaultHandler {
                 }
                 break;
             case GncXmlHelper.TAG_GNC_RECURRENCE:
-                if (mScheduledAction != null){
+                if (mScheduledAction != null) {
                     mScheduledAction.setRecurrence(mRecurrence);
                 }
                 break;
@@ -819,13 +821,13 @@ public class GncXmlHandler extends DefaultHandler {
                     if (parts.length != 2) {
                         String message = "Illegal price - " + characterString;
                         Log.e(LOG_TAG, message);
-                        Crashlytics.log(message);
+                        FirebaseCrashlytics.getInstance().log(message);
                         throw new SAXException(message);
                     } else {
                         mPrice.setValueNum(Long.valueOf(parts[0]));
                         mPrice.setValueDenom(Long.valueOf(parts[1]));
                         Log.d(getClass().getName(), "price " + characterString +
-                        " .. " + mPrice.getValueNum() + "/" + mPrice.getValueDenom());
+                                " .. " + mPrice.getValueNum() + "/" + mPrice.getValueDenom());
                     }
                 }
                 break;
@@ -890,7 +892,7 @@ public class GncXmlHandler extends DefaultHandler {
         String imbalancePrefix = AccountsDbAdapter.getImbalanceAccountPrefix();
 
         // Add all account without a parent to ROOT, and collect top level imbalance accounts
-        for(Account account:mAccountList) {
+        for (Account account : mAccountList) {
             mapFullName.put(account.getUID(), null);
             boolean topLevel = false;
             if (account.getParentUID() == null && account.getAccountType() != AccountType.ROOT) {
@@ -905,7 +907,7 @@ public class GncXmlHandler extends DefaultHandler {
         }
 
         // Set the account for created balancing splits to correct imbalance accounts
-        for (Split split: mAutoBalanceSplits) {
+        for (Split split : mAutoBalanceSplits) {
             // XXX: yes, getAccountUID() returns a currency code in this case (see Transaction.createAutoBalanceSplit())
             String currencyCode = split.getAccountUID();
             Account imbAccount = mapImbalanceAccount.get(currencyCode);
@@ -920,7 +922,7 @@ public class GncXmlHandler extends DefaultHandler {
         }
 
         java.util.Stack<Account> stack = new Stack<>();
-        for (Account account:mAccountList){
+        for (Account account : mAccountList) {
             if (mapFullName.get(account.getUID()) != null) {
                 continue;
             }
@@ -955,7 +957,7 @@ public class GncXmlHandler extends DefaultHandler {
                 stack.pop();
             }
         }
-        for (Account account:mAccountList){
+        for (Account account : mAccountList) {
             account.setFullName(mapFullName.get(account.getUID()));
         }
 
@@ -976,6 +978,7 @@ public class GncXmlHandler extends DefaultHandler {
 
     /**
      * Saves the imported data to the database
+     *
      * @return GUID of the newly created book, or null if not successful
      */
     private void saveToDatabase() {
@@ -983,7 +986,7 @@ public class GncXmlHandler extends DefaultHandler {
         mBook.setRootAccountUID(mRootAccount.getUID());
         mBook.setDisplayName(booksDbAdapter.generateDefaultBookName());
         //we on purpose do not set the book active. Only import. Caller should handle activation
-        
+
         long startTime = System.nanoTime();
         mAccountsDbAdapter.beginTransaction();
         Log.d(getClass().getSimpleName(), "bulk insert starts");
@@ -993,7 +996,7 @@ public class GncXmlHandler extends DefaultHandler {
             mAccountsDbAdapter.enableForeignKey(false);
             Log.d(getClass().getSimpleName(), "before clean up db");
             mAccountsDbAdapter.deleteAllRecords();
-            Log.d(getClass().getSimpleName(), String.format("deb clean up done %d ns", System.nanoTime()-startTime));
+            Log.d(getClass().getSimpleName(), String.format("deb clean up done %d ns", System.nanoTime() - startTime));
             long nAccounts = mAccountsDbAdapter.bulkAddRecords(mAccountList, DatabaseAdapter.UpdateMethod.insert);
             Log.d("Handler:", String.format("%d accounts inserted", nAccounts));
             //We need to add scheduled actions first because there is a foreign key constraint on transactions
@@ -1029,23 +1032,25 @@ public class GncXmlHandler extends DefaultHandler {
 
     /**
      * Returns the unique identifier of the just-imported book
+     *
      * @return GUID of the newly imported book
      */
-    public @NonNull String getBookUID(){
+    public @NonNull String getBookUID() {
         return mBook.getUID();
     }
 
     /**
      * Returns the currency for an account which has been parsed (but not yet saved to the db)
      * <p>This is used when parsing splits to assign the right currencies to the splits</p>
+     *
      * @param accountUID GUID of the account
      * @return Commodity of the account
      */
-    private Commodity getCommodityForAccount(String accountUID){
+    private Commodity getCommodityForAccount(String accountUID) {
         try {
             return mAccountMap.get(accountUID).getCommodity();
         } catch (Exception e) {
-            Crashlytics.logException(e);
+            FirebaseCrashlytics.getInstance().recordException(e);
             return Commodity.DEFAULT_COMMODITY;
         }
     }
@@ -1053,6 +1058,7 @@ public class GncXmlHandler extends DefaultHandler {
 
     /**
      * Handles the case when we reach the end of the template numeric slot
+     *
      * @param characterString Parsed characters containing split amount
      */
     private void handleEndOfTemplateNumericSlot(String characterString, TransactionType splitType) {
@@ -1070,8 +1076,8 @@ public class GncXmlHandler extends DefaultHandler {
         } catch (NumberFormatException | ParseException e) {
             String msg = "Error parsing template credit split amount " + characterString;
             Log.e(LOG_TAG, msg + "\n" + e.getMessage());
-            Crashlytics.log(msg);
-            Crashlytics.logException(e);
+            FirebaseCrashlytics.getInstance().log(msg);
+            FirebaseCrashlytics.getInstance().recordException(e);
         } finally {
             if (splitType == TransactionType.CREDIT)
                 mInCreditNumericSlot = false;
@@ -1082,29 +1088,30 @@ public class GncXmlHandler extends DefaultHandler {
 
     /**
      * Generates the runs of the scheduled action which have been missed since the file was last opened.
+     *
      * @param scheduledAction Scheduled action for transaction
      * @return Number of transaction instances generated
      */
-    private int generateMissedScheduledTransactions(ScheduledAction scheduledAction){
+    private int generateMissedScheduledTransactions(ScheduledAction scheduledAction) {
         //if this scheduled action should not be run for any reason, return immediately
         if (scheduledAction.getActionType() != ScheduledAction.ActionType.TRANSACTION
                 || !scheduledAction.isEnabled() || !scheduledAction.shouldAutoCreate()
                 || (scheduledAction.getEndTime() > 0 && scheduledAction.getEndTime() > System.currentTimeMillis())
-                || (scheduledAction.getTotalPlannedExecutionCount() > 0 && scheduledAction.getExecutionCount() >= scheduledAction.getTotalPlannedExecutionCount())){
+                || (scheduledAction.getTotalPlannedExecutionCount() > 0 && scheduledAction.getExecutionCount() >= scheduledAction.getTotalPlannedExecutionCount())) {
             return 0;
         }
 
         long lastRuntime = scheduledAction.getStartTime();
-        if (scheduledAction.getLastRunTime() > 0){
+        if (scheduledAction.getLastRunTime() > 0) {
             lastRuntime = scheduledAction.getLastRunTime();
         }
 
         int generatedTransactionCount = 0;
         long period = scheduledAction.getPeriod();
         final String actionUID = scheduledAction.getActionUID();
-        while ((lastRuntime = lastRuntime + period) <= System.currentTimeMillis()){
+        while ((lastRuntime = lastRuntime + period) <= System.currentTimeMillis()) {
             for (Transaction templateTransaction : mTemplateTransactions) {
-                if (templateTransaction.getUID().equals(actionUID)){
+                if (templateTransaction.getUID().equals(actionUID)) {
                     Transaction transaction = new Transaction(templateTransaction, true);
                     transaction.setTime(lastRuntime);
                     transaction.setScheduledActionUID(scheduledAction.getUID());

@@ -19,15 +19,17 @@ package org.gnucash.android.ui.passcode;
 import android.content.Intent;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
-import android.support.v7.app.AppCompatActivity;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import androidx.appcompat.app.AppCompatActivity;
 
 import org.gnucash.android.R;
 import org.gnucash.android.ui.common.UxArgument;
 
 /**
  * Activity for entering and confirming passcode
+ *
  * @author Oleksandr Tyshkovets <olexandr.tyshkovets@gmail.com>
  */
 public class PasscodePreferenceActivity extends AppCompatActivity

@@ -5,10 +5,6 @@ import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
-import android.support.v4.app.DialogFragment;
-import android.support.v4.content.ContextCompat;
-import android.support.v7.preference.CheckBoxPreference;
-import android.support.v7.preference.Preference;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -16,6 +12,11 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
+
+import androidx.core.content.ContextCompat;
+import androidx.fragment.app.DialogFragment;
+import androidx.preference.CheckBoxPreference;
+import androidx.preference.Preference;
 
 import com.owncloud.android.lib.common.OwnCloudClient;
 import com.owncloud.android.lib.common.OwnCloudClientFactory;
@@ -69,6 +70,7 @@ public class OwnCloudDialogFragment extends DialogFragment {
     /**
      * Use this factory method to create a new instance of
      * this fragment using the provided parameters.
+     *
      * @return A new instance of fragment OwnCloudDialogFragment.
      */
     public static OwnCloudDialogFragment newInstance(Preference pref) {
@@ -227,7 +229,7 @@ public class OwnCloudDialogFragment extends DialogFragment {
     /**
      * Binds click listeners for the dialog buttons
      */
-    private void setListeners(){
+    private void setListeners() {
 
         mCancelButton.setOnClickListener(new View.OnClickListener() {
 
@@ -242,12 +244,12 @@ public class OwnCloudDialogFragment extends DialogFragment {
             @Override
             public void onClick(View v) {
                 // If data didn't change
-                if(mOkButton.getText().toString().equals(getString(R.string.btn_save)) &&
+                if (mOkButton.getText().toString().equals(getString(R.string.btn_save)) &&
                         mOC_server.equals(mServer.getText().toString().trim()) &&
                         mOC_username.equals(mUsername.getText().toString().trim()) &&
                         mOC_password.equals(mPassword.getText().toString().trim()) &&
                         mOC_dir.equals(mDir.getText().toString().trim())
-                        )
+                )
                     save();
                 else
                     checkData();

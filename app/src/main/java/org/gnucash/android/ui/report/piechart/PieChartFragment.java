@@ -17,13 +17,17 @@
 
 package org.gnucash.android.ui.report.piechart;
 
+import static com.github.mikephil.charting.components.Legend.LegendForm;
+import static com.github.mikephil.charting.components.Legend.LegendPosition;
+
 import android.content.Context;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
-import android.support.annotation.Nullable;
 import android.view.Menu;
 import android.view.MenuItem;
+
+import androidx.annotation.Nullable;
 
 import com.github.mikephil.charting.charts.PieChart;
 import com.github.mikephil.charting.data.Entry;
@@ -43,9 +47,6 @@ import java.util.Collections;
 import java.util.List;
 
 import butterknife.BindView;
-
-import static com.github.mikephil.charting.components.Legend.LegendForm;
-import static com.github.mikephil.charting.components.Legend.LegendPosition;
 
 /**
  * Activity used for drawing a pie chart
@@ -67,7 +68,8 @@ public class PieChartFragment extends BaseReportFragment {
      */
     private static final double GROUPING_SMALLER_SLICES_THRESHOLD = 5;
 
-    @BindView(R.id.pie_chart) PieChart mChart;
+    @BindView(R.id.pie_chart)
+    PieChart mChart;
 
     private AccountsDbAdapter mAccountsDbAdapter;
 
@@ -92,7 +94,7 @@ public class PieChartFragment extends BaseReportFragment {
         mChart.setOnChartValueSelectedListener(this);
         mChart.getLegend().setForm(LegendForm.CIRCLE);
         mChart.getLegend().setWordWrapEnabled(true);
-        mChart.getLegend().setPosition(LegendPosition.BELOW_CHART_CENTER);
+        mChart.getLegend().setPosition(LegendPosition.RIGHT_OF_CHART_INSIDE);
 
     }
 
@@ -130,7 +132,7 @@ public class PieChartFragment extends BaseReportFragment {
 
     @Override
     protected void displayReport() {
-        if (mChartDataPresent){
+        if (mChartDataPresent) {
             mChart.animateXY(ANIMATION_DURATION, ANIMATION_DURATION);
         }
 
@@ -142,6 +144,7 @@ public class PieChartFragment extends BaseReportFragment {
 
     /**
      * Returns {@code PieData} instance with data entries, colors and labels
+     *
      * @return {@code PieData} instance
      */
     private PieData getData() {
@@ -178,6 +181,7 @@ public class PieChartFragment extends BaseReportFragment {
 
     /**
      * Returns a data object that represents situation when no user data available
+     *
      * @return a {@code PieData} instance for situation when no user data available
      */
     private PieData getEmptyData() {
@@ -198,9 +202,9 @@ public class PieChartFragment extends BaseReportFragment {
         float tmp1;
         String tmp2;
         Integer tmp3;
-        for(int i = 0; i < values.size() - 1; i++) {
-            for(int j = 1; j < values.size() - i; j++) {
-                if (values.get(j-1).getVal() > values.get(j).getVal()) {
+        for (int i = 0; i < values.size() - 1; i++) {
+            for (int j = 1; j < values.size() - i; j++) {
+                if (values.get(j - 1).getVal() > values.get(j).getVal()) {
                     tmp1 = values.get(j - 1).getVal();
                     values.get(j - 1).setVal(values.get(j).getVal());
                     values.get(j).setVal(tmp1);
@@ -266,7 +270,8 @@ public class PieChartFragment extends BaseReportFragment {
 
     /**
      * Groups smaller slices. All smaller slices will be combined and displayed as a single "Other".
-     * @param data the pie data which smaller slices will be grouped
+     *
+     * @param data    the pie data which smaller slices will be grouped
      * @param context Context for retrieving resources
      * @return a {@code PieData} instance with combined smaller slices
      */

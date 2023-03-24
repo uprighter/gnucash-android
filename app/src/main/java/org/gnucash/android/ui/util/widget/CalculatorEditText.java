@@ -19,9 +19,6 @@ import android.content.Context;
 import android.content.res.TypedArray;
 import android.inputmethodservice.KeyboardView;
 import android.os.Build;
-import android.support.annotation.Nullable;
-import android.support.annotation.XmlRes;
-import android.support.v7.widget.AppCompatEditText;
 import android.text.Editable;
 import android.text.InputType;
 import android.text.TextWatcher;
@@ -30,7 +27,11 @@ import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 
-import com.crashlytics.android.Crashlytics;
+import androidx.annotation.Nullable;
+import androidx.annotation.XmlRes;
+import androidx.appcompat.widget.AppCompatEditText;
+
+import com.google.firebase.crashlytics.FirebaseCrashlytics;
 
 import net.objecthunter.exp4j.Expression;
 import net.objecthunter.exp4j.ExpressionBuilder;
@@ -50,6 +51,7 @@ import java.util.Locale;
  * A custom EditText which supports computations and uses a custom calculator keyboard.
  * <p>After the view is inflated, make sure to call {@link #bindListeners(KeyboardView)}
  * with the view from your layout where the calculator keyboard should be displayed.</p>
+ *
  * @author Ngewi Fet <ngewif@gmail.com>
  */
 public class CalculatorEditText extends AppCompatEditText {
@@ -84,10 +86,11 @@ public class CalculatorEditText extends AppCompatEditText {
     /**
      * Overloaded constructor
      * Reads any attributes which are specified in XML and applies them
+     *
      * @param context Activity context
-     * @param attrs View attributes
+     * @param attrs   View attributes
      */
-    private void init(Context context, AttributeSet attrs){
+    private void init(Context context, AttributeSet attrs) {
         this.mContext = context;
         TypedArray a = context.getTheme().obtainStyledAttributes(
                 attrs,
@@ -118,10 +121,10 @@ public class CalculatorEditText extends AppCompatEditText {
         });
     }
 
-    public void bindListeners(CalculatorKeyboard calculatorKeyboard){
+    public void bindListeners(CalculatorKeyboard calculatorKeyboard) {
         mCalculatorKeyboard = calculatorKeyboard;
         mContext = calculatorKeyboard.getContext();
-        setOnFocusChangeListener(new OnFocusChangeListener() {
+        setOnFocusChangeListener(new View.OnFocusChangeListener() {
             @Override
             public void onFocusChange(View v, boolean hasFocus) {
                 if (hasFocus) {
@@ -164,26 +167,28 @@ public class CalculatorEditText extends AppCompatEditText {
             }
         });
 
-        ((FormActivity)mContext).setOnBackListener(mCalculatorKeyboard);
+        ((FormActivity) mContext).setOnBackListener(mCalculatorKeyboard);
     }
 
     /**
      * Initializes listeners on the EditText
      */
-    public void bindListeners(KeyboardView keyboardView){
+    public void bindListeners(KeyboardView keyboardView) {
         bindListeners(new CalculatorKeyboard(mContext, keyboardView, mCalculatorKeysLayout));
     }
 
     /**
      * Returns the calculator keyboard instantiated by this EditText
+     *
      * @return CalculatorKeyboard
      */
-    public CalculatorKeyboard getCalculatorKeyboard(){
+    public CalculatorKeyboard getCalculatorKeyboard() {
         return mCalculatorKeyboard;
     }
 
     /**
      * Returns the view Id of the keyboard view
+     *
      * @return Keyboard view
      */
     public KeyboardView getCalculatorKeyboardView() {
@@ -192,6 +197,7 @@ public class CalculatorEditText extends AppCompatEditText {
 
     /**
      * Set the keyboard view used for displaying the keyboard
+     *
      * @param calculatorKeyboardView Calculator keyboard view
      */
     public void setCalculatorKeyboardView(KeyboardView calculatorKeyboardView) {
@@ -201,6 +207,7 @@ public class CalculatorEditText extends AppCompatEditText {
 
     /**
      * Returns the XML resource ID describing the calculator keys layout
+     *
      * @return XML resource ID
      */
     public @XmlRes int getCalculatorKeysLayout() {
@@ -209,6 +216,7 @@ public class CalculatorEditText extends AppCompatEditText {
 
     /**
      * Sets the XML resource describing the layout of the calculator keys
+     *
      * @param calculatorKeysLayout XML resource ID
      */
     public void setCalculatorKeysLayout(@XmlRes int calculatorKeysLayout) {
@@ -218,14 +226,16 @@ public class CalculatorEditText extends AppCompatEditText {
 
     /**
      * Sets the calculator keyboard to use for this EditText
+     *
      * @param keyboard Properly intialized calculator keyobard
      */
-    public void setCalculatorKeyboard(CalculatorKeyboard keyboard){
+    public void setCalculatorKeyboard(CalculatorKeyboard keyboard) {
         this.mCalculatorKeyboard = keyboard;
     }
 
     /**
      * Returns the currency used for computations
+     *
      * @return ISO 4217 currency
      */
     public Commodity getCommodity() {
@@ -235,6 +245,7 @@ public class CalculatorEditText extends AppCompatEditText {
     /**
      * Sets the commodity to use for calculations
      * The commodity determines the number of decimal places used
+     *
      * @param commodity ISO 4217 currency
      */
     public void setCommodity(Commodity commodity) {
@@ -243,9 +254,10 @@ public class CalculatorEditText extends AppCompatEditText {
 
     /**
      * Evaluates the arithmetic expression in the EditText and sets the text property
+     *
      * @return Result of arithmetic evaluation which is same as text displayed in EditText
      */
-    public String evaluate(){
+    public String evaluate() {
         String amountString = getCleanString();
         if (amountString.isEmpty())
             return amountString;
@@ -259,7 +271,7 @@ public class CalculatorEditText extends AppCompatEditText {
             setError(getContext().getString(R.string.label_error_invalid_expression));
             String msg = "Invalid expression: " + amountString;
             Log.e(this.getClass().getSimpleName(), msg);
-            Crashlytics.log(msg);
+            FirebaseCrashlytics.getInstance().log(msg);
             return "";
         }
 
@@ -275,9 +287,10 @@ public class CalculatorEditText extends AppCompatEditText {
 
     /**
      * Evaluates the expression in the text and returns true if the result is valid
+     *
      * @return @{code true} if the input is valid, {@code false} otherwise
      */
-    public boolean isInputValid(){
+    public boolean isInputValid() {
         String text = evaluate();
         return !text.isEmpty() && getError() == null;
     }
@@ -285,30 +298,33 @@ public class CalculatorEditText extends AppCompatEditText {
     /**
      * Returns the amount string formatted as a decimal in Locale.US and trimmed.
      * This also converts decimal operators from other locales into a period (.)
+     *
      * @return String with the amount in the EditText or empty string if there is no input
      */
-    public String getCleanString(){
+    public String getCleanString() {
         return getText().toString().replaceAll(",", ".").trim();
     }
 
     /**
      * Returns true if the content of this view has been modified
+     *
      * @return {@code true} if content has changed, {@code false} otherwise
      */
-    public boolean isInputModified(){
+    public boolean isInputModified() {
         return this.isContentModified;
     }
 
     /**
      * Returns the value of the amount in the edit text or null if the field is empty.
      * Performs an evaluation of the expression first
+     *
      * @return BigDecimal value
      */
-    public @Nullable BigDecimal getValue(){
+    public @Nullable BigDecimal getValue() {
         evaluate();
         try { //catch any exceptions in the conversion e.g. if a string with only "-" is entered
             return AmountParser.parse(getText().toString());
-        } catch (ParseException e){
+        } catch (ParseException e) {
             String msg = "Error parsing amount string " + getText() + " from CalculatorEditText";
             Log.i(getClass().getSimpleName(), msg, e);
             return null;
@@ -319,9 +335,10 @@ public class CalculatorEditText extends AppCompatEditText {
      * Set the text to the value of {@code amount} formatted according to the locale.
      * <p>The number of decimal places are determined by the currency set to the view, and the
      * decimal separator is determined by the device locale. There are no thousandths separators.</p>
+     *
      * @param amount BigDecimal amount
      */
-    public void setValue(BigDecimal amount){
+    public void setValue(BigDecimal amount) {
         BigDecimal newAmount = amount.setScale(mCommodity.getSmallestFractionDigits(), BigDecimal.ROUND_HALF_EVEN);
 
         DecimalFormat formatter = (DecimalFormat) NumberFormat.getInstance(Locale.getDefault());

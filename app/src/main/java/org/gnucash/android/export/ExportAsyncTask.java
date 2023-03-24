@@ -27,12 +27,12 @@ import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.preference.PreferenceManager;
-import android.support.annotation.NonNull;
-import android.support.v4.content.FileProvider;
 import android.util.Log;
 import android.widget.Toast;
 
-import com.crashlytics.android.Crashlytics;
+import androidx.annotation.NonNull;
+import androidx.core.content.FileProvider;
+
 import com.dropbox.core.v2.DbxClientV2;
 import com.dropbox.core.v2.files.FileMetadata;
 import com.google.android.gms.common.api.GoogleApiClient;
@@ -42,6 +42,7 @@ import com.google.android.gms.drive.DriveContents;
 import com.google.android.gms.drive.DriveFolder;
 import com.google.android.gms.drive.DriveId;
 import com.google.android.gms.drive.MetadataChangeSet;
+import com.google.firebase.crashlytics.FirebaseCrashlytics;
 import com.owncloud.android.lib.common.OwnCloudClient;
 import com.owncloud.android.lib.common.OwnCloudClientFactory;
 import com.owncloud.android.lib.common.OwnCloudCredentialsFactory;
@@ -110,7 +111,7 @@ public class ExportAsyncTask extends AsyncTask<ExportParams, Void, Boolean> {
 
     private Exporter mExporter;
 
-    public ExportAsyncTask(Context context, SQLiteDatabase db){
+    public ExportAsyncTask(Context context, SQLiteDatabase db) {
         this.mContext = context;
         this.mDb = db;
     }
@@ -132,6 +133,7 @@ public class ExportAsyncTask extends AsyncTask<ExportParams, Void, Boolean> {
 
     /**
      * Generates the appropriate exported transactions file for the given parameters
+     *
      * @param params Export parameters
      * @return <code>true</code> if export was successful, <code>false</code> otherwise
      */
@@ -144,15 +146,15 @@ public class ExportAsyncTask extends AsyncTask<ExportParams, Void, Boolean> {
             mExportedFiles = mExporter.generateExport();
         } catch (final Exception e) {
             Log.e(TAG, "Error exporting: " + e.getMessage());
-            Crashlytics.logException(e);
+            FirebaseCrashlytics.getInstance().recordException(e);
             e.printStackTrace();
             if (mContext instanceof Activity) {
-                ((Activity)mContext).runOnUiThread(new Runnable() {
+                ((Activity) mContext).runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
                         Toast.makeText(mContext,
                                 mContext.getString(R.string.toast_export_error, mExportParams.getExportFormat().name())
-                                + "\n" + e.getMessage(),
+                                        + "\n" + e.getMessage(),
                                 Toast.LENGTH_SHORT).show();
                     }
                 });
@@ -166,7 +168,8 @@ public class ExportAsyncTask extends AsyncTask<ExportParams, Void, Boolean> {
         try {
             moveToTarget();
         } catch (Exporter.ExporterException e) {
-            Crashlytics.log(Log.ERROR, TAG, "Error sending exported files to target: " + e.getMessage());
+            FirebaseCrashlytics.getInstance().log("Error sending exported files to target");
+            FirebaseCrashlytics.getInstance().recordException(e);
             return false;
         }
 
@@ -176,6 +179,7 @@ public class ExportAsyncTask extends AsyncTask<ExportParams, Void, Boolean> {
     /**
      * Transmits the exported transactions to the designated location, either SD card or third-party application
      * Finishes the activity if the export was starting  in the context of an activity
+     *
      * @param exportSuccessful Result of background export execution
      */
     @Override
@@ -216,6 +220,7 @@ public class ExportAsyncTask extends AsyncTask<ExportParams, Void, Boolean> {
 
     /**
      * Returns an exporter corresponding to the user settings.
+     *
      * @return Object of one of {@link QifExporter}, {@link OfxExporter} or {@link GncXmlExporter}, {@Link CsvAccountExporter} or {@Link CsvTransactionsExporter}
      */
     private Exporter getExporter() {
@@ -236,6 +241,7 @@ public class ExportAsyncTask extends AsyncTask<ExportParams, Void, Boolean> {
 
     /**
      * Moves the generated export files to the target specified by the user
+     *
      * @throws Exporter.ExporterException if the move fails
      */
     private void moveToTarget() throws Exporter.ExporterException {
@@ -272,16 +278,17 @@ public class ExportAsyncTask extends AsyncTask<ExportParams, Void, Boolean> {
     /**
      * Move the exported files to a specified URI.
      * This URI could be a Storage Access Framework file
+     *
      * @throws Exporter.ExporterException if something failed while moving the exported file
      */
     private void moveExportToUri() throws Exporter.ExporterException {
         Uri exportUri = Uri.parse(mExportParams.getExportLocation());
-        if (exportUri == null){
+        if (exportUri == null) {
             Log.w(TAG, "No URI found for export destination");
             return;
         }
 
-        if (mExportedFiles.size() > 0){
+        if (mExportedFiles.size() > 0) {
             try {
                 OutputStream outputStream = mContext.getContentResolver().openOutputStream(exportUri);
                 // Now we always get just one file exported (multi-currency QIFs are zipped)
@@ -294,6 +301,7 @@ public class ExportAsyncTask extends AsyncTask<ExportParams, Void, Boolean> {
 
     /**
      * Move the exported files to a GnuCash folder on Google Drive
+     *
      * @throws Exporter.ExporterException if something failed while moving the exported file
      * @deprecated Explicit Google Drive integration is deprecated, use Storage Access Framework. See {@link #moveExportToUri()}
      */
@@ -312,7 +320,7 @@ public class ExportAsyncTask extends AsyncTask<ExportParams, Void, Boolean> {
                         Drive.DriveApi.newDriveContents(googleApiClient).await(1, TimeUnit.MINUTES);
                 if (!driveContentsResult.getStatus().isSuccess()) {
                     throw new Exporter.ExporterException(mExportParams,
-                                                "Error while trying to create new file contents");
+                            "Error while trying to create new file contents");
                 }
                 final DriveContents driveContents = driveContentsResult.getDriveContents();
                 OutputStream outputStream = driveContents.getOutputStream();
@@ -335,7 +343,7 @@ public class ExportAsyncTask extends AsyncTask<ExportParams, Void, Boolean> {
                 // create a file on root folder
                 DriveFolder.DriveFileResult driveFileResult =
                         folder.createFile(googleApiClient, changeSet, driveContents)
-                                                .await(1, TimeUnit.MINUTES);
+                                .await(1, TimeUnit.MINUTES);
                 if (!driveFileResult.getStatus().isSuccess())
                     throw new Exporter.ExporterException(mExportParams, "Error creating file in Google Drive");
 
@@ -365,7 +373,7 @@ public class ExportAsyncTask extends AsyncTask<ExportParams, Void, Boolean> {
                 inputStream.close();
                 exportedFile.delete(); //delete file to prevent cache accumulation
             } catch (IOException e) {
-                Crashlytics.logException(e);
+                FirebaseCrashlytics.getInstance().recordException(e);
                 Log.e(TAG, e.getMessage());
             } catch (com.dropbox.core.DbxException e) {
                 e.printStackTrace();
@@ -400,7 +408,7 @@ public class ExportAsyncTask extends AsyncTask<ExportParams, Void, Boolean> {
                     mOC_dir, true).execute(mClient);
             if (!dirResult.isSuccess()) {
                 Log.w(TAG, "Error creating folder (it may happen if it already exists): "
-                           + dirResult.getLogMessage());
+                        + dirResult.getLogMessage());
             }
         }
         for (String exportedFilePath : mExportedFiles) {
@@ -426,6 +434,7 @@ public class ExportAsyncTask extends AsyncTask<ExportParams, Void, Boolean> {
     /**
      * Moves the exported files from the internal storage where they are generated to
      * external storage, which is accessible to the user.
+     *
      * @return The list of files moved to the SD card.
      * @deprecated Use the Storage Access Framework to save to SD card. See {@link #moveExportToUri()}
      */
@@ -435,7 +444,7 @@ public class ExportAsyncTask extends AsyncTask<ExportParams, Void, Boolean> {
         new File(Exporter.getExportFolderPath(mExporter.mBookUID));
         List<String> dstFiles = new ArrayList<>();
 
-        for (String src: mExportedFiles) {
+        for (String src : mExportedFiles) {
             String dst = Exporter.getExportFolderPath(mExporter.mBookUID) + stripPathPart(src);
             try {
                 org.gnucash.android.util.FileUtils.moveFile(src, dst);
@@ -457,7 +466,7 @@ public class ExportAsyncTask extends AsyncTask<ExportParams, Void, Boolean> {
      * Backups of the database, saves opening balances (if necessary)
      * and deletes all non-template transactions in the database.
      */
-    private void backupAndDeleteTransactions(){
+    private void backupAndDeleteTransactions() {
         Log.i(TAG, "Backup and deleting transactions after export");
         BackupManager.backupActiveBook(); //create backup before deleting everything
         List<Transaction> openingBalances = new ArrayList<>();
@@ -477,6 +486,7 @@ public class ExportAsyncTask extends AsyncTask<ExportParams, Void, Boolean> {
     /**
      * Starts an intent chooser to allow the user to select an activity to receive
      * the exported files.
+     *
      * @param paths list of full paths of the files to send to the activity.
      */
     private void shareFiles(List<String> paths) {
@@ -497,7 +507,7 @@ public class ExportAsyncTask extends AsyncTask<ExportParams, Void, Boolean> {
 
         SimpleDateFormat formatter = (SimpleDateFormat) SimpleDateFormat.getDateTimeInstance();
         String extraText = mContext.getString(R.string.description_export_email)
-                           + " " + formatter.format(new Date(System.currentTimeMillis()));
+                + " " + formatter.format(new Date(System.currentTimeMillis()));
         shareIntent.putExtra(Intent.EXTRA_TEXT, extraText);
 
         if (mContext instanceof Activity) {
@@ -515,6 +525,7 @@ public class ExportAsyncTask extends AsyncTask<ExportParams, Void, Boolean> {
     /**
      * Convert file paths to URIs by adding the file// prefix
      * <p>e.g. /some/path/file.ext --> file:///some/path/file.ext</p>
+     *
      * @param paths List of file paths to convert
      * @return List of file URIs
      */
@@ -532,7 +543,7 @@ public class ExportAsyncTask extends AsyncTask<ExportParams, Void, Boolean> {
 
     private void reportSuccess() {
         String targetLocation;
-        switch (mExportParams.getExportTarget()){
+        switch (mExportParams.getExportTarget()) {
             case SD_CARD:
                 targetLocation = "SD card";
                 break;
@@ -564,13 +575,13 @@ public class ExportAsyncTask extends AsyncTask<ExportParams, Void, Boolean> {
     }
 
     private void refreshViews() {
-        if (mContext instanceof AccountsActivity){
+        if (mContext instanceof AccountsActivity) {
             AccountsListFragment fragment =
                     ((AccountsActivity) mContext).getCurrentAccountListFragment();
             if (fragment != null)
                 fragment.refresh();
         }
-        if (mContext instanceof TransactionsActivity){
+        if (mContext instanceof TransactionsActivity) {
             ((TransactionsActivity) mContext).refresh();
         }
     }

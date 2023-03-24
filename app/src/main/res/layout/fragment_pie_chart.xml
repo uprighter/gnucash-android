@@ -24,7 +24,8 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <TextView android:id="@+id/selected_chart_slice"
+    <TextView
+        android:id="@+id/selected_chart_slice"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:padding="5dp"
@@ -32,18 +33,19 @@
         tools:text="Selected chart slice"
         android:gravity="center" />
 
-    <android.support.v7.widget.CardView
+    <androidx.cardview.widget.CardView
         android:layout_width="match_parent"
         android:padding="@dimen/dialog_padding"
         android:layout_marginBottom="@dimen/edge_padding"
         android:layout_height="0dp"
         android:layout_weight="1">
+
         <com.github.mikephil.charting.charts.PieChart
             android:id="@+id/pie_chart"
             android:orientation="horizontal"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:minHeight="400dp" />
-    </android.support.v7.widget.CardView>
+    </androidx.cardview.widget.CardView>
 
 </LinearLayout>

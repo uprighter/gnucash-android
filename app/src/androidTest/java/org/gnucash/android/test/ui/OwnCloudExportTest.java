@@ -16,6 +16,24 @@
 
 package org.gnucash.android.test.ui;
 
+import static android.support.test.InstrumentationRegistry.getInstrumentation;
+import static androidx.test.espresso.Espresso.onView;
+import static androidx.test.espresso.action.ViewActions.clearText;
+import static androidx.test.espresso.action.ViewActions.click;
+import static androidx.test.espresso.action.ViewActions.closeSoftKeyboard;
+import static androidx.test.espresso.action.ViewActions.swipeUp;
+import static androidx.test.espresso.action.ViewActions.typeText;
+import static androidx.test.espresso.assertion.ViewAssertions.matches;
+import static androidx.test.espresso.matcher.RootMatchers.withDecorView;
+import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
+import static androidx.test.espresso.matcher.ViewMatchers.withId;
+import static androidx.test.espresso.matcher.ViewMatchers.withText;
+import static junit.framework.Assert.assertEquals;
+import static junit.framework.Assert.assertTrue;
+import static org.gnucash.android.test.ui.AccountsActivityTest.preventFirstRunDialogs;
+import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
+
 import android.Manifest;
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -23,13 +41,13 @@ import android.database.SQLException;
 import android.database.sqlite.SQLiteDatabase;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
-import android.support.test.espresso.Espresso;
-import android.support.test.espresso.contrib.DrawerActions;
-import android.support.test.rule.ActivityTestRule;
-import android.support.test.rule.GrantPermissionRule;
-import android.support.test.runner.AndroidJUnit4;
-import android.test.ActivityInstrumentationTestCase2;
 import android.util.Log;
+
+import androidx.test.espresso.Espresso;
+import androidx.test.espresso.contrib.DrawerActions;
+import androidx.test.rule.ActivityTestRule;
+import androidx.test.rule.GrantPermissionRule;
+import androidx.test.runner.AndroidJUnit4;
 
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
@@ -52,24 +70,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.MethodSorters;
 
-import static android.support.test.InstrumentationRegistry.getInstrumentation;
-import static android.support.test.espresso.Espresso.onView;
-import static android.support.test.espresso.action.ViewActions.clearText;
-import static android.support.test.espresso.action.ViewActions.click;
-import static android.support.test.espresso.action.ViewActions.closeSoftKeyboard;
-import static android.support.test.espresso.action.ViewActions.swipeUp;
-import static android.support.test.espresso.action.ViewActions.typeText;
-import static android.support.test.espresso.assertion.ViewAssertions.matches;
-import static android.support.test.espresso.matcher.RootMatchers.withDecorView;
-import static android.support.test.espresso.matcher.ViewMatchers.isDisplayed;
-import static android.support.test.espresso.matcher.ViewMatchers.withId;
-import static android.support.test.espresso.matcher.ViewMatchers.withText;
-import static junit.framework.Assert.assertEquals;
-import static junit.framework.Assert.assertTrue;
-import static org.gnucash.android.test.ui.AccountsActivityTest.preventFirstRunDialogs;
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.not;
-
 
 @RunWith(AndroidJUnit4.class)
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
@@ -79,13 +79,13 @@ public class OwnCloudExportTest {
     private SharedPreferences mPrefs;
 
     private String OC_SERVER = "https://demo.owncloud.org";
-    private String OC_USERNAME = "test";
-    private String OC_PASSWORD = "test";
+    private String OC_USERNAME = "admin";
+    private String OC_PASSWORD = "admin";
     private String OC_DIR = "gc_test";
 
     /**
      * A JUnit {@link Rule @Rule} to launch your activity under test. This is a replacement
-     * for {@link ActivityInstrumentationTestCase2}.
+     * for {@code ActivityInstrumentationTestCase2}.
      * <p>
      * Rules are interceptors which are executed for each test method and will run before
      * any of your setup code in the {@link Before @Before} method.
@@ -98,8 +98,8 @@ public class OwnCloudExportTest {
     public ActivityTestRule<AccountsActivity> mActivityRule = new ActivityTestRule<>(
             AccountsActivity.class);
 
-
-    @Rule public GrantPermissionRule animationPermissionsRule = GrantPermissionRule.grant(Manifest.permission.SET_ANIMATION_SCALE);
+    @Rule
+    public GrantPermissionRule animationPermissionsRule = GrantPermissionRule.grant(Manifest.permission.SET_ANIMATION_SCALE);
 
     @Before
     public void setUp() throws Exception {
@@ -150,9 +150,10 @@ public class OwnCloudExportTest {
 
     /**
      * Test if there is an active internet connection on the device/emulator
+     *
      * @return {@code true} is an internet connection is available, {@code false} otherwise
      */
-    public static boolean hasActiveInternetConnection(){
+    public static boolean hasActiveInternetConnection() {
         ConnectivityManager connectivityManager
                 = (ConnectivityManager) GnuCashApplication.getAppContext().getSystemService(Context.CONNECTIVITY_SERVICE);
         NetworkInfo activeNetworkInfo = connectivityManager.getActiveNetworkInfo();
@@ -206,6 +207,7 @@ public class OwnCloudExportTest {
 
     /**
      * Checks that a specific toast message is displayed
+     *
      * @param toastString String that should be displayed
      */
     private void assertToastDisplayed(String toastString) {
@@ -213,8 +215,10 @@ public class OwnCloudExportTest {
                 .inRoot(withDecorView(not(is(mActivityRule.getActivity().getWindow().getDecorView()))))
                 .check(matches(isDisplayed()));
     }
+
     /**
      * Sleep the thread for a specified period
+     *
      * @param millis Duration to sleep in milliseconds
      */
     private void sleep(long millis) {

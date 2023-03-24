@@ -18,13 +18,14 @@ package org.gnucash.android.ui.util.dialog;
 
 import android.app.Dialog;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
-import android.support.v4.app.DialogFragment;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.DialogFragment;
 
 import com.squareup.timessquare.CalendarPickerView;
 
@@ -41,27 +42,31 @@ import butterknife.ButterKnife;
 /**
  * Dialog for picking date ranges in terms of months.
  * It is currently used for selecting ranges for reports
+ *
  * @author Ngewi Fet <ngewif@gmail.com>
  */
-public class DateRangePickerDialogFragment extends DialogFragment{
+public class DateRangePickerDialogFragment extends DialogFragment {
 
-    @BindView(R.id.calendar_view) CalendarPickerView mCalendarPickerView;
-    @BindView(R.id.btn_save)    Button mDoneButton;
-    @BindView(R.id.btn_cancel)  Button mCancelButton;
+    @BindView(R.id.calendar_view)
+    CalendarPickerView mCalendarPickerView;
+    @BindView(R.id.btn_save)
+    Button mDoneButton;
+    @BindView(R.id.btn_cancel)
+    Button mCancelButton;
 
     private Date mStartRange = LocalDate.now().minusMonths(1).toDate();
     private Date mEndRange = LocalDate.now().toDate();
     private OnDateRangeSetListener mDateRangeSetListener;
     private static final long ONE_DAY_IN_MILLIS = 24 * 60 * 60 * 1000;
 
-    public static DateRangePickerDialogFragment newInstance(OnDateRangeSetListener dateRangeSetListener){
+    public static DateRangePickerDialogFragment newInstance(OnDateRangeSetListener dateRangeSetListener) {
         DateRangePickerDialogFragment fragment = new DateRangePickerDialogFragment();
         fragment.mDateRangeSetListener = dateRangeSetListener;
         return fragment;
     }
 
     public static DateRangePickerDialogFragment newInstance(long startDate, long endDate,
-                                                            OnDateRangeSetListener dateRangeSetListener){
+                                                            OnDateRangeSetListener dateRangeSetListener) {
         DateRangePickerDialogFragment fragment = new DateRangePickerDialogFragment();
         fragment.mStartRange = new Date(startDate);
         fragment.mEndRange = new Date(endDate);
@@ -100,7 +105,7 @@ public class DateRangePickerDialogFragment extends DialogFragment{
             }
         });
 
-        mCancelButton.setOnClickListener(new View.OnClickListener(){
+        mCancelButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 dismiss();

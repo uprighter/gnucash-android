@@ -19,9 +19,9 @@ package org.gnucash.android.test.ui.util;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.IBinder;
-import android.support.multidex.MultiDex;
-import android.support.test.runner.AndroidJUnitRunner;
 import android.util.Log;
+
+import androidx.test.runner.AndroidJUnitRunner;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -29,7 +29,7 @@ import java.lang.reflect.Method;
 /**
  * Custom test runner
  */
-public class GnucashAndroidTestRunner extends AndroidJUnitRunner{
+public class GnucashAndroidTestRunner extends AndroidJUnitRunner {
     private static final String TAG = "GncAndroidTestRunner";
     private static final String ANIMATION_PERMISSION = "android.permission.SET_ANIMATION_SCALE";
     private static final float DISABLED = 0.0f;
@@ -62,7 +62,7 @@ public class GnucashAndroidTestRunner extends AndroidJUnitRunner{
         }
     }
 
-    private void enableAnimation(){
+    private void enableAnimation() {
         int permStatus = getContext().checkCallingOrSelfPermission(ANIMATION_PERMISSION);
         if (permStatus == PackageManager.PERMISSION_GRANTED) {
             if (reflectivelyDisableAnimation(DEFAULT)) {

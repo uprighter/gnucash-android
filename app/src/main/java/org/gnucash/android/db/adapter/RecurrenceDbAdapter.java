@@ -16,11 +16,14 @@
 
 package org.gnucash.android.db.adapter;
 
+import static org.gnucash.android.db.DatabaseSchema.RecurrenceEntry;
+
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteStatement;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import org.gnucash.android.app.GnuCashApplication;
 import org.gnucash.android.model.PeriodType;
@@ -32,8 +35,6 @@ import java.util.Calendar;
 import java.util.Collections;
 import java.util.List;
 
-import static org.gnucash.android.db.DatabaseSchema.RecurrenceEntry;
-
 /**
  * Database adapter for {@link Recurrence} entries
  */
@@ -41,7 +42,7 @@ public class RecurrenceDbAdapter extends DatabaseAdapter<Recurrence> {
     /**
      * Opens the database adapter with an existing database
      *
-     * @param db        SQLiteDatabase object
+     * @param db SQLiteDatabase object
      */
     public RecurrenceDbAdapter(SQLiteDatabase db) {
         super(db, RecurrenceEntry.TABLE_NAME, new String[]{
@@ -53,7 +54,7 @@ public class RecurrenceDbAdapter extends DatabaseAdapter<Recurrence> {
         });
     }
 
-    public static RecurrenceDbAdapter getInstance(){
+    public static RecurrenceDbAdapter getInstance() {
         return GnuCashApplication.getRecurrenceDbAdapter();
     }
 
@@ -133,7 +134,7 @@ public class RecurrenceDbAdapter extends DatabaseAdapter<Recurrence> {
             }
             builder.append(",");
         }
-        builder.deleteCharAt(builder.length()-1);
+        builder.deleteCharAt(builder.length() - 1);
         return builder.toString();
     }
 

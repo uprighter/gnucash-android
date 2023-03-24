@@ -1,26 +1,127 @@
 name: CI Build
 
 on:
-  push: { }
+  push: {}
   pull_request:
-    branches: [ "master" ]
+    branches: [master]
+
+env:
+  GOOGLE_SERVICES: |
+    {
+      "project_info": {
+        "project_number": "679335683580",
+        "project_id": "gnucash-pocket",
+        "storage_bucket": "gnucash-pocket.appspot.com"
+      },
+      "client": [
+        {
+          "client_info": {
+            "mobilesdk_app_id": "1:679335683580:android:4a7289ff6df3b6d0e7fe79",
+            "android_client_info": {
+              "package_name": "org.gnucash.android"
+            }
+          },
+          "oauth_client": [
+            {
+              "client_id": "679335683580-9k138m2htltj52u018gqetisuf6fj3ca.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ],
+          "api_key": [
+            {
+              "current_key": "AIzaSyD3DWSMPA3bE2fm6vChbGy6o_fNYRLCCsQ"
+            }
+          ],
+          "services": {
+            "appinvite_service": {
+              "other_platform_oauth_client": [
+                {
+                  "client_id": "679335683580-9k138m2htltj52u018gqetisuf6fj3ca.apps.googleusercontent.com",
+                  "client_type": 3
+                }
+              ]
+            }
+          }
+        },
+        {
+          "client_info": {
+            "mobilesdk_app_id": "1:679335683580:android:b7412dd4e5dddc59e7fe79",
+            "android_client_info": {
+              "package_name": "org.gnucash.android.devel"
+            }
+          },
+          "oauth_client": [
+            {
+              "client_id": "679335683580-9k138m2htltj52u018gqetisuf6fj3ca.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ],
+          "api_key": [
+            {
+              "current_key": "AIzaSyD3DWSMPA3bE2fm6vChbGy6o_fNYRLCCsQ"
+            }
+          ],
+          "services": {
+            "appinvite_service": {
+              "other_platform_oauth_client": [
+                {
+                  "client_id": "679335683580-9k138m2htltj52u018gqetisuf6fj3ca.apps.googleusercontent.com",
+                  "client_type": 3
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "configuration_version": "1"
+    }
 
 jobs:
-  main:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout Code
         uses: actions/checkout@v3
       - name: Prepare Java
         uses: actions/setup-java@v3
         with:
-          java-version: "8"
-          distribution: "temurin"
+          java-version: "11"
+          distribution: temurin
       - name: Prepare Gradle
         uses: gradle/gradle-build-action@v2
-      - name: Build
+      - name: Prepare Google Services
+        run: echo $GOOGLE_SERVICES > app/google-services.json
+        env:
+          GOOGLE_SERVICES: ${{ env.GOOGLE_SERVICES }}
+      - name: Build Application APK
         run: ./gradlew assembleDevelopmentDebug
-      - name: Unit Tests
+      - name: Rename Application APK
+        run: cp app/build/outputs/apk/development/debug/*.apk application.apk
+      - name: Upload Application APK
+        uses: actions/upload-artifact@v3
+        with:
+          name: application-apk
+          path: application.apk
+          if-no-files-found: error
+
+  unit-test:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+      - name: Prepare Java
+        uses: actions/setup-java@v3
+        with:
+          java-version: "11"
+          distribution: temurin
+      - name: Prepare Gradle
+        uses: gradle/gradle-build-action@v2
+      - name: Prepare Google Services
+        run: echo $GOOGLE_SERVICES > app/google-services.json
+        env:
+          GOOGLE_SERVICES: ${{ env.GOOGLE_SERVICES }}
+      - name: Run Unit Tests
         run: ./gradlew testDevelopmentDebugUnitTest
       - name: Unit Test Summary
         uses: test-summary/action@v2
@@ -33,38 +134,50 @@ jobs:
         with:
           name: unit-test-results
           path: app/build/test-results/testDevelopmentDebugUnitTest/TEST-*.xml
-      - name: Lint
-        run: ./gradlew lintDevelopmentDebug
-      - name: Upload APK
-        uses: actions/upload-artifact@v3
-        with:
-          name: "Development Debug APK"
-          path: app/build/outputs/apk/development/debug/*.apk
-  instrumentation-test:
-    runs-on: macos-latest
+          if-no-files-found: error
+
+  lint:
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout Code
         uses: actions/checkout@v3
       - name: Prepare Java
         uses: actions/setup-java@v3
         with:
-          java-version: "8"
-          distribution: "temurin"
+          java-version: "11"
+          distribution: temurin
       - name: Prepare Gradle
         uses: gradle/gradle-build-action@v2
-      - name: Instrumentation Tests
-        uses: reactivecircus/android-emulator-runner@v2
+      - name: Prepare Google Services
+        run: echo $GOOGLE_SERVICES > app/google-services.json
+        env:
+          GOOGLE_SERVICES: ${{ env.GOOGLE_SERVICES }}
+      - name: Run Linter
+        run: ./gradlew lintDevelopmentDebug
+
+  instrumentation-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+      - name: Prepare Java
+        uses: actions/setup-java@v3
         with:
-          api-level: 27
-          script: ./gradlew spoonDevelopmentDebugAndroidTest
-      - name: Instrumentation Test Summary
-        uses: test-summary/action@v2
-        if: always()
-        with:
-          paths: "app/build/spoon/junit-reports/*.xml"
-      - name: Upload Instrumentation Test Results for Report
+          java-version: "11"
+          distribution: temurin
+      - name: Prepare Gradle
+        uses: gradle/gradle-build-action@v2
+      - name: Prepare Google Services
+        run: echo $GOOGLE_SERVICES > app/google-services.json
+        env:
+          GOOGLE_SERVICES: ${{ env.GOOGLE_SERVICES }}
+      - name: Build Instrumentation APK
+        run: ./gradlew assembleDevelopmentDebugAndroidTest
+      - name: Rename Instrumentation APK
+        run: cp app/build/outputs/apk/androidTest/development/debug/*.apk instrumentation.apk
+      - name: Upload Instrumentation APK
         uses: actions/upload-artifact@v3
-        if: always()
         with:
-          name: instrumentation-test-results
-          path: app/build/spoon
+          name: instrumentation-apk
+          path: instrumentation.apk
+          if-no-files-found: error

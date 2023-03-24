@@ -18,11 +18,12 @@ package org.gnucash.android.util;
 
 import android.content.Context;
 import android.database.Cursor;
-import android.support.annotation.LayoutRes;
-import android.support.v4.widget.SimpleCursorAdapter;
 import android.text.TextUtils;
 import android.view.View;
 import android.widget.TextView;
+
+import androidx.annotation.LayoutRes;
+import androidx.cursoradapter.widget.SimpleCursorAdapter;
 
 import org.gnucash.android.db.DatabaseSchema;
 import org.gnucash.android.db.adapter.CommoditiesDbAdapter;
@@ -39,7 +40,7 @@ public class CommoditiesCursorAdapter extends SimpleCursorAdapter {
         super(context, itemLayoutResource,
                 CommoditiesDbAdapter.getInstance().fetchAllRecords(DatabaseSchema.CommodityEntry.COLUMN_MNEMONIC + " ASC"),
                 new String[]{DatabaseSchema.CommodityEntry.COLUMN_FULLNAME},
-                new int[] {android.R.id.text1}, 0);
+                new int[]{android.R.id.text1}, 0);
     }
 
     @Override

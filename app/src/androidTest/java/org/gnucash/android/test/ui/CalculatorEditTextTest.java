@@ -16,14 +16,23 @@
 
 package org.gnucash.android.test.ui;
 
+import static androidx.test.espresso.Espresso.onView;
+import static androidx.test.espresso.Espresso.pressBack;
+import static androidx.test.espresso.action.ViewActions.click;
+import static androidx.test.espresso.assertion.ViewAssertions.matches;
+import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
+import static androidx.test.espresso.matcher.ViewMatchers.withId;
+import static org.hamcrest.Matchers.not;
+
 import android.Manifest;
 import android.content.Intent;
 import android.database.SQLException;
 import android.database.sqlite.SQLiteDatabase;
-import android.support.test.rule.ActivityTestRule;
-import android.support.test.rule.GrantPermissionRule;
-import android.support.test.runner.AndroidJUnit4;
 import android.util.Log;
+
+import androidx.test.rule.ActivityTestRule;
+import androidx.test.rule.GrantPermissionRule;
+import androidx.test.runner.AndroidJUnit4;
 
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
@@ -47,35 +56,28 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import static android.support.test.espresso.Espresso.onView;
-import static android.support.test.espresso.Espresso.pressBack;
-import static android.support.test.espresso.action.ViewActions.click;
-import static android.support.test.espresso.assertion.ViewAssertions.matches;
-import static android.support.test.espresso.matcher.ViewMatchers.isDisplayed;
-import static android.support.test.espresso.matcher.ViewMatchers.withId;
-import static org.hamcrest.Matchers.not;
-
 // TODO: Find out how to press the keys in the KeyboardView.
 @RunWith(AndroidJUnit4.class)
 public class CalculatorEditTextTest {
-	private static final String DUMMY_ACCOUNT_UID = "transactions-account";
-	private static final String DUMMY_ACCOUNT_NAME = "Transactions Account";
+    private static final String DUMMY_ACCOUNT_UID = "transactions-account";
+    private static final String DUMMY_ACCOUNT_NAME = "Transactions Account";
 
-    private static final String TRANSFER_ACCOUNT_NAME   = "Transfer account";
-    private static final String TRANSFER_ACCOUNT_UID    = "transfer_account";
+    private static final String TRANSFER_ACCOUNT_NAME = "Transfer account";
+    private static final String TRANSFER_ACCOUNT_UID = "transfer_account";
     public static final String CURRENCY_CODE = "USD";
 
     private static DatabaseHelper mDbHelper;
     private static AccountsDbAdapter mAccountsDbAdapter;
     private static TransactionsDbAdapter mTransactionsDbAdapter;
     private static SplitsDbAdapter mSplitsDbAdapter;
-	private TransactionsActivity mTransactionsActivity;
+    private TransactionsActivity mTransactionsActivity;
 
-	public CalculatorEditTextTest() {
-	}
+    public CalculatorEditTextTest() {
+    }
 
 
-    @Rule public GrantPermissionRule animationPermissionsRule = GrantPermissionRule.grant(Manifest.permission.SET_ANIMATION_SCALE);
+    @Rule
+    public GrantPermissionRule animationPermissionsRule = GrantPermissionRule.grant(Manifest.permission.SET_ANIMATION_SCALE);
 
     @ClassRule
     public static DisableAnimationsRule disableAnimationsRule = new DisableAnimationsRule();
@@ -86,7 +88,7 @@ public class CalculatorEditTextTest {
 
 
     @BeforeClass
-    public static void prepTestCase(){
+    public static void prepTestCase() {
         String activeBookUID = BooksDbAdapter.getInstance().getActiveBookUID();
         mDbHelper = new DatabaseHelper(GnuCashApplication.getAppContext(), activeBookUID);
 
@@ -101,15 +103,15 @@ public class CalculatorEditTextTest {
 //        mTransactionsDbAdapter = new TransactionsDbAdapter(mDb, mSplitsDbAdapter);
 //        mAccountsDbAdapter = new AccountsDbAdapter(mDb, mTransactionsDbAdapter);
 
-        mSplitsDbAdapter        = SplitsDbAdapter.getInstance();
-        mTransactionsDbAdapter  = TransactionsDbAdapter.getInstance();
-        mAccountsDbAdapter      = AccountsDbAdapter.getInstance();
+        mSplitsDbAdapter = SplitsDbAdapter.getInstance();
+        mTransactionsDbAdapter = TransactionsDbAdapter.getInstance();
+        mAccountsDbAdapter = AccountsDbAdapter.getInstance();
 
         AccountsActivityTest.preventFirstRunDialogs(GnuCashApplication.getAppContext());
     }
 
     @Before
-	public void setUp() throws Exception {
+    public void setUp() throws Exception {
 
         mAccountsDbAdapter.deleteAllRecords();
 
@@ -130,7 +132,7 @@ public class CalculatorEditTextTest {
         mActivityRule.launchActivity(intent);
         mTransactionsActivity = mActivityRule.getActivity();
 
-	}
+    }
 
     /**
      * Checks the calculator keyboard is showed/hided as expected.
@@ -156,22 +158,23 @@ public class CalculatorEditTextTest {
         onView(withId(R.id.calculator_keyboard)).check(matches(not(isDisplayed())));
     }
 
-	/**
-	 * Simple wrapper for clicking on views with espresso
-	 * @param viewId View resource ID
-	 */
-	private void clickOnView(int viewId){
-		onView(withId(viewId)).perform(click());
-	}
+    /**
+     * Simple wrapper for clicking on views with espresso
+     *
+     * @param viewId View resource ID
+     */
+    private void clickOnView(int viewId) {
+        onView(withId(viewId)).perform(click());
+    }
 
-	@After
-	public void tearDown() throws Exception {
-		if (mTransactionsActivity != null)
+    @After
+    public void tearDown() throws Exception {
+        if (mTransactionsActivity != null)
             mTransactionsActivity.finish();
-	}
+    }
 
     @AfterClass
-    public static void cleanup(){
+    public static void cleanup() {
         if (mDbHelper != null)
             mDbHelper.close();
     }

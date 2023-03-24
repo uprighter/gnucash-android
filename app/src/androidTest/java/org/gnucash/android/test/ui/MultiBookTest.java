@@ -15,15 +15,28 @@
  */
 package org.gnucash.android.test.ui;
 
+import static androidx.test.espresso.Espresso.onView;
+import static androidx.test.espresso.action.ViewActions.click;
+import static androidx.test.espresso.action.ViewActions.swipeUp;
+import static androidx.test.espresso.assertion.ViewAssertions.matches;
+import static androidx.test.espresso.intent.matcher.IntentMatchers.hasComponent;
+import static androidx.test.espresso.matcher.ViewMatchers.hasDescendant;
+import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
+import static androidx.test.espresso.matcher.ViewMatchers.withId;
+import static androidx.test.espresso.matcher.ViewMatchers.withParent;
+import static androidx.test.espresso.matcher.ViewMatchers.withText;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.allOf;
+
 import android.Manifest;
-import android.support.test.espresso.contrib.DrawerActions;
-import android.support.test.espresso.intent.Intents;
-import android.support.test.espresso.intent.rule.IntentsTestRule;
-import android.support.test.rule.GrantPermissionRule;
-import android.support.test.runner.AndroidJUnit4;
+
+import androidx.test.espresso.contrib.DrawerActions;
+import androidx.test.espresso.intent.Intents;
+import androidx.test.espresso.intent.rule.IntentsTestRule;
+import androidx.test.rule.GrantPermissionRule;
+import androidx.test.runner.AndroidJUnit4;
 
 import org.gnucash.android.R;
-import org.gnucash.android.db.BookDbHelper;
 import org.gnucash.android.db.adapter.BooksDbAdapter;
 import org.gnucash.android.model.Book;
 import org.gnucash.android.test.ui.util.DisableAnimationsRule;
@@ -35,19 +48,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import static android.support.test.espresso.Espresso.onView;
-import static android.support.test.espresso.action.ViewActions.click;
-import static android.support.test.espresso.action.ViewActions.swipeUp;
-import static android.support.test.espresso.assertion.ViewAssertions.matches;
-import static android.support.test.espresso.intent.matcher.IntentMatchers.hasComponent;
-import static android.support.test.espresso.matcher.ViewMatchers.hasDescendant;
-import static android.support.test.espresso.matcher.ViewMatchers.isDisplayed;
-import static android.support.test.espresso.matcher.ViewMatchers.withId;
-import static android.support.test.espresso.matcher.ViewMatchers.withParent;
-import static android.support.test.espresso.matcher.ViewMatchers.withText;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.hamcrest.Matchers.allOf;
-
 /**
  * Test support for multiple books in the application
  */
@@ -56,7 +56,8 @@ public class MultiBookTest {
 
     private static BooksDbAdapter mBooksDbAdapter;
 
-    @Rule public GrantPermissionRule animationPermissionsRule = GrantPermissionRule.grant(Manifest.permission.SET_ANIMATION_SCALE);
+    @Rule
+    public GrantPermissionRule animationPermissionsRule = GrantPermissionRule.grant(Manifest.permission.SET_ANIMATION_SCALE);
 
     @ClassRule
     public static DisableAnimationsRule disableAnimationsRule = new DisableAnimationsRule();
@@ -65,12 +66,12 @@ public class MultiBookTest {
     public IntentsTestRule<AccountsActivity> mActivityRule = new IntentsTestRule<>(AccountsActivity.class);
 
     @BeforeClass
-    public static void prepTestCase(){
+    public static void prepTestCase() {
         mBooksDbAdapter = BooksDbAdapter.getInstance();
     }
 
     @Test
-    public void shouldOpenBookManager(){
+    public void shouldOpenBookManager() {
         onView(withId(R.id.drawer_layout)).perform(DrawerActions.open());
         onView(withId(R.id.book_name)).check(matches(isDisplayed())).perform(click());
 
@@ -79,7 +80,7 @@ public class MultiBookTest {
         Intents.intended(hasComponent(PreferenceActivity.class.getName()));
     }
 
-    public void testLoadBookFromBookManager(){
+    public void testLoadBookFromBookManager() {
         Book book = new Book();
         book.setDisplayName("Launch Codes");
         BooksDbAdapter.getInstance().addRecord(book);
@@ -91,7 +92,7 @@ public class MultiBookTest {
     }
 
     @Test
-    public void creatingNewAccounts_shouldCreatedNewBook(){
+    public void creatingNewAccounts_shouldCreatedNewBook() {
         long booksCount = mBooksDbAdapter.getRecordsCount();
 
         onView(withId(R.id.drawer_layout)).perform(DrawerActions.open());
@@ -107,15 +108,15 @@ public class MultiBookTest {
         //// TODO: 18.05.2016 wait for import to finish instead
         sleep(2000); //give import time to finish
 
-        assertThat(mBooksDbAdapter.getRecordsCount()).isEqualTo(booksCount+1);
+        assertThat(mBooksDbAdapter.getRecordsCount()).isEqualTo(booksCount + 1);
 
         //// TODO: 25.08.2016 Delete all books before the start of this test
         Book activeBook = mBooksDbAdapter.getRecord(mBooksDbAdapter.getActiveBookUID());
-        assertThat(activeBook.getDisplayName()).isEqualTo("Book " + (booksCount+1));
+        assertThat(activeBook.getDisplayName()).isEqualTo("Book " + (booksCount + 1));
     }
 
     @Test
-    public void testCreateNewBook(){
+    public void testCreateNewBook() {
         long bookCount = mBooksDbAdapter.getRecordsCount();
 
         shouldOpenBookManager();
@@ -124,11 +125,11 @@ public class MultiBookTest {
                 .check(matches(isDisplayed()))
                 .perform(click());
 
-        assertThat(mBooksDbAdapter.getRecordsCount()).isEqualTo(bookCount+1);
+        assertThat(mBooksDbAdapter.getRecordsCount()).isEqualTo(bookCount + 1);
     }
 
     //TODO: Finish implementation of this test
-    public void testDeleteBook(){
+    public void testDeleteBook() {
         long bookCount = mBooksDbAdapter.getRecordsCount();
 
         Book book = new Book();
@@ -149,7 +150,7 @@ public class MultiBookTest {
         assertThat(mBooksDbAdapter.getRecordsCount()).isEqualTo(bookCount);
     }
 
-    private static void sleep(long millis){
+    private static void sleep(long millis) {
         try {
             Thread.sleep(millis);
         } catch (InterruptedException e) {

@@ -15,7 +15,6 @@
  */
 package org.gnucash.android.importer;
 
-import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.ProgressDialog;
 import android.content.ContentValues;
@@ -23,12 +22,11 @@ import android.content.Context;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.AsyncTask;
-import android.os.Build;
 import android.provider.OpenableColumns;
 import android.util.Log;
 import android.widget.Toast;
 
-import com.crashlytics.android.Crashlytics;
+import com.google.firebase.crashlytics.FirebaseCrashlytics;
 
 import org.gnucash.android.R;
 import org.gnucash.android.db.DatabaseSchema;
@@ -49,11 +47,11 @@ public class ImportAsyncTask extends AsyncTask<Uri, Void, Boolean> {
 
     private String mImportedBookUID;
 
-    public ImportAsyncTask(Activity context){
+    public ImportAsyncTask(Activity context) {
         this.mContext = context;
     }
 
-    public ImportAsyncTask(Activity context, TaskDelegate delegate){
+    public ImportAsyncTask(Activity context, TaskDelegate delegate) {
         this.mContext = context;
         this.mDelegate = delegate;
     }
@@ -80,14 +78,14 @@ public class ImportAsyncTask extends AsyncTask<Uri, Void, Boolean> {
             InputStream accountInputStream = mContext.getContentResolver().openInputStream(uris[0]);
             mImportedBookUID = GncXmlImporter.parse(accountInputStream);
 
-        } catch (Exception exception){
+        } catch (Exception exception) {
             Log.e(ImportAsyncTask.class.getName(), "" + exception.getMessage());
-            Crashlytics.log("Could not open: " + uris[0].toString());
-            Crashlytics.logException(exception);
+            FirebaseCrashlytics.getInstance().log("Could not open: " + uris[0].toString());
+            FirebaseCrashlytics.getInstance().recordException(exception);
             exception.printStackTrace();
 
             final String err_msg = exception.getLocalizedMessage();
-            Crashlytics.log(err_msg);
+            FirebaseCrashlytics.getInstance().log(err_msg);
             mContext.runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
@@ -126,7 +124,7 @@ public class ImportAsyncTask extends AsyncTask<Uri, Void, Boolean> {
         try {
             if (mProgressDialog != null && mProgressDialog.isShowing())
                 mProgressDialog.dismiss();
-        } catch (IllegalArgumentException ex){
+        } catch (IllegalArgumentException ex) {
             //TODO: This is a hack to catch "View not attached to window" exceptions
             //FIXME by moving the creation and display of the progress dialog to the Fragment
         } finally {

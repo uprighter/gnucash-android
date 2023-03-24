@@ -20,7 +20,8 @@ import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.DialogInterface;
 import android.os.Bundle;
-import android.support.v4.app.DialogFragment;
+
+import androidx.fragment.app.DialogFragment;
 
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
@@ -39,8 +40,8 @@ import java.util.List;
 /**
  * Displays a delete confirmation dialog for transactions
  * If the transaction ID parameter is 0, then all transactions will be deleted
- * @author Ngewi Fet <ngewif@gmail.com>
  *
+ * @author Ngewi Fet <ngewif@gmail.com>
  */
 public class TransactionsDeleteConfirmationDialogFragment extends DialogFragment {
 
@@ -53,7 +54,8 @@ public class TransactionsDeleteConfirmationDialogFragment extends DialogFragment
         return frag;
     }
 
-    @Override    public Dialog onCreateDialog(Bundle savedInstanceState) {
+    @Override
+    public Dialog onCreateDialog(Bundle savedInstanceState) {
         int title = getArguments().getInt("title");
         final long rowId = getArguments().getLong(UxArgument.SELECTED_TRANSACTION_IDS);
         int message = rowId == 0 ? R.string.msg_delete_all_transactions_confirmation : R.string.msg_delete_transaction_confirmation;

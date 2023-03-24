@@ -17,27 +17,25 @@
 
 package org.gnucash.android.ui.wizard;
 
-import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.pm.PackageManager;
 import android.content.res.Resources;
 import android.graphics.drawable.ColorDrawable;
-import android.os.Build;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
-import android.support.v4.app.Fragment;
-import android.support.v4.app.FragmentManager;
-import android.support.v4.app.FragmentStatePagerAdapter;
-import android.support.v4.content.ContextCompat;
-import android.support.v4.view.ViewPager;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.AppCompatButton;
 import android.util.TypedValue;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.AppCompatButton;
+import androidx.core.content.ContextCompat;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentManager;
+import androidx.fragment.app.FragmentStatePagerAdapter;
+import androidx.viewpager.widget.ViewPager;
 
 import com.tech.freak.wizardpager.model.AbstractWizardModel;
 import com.tech.freak.wizardpager.model.ModelCallbacks;
@@ -65,7 +63,8 @@ import butterknife.ButterKnife;
 public class FirstRunWizardActivity extends AppCompatActivity implements
         PageFragmentCallbacks, ReviewFragment.Callbacks, ModelCallbacks {
 
-    @BindView(R.id.pager) ViewPager mPager;
+    @BindView(R.id.pager)
+    ViewPager mPager;
     private MyPagerAdapter mPagerAdapter;
 
     private boolean mEditingAfterReview;
@@ -74,9 +73,12 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
 
     private boolean mConsumePageSelectedEvent;
 
-    @BindView(R.id.btn_save)    AppCompatButton mNextButton;
-    @BindView(R.id.btn_cancel)  Button mPrevButton;
-    @BindView(R.id.strip)       StepPagerStrip mStepPagerStrip;
+    @BindView(R.id.btn_save)
+    AppCompatButton mNextButton;
+    @BindView(R.id.btn_cancel)
+    Button mPrevButton;
+    @BindView(R.id.strip)
+    StepPagerStrip mStepPagerStrip;
 
     private List<Page> mCurrentPageSequence;
     private String mAccountOptions;
@@ -139,13 +141,13 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
                     String feedbackOption = getString(R.string.wizard_option_disable_crash_reports);
                     for (ReviewItem reviewItem : reviewItems) {
                         String title = reviewItem.getTitle();
-                        if (title.equals(getString(R.string.wizard_title_default_currency))){
+                        if (title.equals(getString(R.string.wizard_title_default_currency))) {
                             mCurrencyCode = reviewItem.getDisplayValue();
-                        } else if (title.equals(getString(R.string.wizard_title_select_currency))){
+                        } else if (title.equals(getString(R.string.wizard_title_select_currency))) {
                             mCurrencyCode = reviewItem.getDisplayValue();
-                        } else if (title.equals(getString(R.string.wizard_title_account_setup))){
+                        } else if (title.equals(getString(R.string.wizard_title_account_setup))) {
                             mAccountOptions = reviewItem.getDisplayValue();
-                        } else if (title.equals(getString(R.string.wizard_title_feedback_options))){
+                        } else if (title.equals(getString(R.string.wizard_title_feedback_options))) {
                             feedbackOption = reviewItem.getDisplayValue();
                         }
                     }
@@ -154,7 +156,7 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
                     SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(FirstRunWizardActivity.this);
                     SharedPreferences.Editor preferenceEditor = preferences.edit();
 
-                    if (feedbackOption.equals(getString(R.string.wizard_option_auto_send_crash_reports))){
+                    if (feedbackOption.equals(getString(R.string.wizard_option_auto_send_crash_reports))) {
                         preferenceEditor.putBoolean(getString(R.string.key_enable_crashlytics), true);
                     } else {
                         preferenceEditor.putBoolean(getString(R.string.key_enable_crashlytics), false);
@@ -193,8 +195,9 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
     /**
      * Create the wizard model for the activity, taking into accoun the savedInstanceState if it
      * exists (and if it contains a "model" key that we can use).
-     * @param savedInstanceState    the instance state available in {{@link #onCreate(Bundle)}}
-     * @return  an appropriate wizard model for this activity
+     *
+     * @param savedInstanceState the instance state available in {{@link #onCreate(Bundle)}}
+     * @return an appropriate wizard model for this activity
      */
     private AbstractWizardModel createWizardModel(Bundle savedInstanceState) {
         AbstractWizardModel model = new FirstRunWizardModel(this);
@@ -215,13 +218,13 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
     private void createAccountsAndFinish() {
         AccountsActivity.removeFirstRunFlag();
 
-        if (mAccountOptions.equals(getString(R.string.wizard_option_create_default_accounts))){
+        if (mAccountOptions.equals(getString(R.string.wizard_option_create_default_accounts))) {
             //save the UID of the active book, and then delete it after successful import
             String bookUID = BooksDbAdapter.getInstance().getActiveBookUID();
             AccountsActivity.createDefaultAccounts(mCurrencyCode, FirstRunWizardActivity.this);
             BooksDbAdapter.getInstance().deleteBook(bookUID); //a default book is usually created
             finish();
-        } else if (mAccountOptions.equals(getString(R.string.wizard_option_import_my_accounts))){
+        } else if (mAccountOptions.equals(getString(R.string.wizard_option_import_my_accounts))) {
             AccountsActivity.startXmlFileChooser(this);
         } else { //user prefers to handle account creation themselves
             AccountsActivity.start(this);
@@ -264,7 +267,7 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        switch (requestCode){
+        switch (requestCode) {
             case AccountsActivity.REQUEST_PICK_ACCOUNTS_FILE:
                 if (resultCode == Activity.RESULT_OK && data != null) {
                     AccountsActivity.importXmlFileFromIntent(this, data, new TaskDelegate() {

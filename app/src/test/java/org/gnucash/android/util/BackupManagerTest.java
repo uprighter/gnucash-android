@@ -1,5 +1,7 @@
 package org.gnucash.android.util;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
 import org.gnucash.android.db.adapter.BooksDbAdapter;
@@ -17,10 +19,9 @@ import java.io.IOException;
 
 import javax.xml.parsers.ParserConfigurationException;
 
-import static org.assertj.core.api.Assertions.assertThat;
 
-
-@RunWith(RobolectricTestRunner.class) //package is required so that resources can be found in dev mode
+@RunWith(RobolectricTestRunner.class)
+//package is required so that resources can be found in dev mode
 @Config(sdk = 21, packageName = "org.gnucash.android",
         shadows = {ShadowCrashlytics.class, ShadowUserVoice.class})
 public class BackupManagerTest {
@@ -69,10 +70,11 @@ public class BackupManagerTest {
 
     /**
      * Creates a new database with default accounts
+     *
      * @return The book UID for the new database
      * @throws RuntimeException if the new books could not be created
      */
-    private String createNewBookWithDefaultAccounts(){
+    private String createNewBookWithDefaultAccounts() {
         try {
             return GncXmlImporter.parse(GnuCashApplication.getAppContext().getResources().openRawResource(R.raw.default_accounts));
         } catch (ParserConfigurationException | SAXException | IOException e) {
