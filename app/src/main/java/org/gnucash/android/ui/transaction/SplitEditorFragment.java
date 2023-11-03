@@ -209,6 +209,12 @@ public class SplitEditorFragment extends Fragment {
         SplitViewHolder viewHolder = new SplitViewHolder(splitView, split);
         splitView.setTag(viewHolder);
         mSplitItemViewList.add(splitView);
+
+        if (split == null ) {
+            // Only request focus on newly created split.
+            splitView.requestFocus();
+        }
+
         return splitView;
     }
 
