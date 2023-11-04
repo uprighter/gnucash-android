@@ -58,7 +58,7 @@ import androidx.test.espresso.Espresso;
 import androidx.test.espresso.matcher.ViewMatchers;
 import androidx.test.rule.ActivityTestRule;
 import androidx.test.rule.GrantPermissionRule;
-import androidx.test.runner.AndroidJUnit4;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 
 import com.kobakei.ratethisapp.RateThisApp;
 
@@ -318,7 +318,7 @@ public class AccountsActivityTest {
         //no sub-accounts
         assertThat(mAccountsDbAdapter.getSubAccountCount(SIMPLE_ACCOUNT_UID)).isEqualTo(0);
         assertThat(mAccountsDbAdapter.getSubAccountCount(mAccountsDbAdapter.getOrCreateGnuCashRootAccountUID())).isEqualTo(2);
-        assertThat(mAccountsDbAdapter.getSimpleAccountList()).extracting("mAccountType").contains(AccountType.TRADING);
+        assertThat(mAccountsDbAdapter.getSimpleAccountList()).extracting("accountType").contains(AccountType.TRADING);
     }
 
     @Test
