@@ -35,8 +35,6 @@ import java.util.Locale;
  * @author Yongxin Wang <fefe.wyx@gmail.com>
  */
 public abstract class GncXmlHelper {
-    public static final String TAG_GNC_PREFIX = "gnc:";
-
     public static final String ATTR_KEY_CD_TYPE = "cd:type";
     public static final String ATTR_KEY_TYPE = "type";
     public static final String ATTR_KEY_VERSION = "version";
@@ -88,7 +86,6 @@ public abstract class GncXmlHelper {
     public static final String TAG_SPLIT_ID = "split:id";
     public static final String TAG_SPLIT_MEMO = "split:memo";
     public static final String TAG_RECONCILED_STATE = "split:reconciled-state";
-    public static final String TAG_RECONCILED_DATE = "split:recondiled-date";
     public static final String TAG_SPLIT_ACCOUNT = "split:account";
     public static final String TAG_SPLIT_VALUE = "split:value";
     public static final String TAG_SPLIT_QUANTITY = "split:quantity";
@@ -217,6 +214,7 @@ public abstract class GncXmlHelper {
      * @return Formatted split amount
      * @deprecated Just use the values for numerator and denominator which are saved in the database
      */
+    @Deprecated
     public static String formatSplitAmount(BigDecimal amount, Commodity commodity) {
         int denomInt = commodity.getSmallestFraction();
         BigDecimal denom = new BigDecimal(denomInt);

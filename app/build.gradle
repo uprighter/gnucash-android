@@ -1,9 +1,18 @@
+/**
+ * The first line in the build configuration applies the Android Gradle plugin
+ * to this build and makes the android block available to specify
+ * Android-specific build options.
+ */
+
+plugins {
+    id 'com.android.application'
+    id 'com.google.firebase.crashlytics'
+    id 'com.google.gms.google-services'
+    id 'kotlin-android'
+}
+
 import java.text.SimpleDateFormat
 
-apply plugin: 'com.android.application'
-apply plugin: 'com.google.firebase.crashlytics'
-apply plugin: 'com.google.gms.google-services'
-apply plugin: 'kotlin-android'
 
 def versionMajor = 2
 def versionMinor = 4
@@ -20,14 +29,22 @@ static def gitSha() {
     return 'git rev-parse --short HEAD'.execute().text.trim()
 }
 
+kotlin {
+    jvmToolchain 17
+}
+
+/**
+ * The android block is where you configure all your Android-specific
+ * build options.
+ */
 
 android {
     compileSdk 34
+    namespace 'org.gnucash.android'
     defaultConfig {
         applicationId "org.gnucash.android"
         testApplicationId 'org.gnucash.android.test'
         minSdkVersion 19
-        targetSdkVersion 34
         versionCode versionMajor * 10000 + versionMinor * 1000 + versionPatch * 100 + versionBuild
         versionName "${versionMajor}.${versionMinor}.${versionPatch}"
         resValue "string", "app_version_name", "${versionName}"
@@ -38,6 +55,25 @@ android {
         multiDexEnabled true
         testInstrumentationRunner "org.gnucash.android.test.ui.util.GnucashAndroidTestRunner"
 
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (project.hasProperty("RELEASE_STORE_FILE")) {
+                signingConfig signingConfigs.release
+            } else {
+                signingConfig signingConfigs.debug
+            }
+        }
+        debug {
+            debuggable true
+            minifyEnabled false
+            testCoverageEnabled true
+            signingConfig signingConfigs.debug
+        }
     }
 
     packagingOptions {
@@ -67,31 +103,7 @@ android {
         }
     }
 
-    buildTypes {
-        //todo re-enable proguard and test coverage
-        release {
-//            minifyEnabled true
-//            shrinkResources true
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            if (project.hasProperty("RELEASE_STORE_FILE")) {
-                signingConfig signingConfigs.release
-            } else {
-                signingConfig signingConfigs.debug
-            }
-        }
-        debug {
-            debuggable true
-            minifyEnabled false
-//            testCoverageEnabled true
-            signingConfig signingConfigs.debug
-        }
-    }
-    lint {
-        abortOnError false
-    }
-
     flavorDimensions "stability"
-
     productFlavors {
         development {
             applicationId 'org.gnucash.android.devel'
@@ -137,11 +149,17 @@ android {
         }
     }
 
-
     compileOptions { //we want switch with strings during xml parsing
         encoding "UTF-8"
         sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
+    }
+    lint {
+        abortOnError false
+    }
+    allprojects {
+        tasks.withType(JavaCompile) {
+            options.compilerArgs << "-Xlint:unchecked" << "-Xlint:deprecation"
+        }
     }
 
     testOptions {
@@ -150,12 +168,71 @@ android {
         }
     }
 
-    namespace 'org.gnucash.android'
-
     sourceSets {
         main {
             jniLibs.srcDirs = ['libs']
         }
+    }
+}
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation(
+            'androidx.appcompat:appcompat:1.6.1',
+            'androidx.cardview:cardview:1.0.0',
+            'androidx.drawerlayout:drawerlayout:1.2.0',
+            'androidx.multidex:multidex:2.0.1',
+            'androidx.preference:preference:1.2.0',
+            'androidx.recyclerview:recyclerview:1.3.0',
+            'com.google.android.material:material:1.10.0',
+    )
+
+    implementation platform('com.google.firebase:firebase-bom:31.2.1')
+    implementation 'com.google.firebase:firebase-analytics:21.5.0'
+    implementation 'com.google.firebase:firebase-crashlytics:18.5.1'
+    implementation 'com.google.android.gms:play-services-drive:17.0.0'
+
+    implementation 'net.objecthunter:exp4j:0.4.8'
+
+    implementation 'joda-time:joda-time:2.12.5'
+
+    implementation 'com.github.techfreak:wizardpager:1.0.3'
+    implementation 'com.github.PhilJay:MPAndroidChart:v2.1.3'
+    implementation 'com.code-troopers.betterpickers:library:3.1.0'
+    implementation 'com.dropbox.core:dropbox-core-sdk:5.4.6'
+    implementation 'com.squareup:android-times-square:1.7.11'
+
+    annotationProcessor 'com.jakewharton:butterknife-compiler:10.2.3'
+    implementation 'com.jakewharton:butterknife:10.2.3'
+
+    debugImplementation 'com.facebook.stetho:stetho:1.6.0'
+
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.assertj:assertj-core:3.24.2'
+    testImplementation 'org.robolectric:robolectric:4.11.1'
+    testImplementation 'org.robolectric:shadows-multidex:4.11.1'
+}
+
+def androidEspressoVersion = "3.5.1"
+dependencies {
+    //the following are only added so that the app and test version both us the same versions
+    androidTestImplementation 'com.google.android.material:material:1.10.0'
+
+    androidTestImplementation 'androidx.test:runner:1.5.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test:rules:1.5.0'
+    androidTestImplementation 'androidx.test.uiautomator:uiautomator:2.2.0'
+
+    androidTestImplementation 'androidx.test.espresso:espresso-core:' + androidEspressoVersion
+    androidTestImplementation 'androidx.test.espresso:espresso-intents:' + androidEspressoVersion
+    androidTestImplementation('androidx.test.espresso:espresso-contrib:' + androidEspressoVersion) {
+        exclude group: 'com.android.support', module: 'support-v4'
+        exclude module: 'recyclerview-v7'
+    }
+
+    androidTestImplementation 'com.squareup.spoon:spoon-client:1.7.1'
+    androidTestImplementation('com.squareup.assertj:assertj-android:1.2.0') {
+        exclude group: 'com.android.support', module: 'support-annotations'
     }
 }
 
@@ -166,82 +243,4 @@ afterEvaluate {
         grantAllPermissions = true
         codeCoverage = true
     }
-}
-
-def androidSupportVersion = "27.1.1"
-dependencies {
-    implementation fileTree(dir: 'libs', include: ['*.jar'])
-
-    implementation "org.jetbrains.kotlin:kotlin-stdlib:1.8.21"
-
-    implementation(
-            'androidx.appcompat:appcompat:1.6.1',
-            'com.google.android.material:material:1.9.0',
-            'androidx.cardview:cardview:1.0.0',
-            'androidx.preference:preference:1.2.0',
-            'androidx.recyclerview:recyclerview:1.3.0'
-    )
-
-    implementation 'net.objecthunter:exp4j:0.4.7'
-    implementation 'androidx.drawerlayout:drawerlayout:1.2.0'
-    implementation 'androidx.multidex:multidex:2.0.1'
-
-    implementation 'com.google.android.gms:play-services-drive:17.0.0'
-
-    implementation platform('com.google.firebase:firebase-bom:31.2.1')
-    implementation 'com.google.firebase:firebase-crashlytics'
-
-    implementation 'com.jakewharton:butterknife:10.2.3'
-    annotationProcessor 'com.jakewharton:butterknife-compiler:10.2.3'
-
-    implementation('com.uservoice:uservoice-android-sdk:1.2.6') {
-        exclude module: 'commons-logging'
-        exclude module: 'httpcore'
-        exclude module: 'httpclient'
-    }
-
-    implementation 'org.jraf:android-switch-backport:2.0.1@aar'
-    implementation 'com.github.nextcloud:android-library:1.0.31'
-    implementation 'com.squareup:android-times-square:1.6.5@aar'
-    implementation 'com.github.PhilJay:MPAndroidChart:v2.1.3'
-
-    implementation 'joda-time:joda-time:2.12.5'
-    implementation 'org.apache.jackrabbit:jackrabbit-webdav:2.13.3'
-    implementation 'com.code-troopers.betterpickers:library:3.1.0'
-    implementation 'com.github.techfreak:wizardpager:1.0.3'
-    implementation 'com.dropbox.core:dropbox-core-sdk:3.0.3'
-    implementation 'io.github.kobakei:ratethisapp:1.1.3'
-
-    debugImplementation 'com.facebook.stetho:stetho:1.5.0'
-
-    testImplementation 'org.robolectric:robolectric:4.3.1'
-    testImplementation 'junit:junit:4.13.2'
-    testImplementation 'org.assertj:assertj-core:1.7.1'
-    testImplementation 'org.robolectric:shadows-multidex:3.0'
-}
-
-def androidEspressoVersion = "3.5.1"
-dependencies {
-    androidTestImplementation 'androidx.annotation:annotation-experimental:1.3.1'
-    //the following are only added so that the app and test version both us the same versions
-    androidTestImplementation 'com.google.android.material:material:1.10.0'
-
-    androidTestImplementation 'androidx.test:runner:1.5.2'
-    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
-    androidTestImplementation 'androidx.test:rules:1.5.0'
-
-    androidTestImplementation 'androidx.test.uiautomator:uiautomator:2.2.0'
-
-    androidTestImplementation 'androidx.test.espresso:espresso-core:' + androidEspressoVersion
-    androidTestImplementation 'androidx.test.espresso:espresso-intents:' + androidEspressoVersion
-    androidTestImplementation('androidx.test.espresso:espresso-contrib:' + androidEspressoVersion) {
-        exclude group: 'com.android.support', module: 'support-v4'
-        exclude module: 'recyclerview-v7'
-    }
-
-    androidTestImplementation('com.squareup.assertj:assertj-android:1.1.1') {
-        exclude group: 'com.android.support', module: 'support-annotations'
-    }
-
-    androidTestImplementation 'com.squareup.spoon:spoon-client:1.6.4'
 }

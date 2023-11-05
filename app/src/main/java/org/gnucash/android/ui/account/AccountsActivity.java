@@ -50,7 +50,6 @@ import androidx.viewpager.widget.ViewPager;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.material.tabs.TabLayout;
 import com.google.firebase.crashlytics.FirebaseCrashlytics;
-import com.kobakei.ratethisapp.RateThisApp;
 
 import org.gnucash.android.BuildConfig;
 import org.gnucash.android.R;
@@ -139,10 +138,6 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
     @BindView(R.id.coordinatorLayout)
     CoordinatorLayout mCoordinatorLayout;
 
-    /**
-     * Configuration for rating the app
-     */
-    public static RateThisApp.Config rateAppConfig = new RateThisApp.Config(14, 100);
     private AccountViewPagerAdapter mPagerAdapter;
 
     /**
@@ -270,17 +265,6 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
                 startActivityForResult(addAccountIntent, AccountsActivity.REQUEST_EDIT_ACCOUNT);
             }
         });
-    }
-
-    @Override
-    protected void onStart() {
-        super.onStart();
-
-        if (BuildConfig.CAN_REQUEST_RATING) {
-            RateThisApp.init(rateAppConfig);
-            RateThisApp.onStart(this);
-            RateThisApp.showRateDialogIfNeeded(this);
-        }
     }
 
     /**

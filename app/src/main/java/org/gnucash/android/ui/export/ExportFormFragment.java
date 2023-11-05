@@ -67,7 +67,6 @@ import org.gnucash.android.model.BaseModel;
 import org.gnucash.android.model.ScheduledAction;
 import org.gnucash.android.ui.common.UxArgument;
 import org.gnucash.android.ui.settings.BackupPreferenceFragment;
-import org.gnucash.android.ui.settings.dialog.OwnCloudDialogFragment;
 import org.gnucash.android.ui.transaction.TransactionFormFragment;
 import org.gnucash.android.ui.util.RecurrenceParser;
 import org.gnucash.android.ui.util.RecurrenceViewClickListener;
@@ -171,14 +170,14 @@ public class ExportFormFragment extends Fragment implements
     /**
      * Event recurrence options
      */
-    private EventRecurrence mEventRecurrence = new EventRecurrence();
+    private final EventRecurrence mEventRecurrence = new EventRecurrence();
 
     /**
      * Recurrence rule
      */
     private String mRecurrenceRule;
 
-    private Calendar mExportStartCalendar = Calendar.getInstance();
+    private final Calendar mExportStartCalendar = Calendar.getInstance();
 
     /**
      * Tag for logging
@@ -397,17 +396,7 @@ public class ExportFormFragment extends Fragment implements
                             Auth.startOAuth2Authentication(getActivity(), dropboxAppKey);
                         }
                         break;
-                    case 2: //OwnCloud
-                        setExportUriText(null);
-                        mRecurrenceOptionsView.setVisibility(View.VISIBLE);
-                        mExportTarget = ExportParams.ExportTarget.OWNCLOUD;
-                        if (!(PreferenceManager.getDefaultSharedPreferences(getActivity())
-                                .getBoolean(getString(R.string.key_owncloud_sync), false))) {
-                            OwnCloudDialogFragment ocDialog = OwnCloudDialogFragment.newInstance(null);
-                            ocDialog.show(getActivity().getSupportFragmentManager(), "ownCloud dialog");
-                        }
-                        break;
-                    case 3: //Share File
+                    case 2: //Share File
                         setExportUriText(getString(R.string.label_select_destination_after_export));
                         mExportTarget = ExportParams.ExportTarget.SHARING;
                         mRecurrenceOptionsView.setVisibility(View.GONE);
@@ -597,9 +586,6 @@ public class ExportFormFragment extends Fragment implements
 
         switch (requestCode) {
             case BackupPreferenceFragment.REQUEST_RESOLVE_CONNECTION:
-                if (resultCode == Activity.RESULT_OK) {
-                    BackupPreferenceFragment.mGoogleApiClient.connect();
-                }
                 break;
 
             case REQUEST_EXPORT_FILE:

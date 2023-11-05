@@ -17,13 +17,11 @@ package org.gnucash.android.ui.common;
 
 import android.app.Activity;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.database.Cursor;
 import android.graphics.Color;
 import android.graphics.PorterDuff;
 import android.os.Bundle;
-import android.preference.PreferenceManager;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -39,7 +37,6 @@ import androidx.appcompat.widget.Toolbar;
 import androidx.drawerlayout.widget.DrawerLayout;
 
 import com.google.android.material.navigation.NavigationView;
-import com.uservoice.uservoicesdk.UserVoice;
 
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
@@ -268,12 +265,6 @@ public abstract class BaseDrawerActivity extends PasscodeLockActivity implements
             }
             break;
 
-/*
-            //todo: Re-enable this when Budget UI is complete
-            case R.id.nav_item_budgets:
-                startActivity(new Intent(this, BudgetsActivity.class));
-                break;
-*/
             case R.id.nav_item_scheduled_actions: { //show scheduled transactions
                 Intent intent = new Intent(this, ScheduledActionsActivity.class);
                 intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
@@ -290,35 +281,9 @@ public abstract class BaseDrawerActivity extends PasscodeLockActivity implements
                 break;
 
             case R.id.nav_item_help:
-                SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-                prefs.edit().putBoolean(UxArgument.SKIP_PASSCODE_SCREEN, true).apply();
-                UserVoice.launchUserVoice(this);
                 break;
         }
         mDrawerLayout.closeDrawer(mNavigationView);
-    }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (resultCode == Activity.RESULT_CANCELED) {
-            super.onActivityResult(requestCode, resultCode, data);
-            return;
-        }
-
-        switch (requestCode) {
-            case AccountsActivity.REQUEST_PICK_ACCOUNTS_FILE:
-                AccountsActivity.importXmlFileFromIntent(this, data, null);
-                break;
-            case BaseDrawerActivity.REQUEST_OPEN_DOCUMENT: //this uses the Storage Access Framework
-                final int takeFlags = data.getFlags()
-                        & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-                AccountsActivity.importXmlFileFromIntent(this, data, null);
-                getContentResolver().takePersistableUriPermission(data.getData(), takeFlags);
-                break;
-            default:
-                super.onActivityResult(requestCode, resultCode, data);
-                break;
-        }
     }
 
     @Override

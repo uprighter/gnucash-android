@@ -53,21 +53,17 @@ import android.preference.PreferenceManager;
 import android.util.Log;
 import android.view.View;
 
-import androidx.fragment.app.Fragment;
 import androidx.test.espresso.Espresso;
 import androidx.test.espresso.matcher.ViewMatchers;
 import androidx.test.rule.ActivityTestRule;
 import androidx.test.rule.GrantPermissionRule;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 
-import com.kobakei.ratethisapp.RateThisApp;
-
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
 import org.gnucash.android.db.DatabaseHelper;
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.db.adapter.BooksDbAdapter;
-import org.gnucash.android.db.adapter.CommoditiesDbAdapter;
 import org.gnucash.android.db.adapter.DatabaseAdapter;
 import org.gnucash.android.db.adapter.SplitsDbAdapter;
 import org.gnucash.android.db.adapter.TransactionsDbAdapter;
@@ -103,13 +99,7 @@ public class AccountsActivityTest {
     private final Commodity ACCOUNTS_CURRENCY = Commodity.getInstance(ACCOUNTS_CURRENCY_CODE);
     private static final String SIMPLE_ACCOUNT_NAME = "Simple account";
     private static final String SIMPLE_ACCOUNT_UID = "simple-account";
-    private static final String ROOT_ACCOUNT_NAME = "Root account";
-    private static final String ROOT_ACCOUNT_UID = "root-account";
-    private static final String PARENT_ACCOUNT_NAME = "Parent account";
-    private static final String PARENT_ACCOUNT_UID = "parent-account";
     private static final String CHILD_ACCOUNT_UID = "child-account";
-    private static final String CHILD_ACCOUNT_NAME = "Child account";
-    public static final String TEST_DB_NAME = "test_gnucash_db.sqlite";
 
     private static DatabaseHelper mDbHelper;
     private static SQLiteDatabase mDb;
@@ -147,7 +137,6 @@ public class AccountsActivityTest {
         mSplitsDbAdapter = SplitsDbAdapter.getInstance();
         mTransactionsDbAdapter = TransactionsDbAdapter.getInstance();
         mAccountsDbAdapter = AccountsDbAdapter.getInstance();
-        CommoditiesDbAdapter commoditiesDbAdapter = new CommoditiesDbAdapter(mDb); //initialize commodity constants
     }
 
     @Before
@@ -172,7 +161,6 @@ public class AccountsActivityTest {
      * @param context Application context
      */
     public static void preventFirstRunDialogs(Context context) {
-        AccountsActivity.rateAppConfig = new RateThisApp.Config(10000, 10000);
         Editor editor = PreferenceManager.getDefaultSharedPreferences(context).edit();
 
         //do not show first run dialog
@@ -252,8 +240,6 @@ public class AccountsActivityTest {
         mTransactionsDbAdapter.addRecord(transaction);
 
         refreshAccountsList();
-
-        List<Transaction> trxns = mTransactionsDbAdapter.getAllTransactions();
 
         onView(first(withText(containsString("4.15")))).check(matches(isDisplayed()));
     }
@@ -527,8 +513,8 @@ public class AccountsActivityTest {
             mActivityRule.runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    Fragment fragment = mAccountsActivity.getCurrentAccountListFragment();
-                    ((AccountsListFragment) fragment).refresh();
+                    AccountsListFragment fragment = mAccountsActivity.getCurrentAccountListFragment();
+                    fragment.refresh();
                 }
             });
         } catch (Throwable throwable) {
@@ -544,7 +530,7 @@ public class AccountsActivityTest {
      */
     public static Matcher<View> first(final Matcher<View> expected) {
 
-        return new TypeSafeMatcher<View>() {
+        return new TypeSafeMatcher<>() {
             private boolean first = false;
 
             @Override

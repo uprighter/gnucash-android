@@ -21,13 +21,11 @@ import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.IntentSender;
 import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 import android.widget.ArrayAdapter;
-import android.widget.Toast;
 
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
@@ -37,13 +35,6 @@ import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.PreferenceManager;
 
 import com.dropbox.core.android.Auth;
-import com.google.android.gms.common.ConnectionResult;
-import com.google.android.gms.common.GooglePlayServicesUtil;
-import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.common.api.ResultCallback;
-import com.google.android.gms.drive.Drive;
-import com.google.android.gms.drive.DriveFolder;
-import com.google.android.gms.drive.MetadataChangeSet;
 import com.google.android.material.snackbar.Snackbar;
 
 import org.gnucash.android.R;
@@ -51,7 +42,6 @@ import org.gnucash.android.app.GnuCashApplication;
 import org.gnucash.android.db.adapter.BooksDbAdapter;
 import org.gnucash.android.export.Exporter;
 import org.gnucash.android.importer.ImportAsyncTask;
-import org.gnucash.android.ui.settings.dialog.OwnCloudDialogFragment;
 import org.gnucash.android.util.BackupManager;
 
 import java.io.File;
@@ -94,12 +84,6 @@ public class BackupPreferenceFragment extends PreferenceFragmentCompat implement
      */
     public static final String LOG_TAG = "BackupPrefFragment";
 
-    /**
-     * Client for Google Drive Sync
-     */
-    public static GoogleApiClient mGoogleApiClient;
-
-
     @Override
     public void onCreatePreferences(Bundle bundle, String s) {
         addPreferencesFromResource(R.xml.fragment_backup_preferences);
@@ -113,9 +97,6 @@ public class BackupPreferenceFragment extends PreferenceFragmentCompat implement
         actionBar.setHomeButtonEnabled(true);
         actionBar.setDisplayHomeAsUpEnabled(true);
         actionBar.setTitle(R.string.title_backup_prefs);
-
-        mGoogleApiClient = getGoogleApiClient(getActivity());
-
     }
 
     @Override
@@ -185,11 +166,6 @@ public class BackupPreferenceFragment extends PreferenceFragmentCompat implement
             toggleDropboxPreference(preference);
         }
 
-        if (key.equals(getString(R.string.key_owncloud_sync))) {
-            toggleOwnCloudSync(preference);
-            toggleOwnCloudPreference(preference);
-        }
-
         if (key.equals(getString(R.string.key_create_backup))) {
             boolean result = BackupManager.backupActiveBook();
             int msg = result ? R.string.toast_backup_successful : R.string.toast_backup_failed;
@@ -215,14 +191,14 @@ public class BackupPreferenceFragment extends PreferenceFragmentCompat implement
 
         if (preference.getKey().equals(getString(R.string.key_default_export_email))) {
             String emailSetting = newValue.toString();
-            if (emailSetting == null || emailSetting.trim().isEmpty()) {
+            if (emailSetting.trim().isEmpty()) {
                 preference.setSummary(R.string.summary_default_export_email);
             }
         }
 
         if (preference.getKey().equals(getString(R.string.key_default_export_format))) {
             String exportFormat = newValue.toString();
-            if (exportFormat == null || exportFormat.trim().isEmpty()) {
+            if (exportFormat.trim().isEmpty()) {
                 preference.setSummary(R.string.summary_default_export_format);
             }
         }
@@ -252,18 +228,6 @@ public class BackupPreferenceFragment extends PreferenceFragmentCompat implement
     }
 
     /**
-     * Toggles the checkbox of the GoogleDrive Sync preference if a Google Drive account is linked
-     *
-     * @param pref Google Drive Sync preference
-     */
-    public void toggleGoogleDrivePreference(Preference pref) {
-        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(getActivity());
-        String appFolderId = sharedPreferences.getString(getString(R.string.key_google_drive_app_folder_id), null);
-        ((CheckBoxPreference) pref).setChecked(appFolderId != null);
-    }
-
-
-    /**
      * Toggles the authorization state of a DropBox account.
      * If a link exists, it is removed else DropBox authorization is started
      */
@@ -275,94 +239,6 @@ public class BackupPreferenceFragment extends PreferenceFragmentCompat implement
         } else {
             prefs.edit().remove(getString(R.string.key_dropbox_access_token)).apply();
         }
-    }
-
-    /**
-     * Toggles synchronization with Google Drive on or off
-     */
-    private void toggleGoogleDriveSync() {
-        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(getActivity());
-        final String appFolderId = sharedPreferences.getString(getString(R.string.key_google_drive_app_folder_id), null);
-        if (appFolderId != null) {
-            sharedPreferences.edit().remove(getString(R.string.key_google_drive_app_folder_id)).commit(); //commit (not apply) because we need it to be saved *now*
-            mGoogleApiClient.disconnect();
-        } else {
-            mGoogleApiClient.connect();
-        }
-    }
-
-    /**
-     * Toggles synchronization with ownCloud on or off
-     */
-    private void toggleOwnCloudSync(Preference pref) {
-        SharedPreferences mPrefs = getActivity().getSharedPreferences(getString(R.string.owncloud_pref), Context.MODE_PRIVATE);
-
-        if (mPrefs.getBoolean(getString(R.string.owncloud_sync), false))
-            mPrefs.edit().putBoolean(getString(R.string.owncloud_sync), false).apply();
-        else {
-            OwnCloudDialogFragment ocDialog = OwnCloudDialogFragment.newInstance(pref);
-            ocDialog.show(getActivity().getSupportFragmentManager(), "owncloud_dialog");
-        }
-    }
-
-
-    public static GoogleApiClient getGoogleApiClient(final Context context) {
-        return new GoogleApiClient.Builder(context)
-                .addApi(Drive.API)
-                .addScope(Drive.SCOPE_APPFOLDER)
-                .addScope(Drive.SCOPE_FILE)
-                .addConnectionCallbacks(new GoogleApiClient.ConnectionCallbacks() {
-                    @Override
-                    public void onConnected(Bundle bundle) {
-                        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(context);
-                        String appFolderId = sharedPreferences.getString(context.getString(R.string.key_google_drive_app_folder_id), null);
-                        if (appFolderId == null) {
-                            MetadataChangeSet changeSet = new MetadataChangeSet.Builder()
-                                    .setTitle(context.getString(R.string.app_name)).build();
-                            Drive.DriveApi.getRootFolder(mGoogleApiClient).createFolder(
-                                    mGoogleApiClient, changeSet).setResultCallback(new ResultCallback<DriveFolder.DriveFolderResult>() {
-                                @Override
-                                public void onResult(DriveFolder.DriveFolderResult result) {
-                                    if (!result.getStatus().isSuccess()) {
-                                        Log.e(LOG_TAG, "Error creating the application folder");
-                                        return;
-                                    }
-
-                                    String folderId = result.getDriveFolder().getDriveId().toString();
-                                    PreferenceManager.getDefaultSharedPreferences(context)
-                                            .edit().putString(context.getString(R.string.key_google_drive_app_folder_id),
-                                                    folderId).commit(); //commit because we need it to be saved *now*
-                                }
-                            });
-
-                        }
-                        Toast.makeText(context, R.string.toast_connected_to_google_drive, Toast.LENGTH_SHORT).show();
-                    }
-
-                    @Override
-                    public void onConnectionSuspended(int i) {
-                        Toast.makeText(context, "Connection to Google Drive suspended!", Toast.LENGTH_LONG).show();
-                    }
-                })
-                .addOnConnectionFailedListener(new GoogleApiClient.OnConnectionFailedListener() {
-                    @Override
-                    public void onConnectionFailed(ConnectionResult connectionResult) {
-                        Log.e(PreferenceActivity.class.getName(), "Connection to Google Drive failed");
-                        if (connectionResult.hasResolution() && context instanceof Activity) {
-                            try {
-                                Log.e(BackupPreferenceFragment.class.getName(), "Trying resolution of Google API connection failure");
-                                connectionResult.startResolutionForResult((Activity) context, REQUEST_RESOLVE_CONNECTION);
-                            } catch (IntentSender.SendIntentException e) {
-                                Log.e(BackupPreferenceFragment.class.getName(), e.getMessage());
-                                Toast.makeText(context, R.string.toast_unable_to_connect_to_google_drive, Toast.LENGTH_LONG).show();
-                            }
-                        } else {
-                            if (context instanceof Activity)
-                                GooglePlayServicesUtil.getErrorDialog(connectionResult.getErrorCode(), (Activity) context, 0).show();
-                        }
-                    }
-                })
-                .build();
     }
 
     /**
@@ -452,7 +328,6 @@ public class BackupPreferenceFragment extends PreferenceFragmentCompat implement
 
             case REQUEST_RESOLVE_CONNECTION:
                 if (resultCode == Activity.RESULT_OK) {
-                    mGoogleApiClient.connect();
                     Preference pref = findPreference(getString(R.string.key_dropbox_sync));
                     if (pref == null) //if we are in a preference header fragment, this may return null
                         break;
