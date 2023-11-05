@@ -343,7 +343,7 @@ public class GnuCashApplication extends MultiDexApplication {
         Intent alarmIntent = new Intent(context, PeriodicJobReceiver.class);
         alarmIntent.setAction(PeriodicJobReceiver.ACTION_SCHEDULED_ACTIONS);
         PendingIntent pendingIntent = PendingIntent.getBroadcast(context, 0, alarmIntent,
-                PendingIntent.FLAG_NO_CREATE | PendingIntent.FLAG_MUTABLE);
+                PendingIntent.FLAG_NO_CREATE | PendingIntent.FLAG_IMMUTABLE);
 
         if (pendingIntent != null) //if service is already scheduled, just return
             return;
