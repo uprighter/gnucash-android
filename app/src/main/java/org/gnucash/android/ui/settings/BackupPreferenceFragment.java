@@ -138,10 +138,6 @@ public class BackupPreferenceFragment extends PreferenceFragmentCompat implement
         pref = findPreference(getString(R.string.key_dropbox_sync));
         pref.setOnPreferenceClickListener(this);
         toggleDropboxPreference(pref);
-
-        pref = findPreference(getString(R.string.key_owncloud_sync));
-        pref.setOnPreferenceClickListener(this);
-        toggleOwnCloudPreference(pref);
     }
 
     @Override
@@ -215,16 +211,6 @@ public class BackupPreferenceFragment extends PreferenceFragmentCompat implement
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getActivity());
         String accessToken = prefs.getString(getString(R.string.key_dropbox_access_token), null);
         ((CheckBoxPreference) pref).setChecked(accessToken != null);
-    }
-
-    /**
-     * Toggles the checkbox of the ownCloud Sync preference if an ownCloud account is linked
-     *
-     * @param pref ownCloud Sync preference
-     */
-    public void toggleOwnCloudPreference(Preference pref) {
-        SharedPreferences mPrefs = getActivity().getSharedPreferences(getString(R.string.owncloud_pref), Context.MODE_PRIVATE);
-        ((CheckBoxPreference) pref).setChecked(mPrefs.getBoolean(getString(R.string.owncloud_sync), false));
     }
 
     /**

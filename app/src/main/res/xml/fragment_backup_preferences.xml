@@ -35,12 +35,6 @@
             android:key="@string/key_dropbox_sync"
             android:icon="@drawable/ic_dropbox_android" />
 
-        <androidx.preference.CheckBoxPreference
-            android:title="@string/title_owncloud_sync_preference"
-            android:summary="@string/summary_owncloud_sync"
-            android:checked="false"
-            android:key="@string/key_owncloud_sync"
-            android:icon="@drawable/ic_owncloud" />
     </androidx.preference.PreferenceCategory>>
     <androidx.preference.PreferenceCategory android:title="@string/title_export_preference_category">
 
@@ -58,6 +52,7 @@
         <androidx.preference.SwitchPreferenceCompat
             android:summary="@string/hint_export_choice"
             android:key="@string/key_export_all_transactions"
+            android:defaultValue="true"
             android:title="@string/title_export_all_transactions" />
         <androidx.preference.SwitchPreferenceCompat
             android:summary="@string/hint_delete_after_export"
