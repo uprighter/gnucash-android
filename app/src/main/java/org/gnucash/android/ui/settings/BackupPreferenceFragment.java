@@ -342,8 +342,17 @@ public class BackupPreferenceFragment extends PreferenceFragmentCompat implement
                         backupFileUri = data.getData();
                     }
 
-                    final int takeFlags = data.getFlags()
-                            & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+                    final int takeFlags;
+                    if ((data.getFlags() & Intent.FLAG_GRANT_READ_URI_PERMISSION) == Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    {
+                        takeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION;
+                    } else
+                    if ((data.getFlags() & Intent.FLAG_GRANT_WRITE_URI_PERMISSION) == Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                    {
+                        takeFlags = Intent.FLAG_GRANT_WRITE_URI_PERMISSION;
+                    } else{
+                        takeFlags = 0;
+                    }
                     getActivity().getContentResolver().takePersistableUriPermission(backupFileUri, takeFlags);
 
                     PreferenceActivity.getActiveBookSharedPreferences()

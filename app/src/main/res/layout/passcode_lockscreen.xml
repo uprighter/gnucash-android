@@ -20,11 +20,10 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
-    <fragment
-        android:id="@+id/listFragment"
+    <androidx.fragment.app.FragmentContainerView
+        android:id="@+id/passcode_label"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        tools:layout="@layout/fragment_numeric_keyboard"
-        class="org.gnucash.android.ui.passcode.KeyboardFragment" />
+        tools:layout="@layout/fragment_numeric_keyboard"/>
 
 </LinearLayout>

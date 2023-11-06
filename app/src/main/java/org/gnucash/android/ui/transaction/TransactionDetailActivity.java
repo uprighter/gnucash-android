@@ -102,7 +102,7 @@ public class TransactionDetailActivity extends PasscodeLockActivity {
 
     }
 
-    class SplitAmountViewHolder {
+    static class SplitAmountViewHolder {
         @BindView(R.id.split_account_name)
         TextView accountName;
         @BindView(R.id.split_debit)
@@ -220,6 +220,7 @@ public class TransactionDetailActivity extends PasscodeLockActivity {
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
         if (resultCode == Activity.RESULT_OK) {
             refresh();
         }

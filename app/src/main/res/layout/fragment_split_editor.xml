@@ -39,7 +39,9 @@ limitations under the License.
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:gravity="center_horizontal|center_vertical"
+            android:gravity="end|center_vertical"
+            android:layout_marginEnd="60dp"
+            android:paddingEnd="30dp"
             android:textAppearance="?android:attr/textAppearanceSmall"
             tools:text="$200" />
     </LinearLayout>

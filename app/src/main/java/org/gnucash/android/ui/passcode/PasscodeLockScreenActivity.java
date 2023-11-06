@@ -70,6 +70,7 @@ public class PasscodeLockScreenActivity extends AppCompatActivity
 
     @Override
     public void onBackPressed() {
+        super.onBackPressed();
         setResult(RESULT_CANCELED);
 
         if (UxArgument.DISABLE_PASSCODE.equals(getIntent().getStringExtra(UxArgument.DISABLE_PASSCODE))) {

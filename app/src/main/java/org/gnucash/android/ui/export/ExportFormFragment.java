@@ -51,7 +51,6 @@ import com.codetroopers.betterpickers.radialtimepicker.RadialTimePickerDialogFra
 import com.codetroopers.betterpickers.recurrencepicker.EventRecurrence;
 import com.codetroopers.betterpickers.recurrencepicker.EventRecurrenceFormatter;
 import com.codetroopers.betterpickers.recurrencepicker.RecurrencePickerDialogFragment;
-import com.dropbox.core.android.Auth;
 
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
@@ -387,14 +386,6 @@ public class ExportFormFragment extends Fragment implements
                         break;
                     case 1: //DROPBOX
                         setExportUriText(getString(R.string.label_dropbox_export_destination));
-                        mRecurrenceOptionsView.setVisibility(View.VISIBLE);
-                        mExportTarget = ExportParams.ExportTarget.DROPBOX;
-                        String dropboxAppKey = getString(R.string.dropbox_app_key, BackupPreferenceFragment.DROPBOX_APP_KEY);
-                        String dropboxAppSecret = getString(R.string.dropbox_app_secret, BackupPreferenceFragment.DROPBOX_APP_SECRET);
-
-                        if (!DropboxHelper.hasToken()) {
-                            Auth.startOAuth2Authentication(getActivity(), dropboxAppKey);
-                        }
                         break;
                     case 2: //Share File
                         setExportUriText(getString(R.string.label_select_destination_after_export));
@@ -594,8 +585,17 @@ public class ExportFormFragment extends Fragment implements
                         mExportUri = data.getData();
                     }
 
-                    final int takeFlags = data.getFlags()
-                            & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+                    final int takeFlags;
+                    if ((data.getFlags() & Intent.FLAG_GRANT_READ_URI_PERMISSION) == Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    {
+                        takeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION;
+                    } else
+                    if ((data.getFlags() & Intent.FLAG_GRANT_WRITE_URI_PERMISSION) == Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                    {
+                        takeFlags = Intent.FLAG_GRANT_WRITE_URI_PERMISSION;
+                    } else{
+                        takeFlags = 0;
+                    }
                     getActivity().getContentResolver().takePersistableUriPermission(mExportUri, takeFlags);
 
                     mTargetUriTextView.setText(mExportUri.toString());

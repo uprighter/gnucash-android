@@ -22,6 +22,7 @@ import android.view.View;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
 
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
 import org.gnucash.android.ui.common.BaseDrawerActivity;
@@ -31,7 +32,7 @@ import org.gnucash.android.ui.common.UxArgument;
 /**
  * Activity for managing display and editing of budgets
  */
-public class BudgetsActivity extends BaseDrawerActivity {
+public class BudgetsActivity extends BaseDrawerActivity implements View.OnClickListener {
 
     public static final int REQUEST_CREATE_BUDGET = 0xA;
 
@@ -48,6 +49,8 @@ public class BudgetsActivity extends BaseDrawerActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        FloatingActionButton createBudgetButton = findViewById(R.id.fab_create_budget);
+        createBudgetButton.setOnClickListener(this);
 
         if (savedInstanceState == null) {
             FragmentManager fragmentManager = getSupportFragmentManager();
@@ -64,7 +67,8 @@ public class BudgetsActivity extends BaseDrawerActivity {
      *
      * @param view View which was clicked
      */
-    public void onCreateBudgetClick(View view) {
+    @Override
+    public void onClick(View view) {
         Intent addAccountIntent = new Intent(BudgetsActivity.this, FormActivity.class);
         addAccountIntent.setAction(Intent.ACTION_INSERT_OR_EDIT);
         addAccountIntent.putExtra(UxArgument.FORM_TYPE, FormActivity.FormType.BUDGET.name());

@@ -21,6 +21,8 @@ import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
 import android.widget.QuickContactBadge;
 
+import androidx.core.content.res.ResourcesCompat;
+
 import org.gnucash.android.R;
 
 /**
@@ -39,7 +41,7 @@ public class ColorSquare extends QuickContactBadge {
     @Override
     public void setBackgroundColor(int color) {
         Drawable[] colorDrawable = new Drawable[]{
-                getContext().getResources().getDrawable(R.drawable.color_square)};
+                ResourcesCompat.getDrawable(getContext().getResources(), R.drawable.color_square, null)};
         setImageDrawable(new ColorStateDrawable(colorDrawable, color));
     }
 }

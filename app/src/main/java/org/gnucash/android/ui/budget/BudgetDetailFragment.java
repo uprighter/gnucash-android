@@ -191,8 +191,8 @@ public class BudgetDetailFragment extends Fragment implements Refreshable {
 
 
     public class BudgetAmountAdapter extends RecyclerView.Adapter<BudgetAmountAdapter.BudgetAmountViewHolder> {
-        private List<BudgetAmount> mBudgetAmounts;
-        private Budget mBudget;
+        private final List<BudgetAmount> mBudgetAmounts;
+        private final Budget mBudget;
 
         public BudgetAmountAdapter() {
             mBudget = mBudgetsDbAdapter.getRecord(mBudgetUID);
@@ -237,7 +237,7 @@ public class BudgetDetailFragment extends Fragment implements Refreshable {
                 @Override
                 public void onClick(View v) {
                     Intent intent = new Intent(getActivity(), TransactionsActivity.class);
-                    intent.putExtra(UxArgument.SELECTED_ACCOUNT_UID, mBudgetAmounts.get(position).getAccountUID());
+                    intent.putExtra(UxArgument.SELECTED_ACCOUNT_UID, mBudgetAmounts.get(holder.getAdapterPosition()).getAccountUID());
                     startActivityForResult(intent, 0x10);
                 }
             });

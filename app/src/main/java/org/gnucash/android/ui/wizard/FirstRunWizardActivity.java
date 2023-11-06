@@ -245,7 +245,6 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
 
     private void updateBottomBar() {
         int position = mPager.getCurrentItem();
-        final Resources res = getResources();
         if (position == mCurrentPageSequence.size()) {
             mNextButton.setText(R.string.btn_wizard_finish);
 
@@ -267,6 +266,7 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
         switch (requestCode) {
             case AccountsActivity.REQUEST_PICK_ACCOUNTS_FILE:
                 if (resultCode == Activity.RESULT_OK && data != null) {
