@@ -41,7 +41,6 @@ limitations under the License.
             android:layout_weight="1"
             android:gravity="end|center_vertical"
             android:layout_marginEnd="60dp"
-            android:paddingEnd="30dp"
             android:textAppearance="?android:attr/textAppearanceSmall"
             tools:text="$200" />
     </LinearLayout>

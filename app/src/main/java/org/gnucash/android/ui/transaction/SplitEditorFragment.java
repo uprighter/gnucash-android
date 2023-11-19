@@ -39,6 +39,8 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.cursoradapter.widget.SimpleCursorAdapter;
@@ -48,6 +50,9 @@ import net.objecthunter.exp4j.Expression;
 import net.objecthunter.exp4j.ExpressionBuilder;
 
 import org.gnucash.android.R;
+import org.gnucash.android.databinding.FragmentSplitEditorBinding;
+import org.gnucash.android.databinding.ItemSplitEntryBinding;
+
 import org.gnucash.android.db.DatabaseSchema;
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.db.adapter.CommoditiesDbAdapter;
@@ -70,9 +75,6 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
-import butterknife.BindView;
-import butterknife.ButterKnife;
-
 /**
  * Dialog for editing the splits in a transaction
  *
@@ -80,11 +82,10 @@ import butterknife.ButterKnife;
  */
 public class SplitEditorFragment extends Fragment {
 
-    @BindView(R.id.split_list_layout)
+    private FragmentSplitEditorBinding binding;
+
     LinearLayout mSplitsLinearLayout;
-    @BindView(R.id.calculator_keyboard)
     KeyboardView mKeyboardView;
-    @BindView(R.id.imbalance_textview)
     TextView mImbalanceTextView;
 
     private AccountsDbAdapter mAccountsDbAdapter;
@@ -101,7 +102,7 @@ public class SplitEditorFragment extends Fragment {
     BalanceTextWatcher mImbalanceWatcher = new BalanceTextWatcher();
 
     /**
-     * Create and return a new instance of the fragment with the appropriate paramenters
+     * Create and return a new instance of the fragment with the appropriate parameters
      *
      * @param args Arguments to be set to the fragment. <br>
      *             See {@link UxArgument#AMOUNT_STRING} and {@link UxArgument#SPLIT_LIST}
@@ -114,20 +115,34 @@ public class SplitEditorFragment extends Fragment {
     }
 
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-        View view = inflater.inflate(R.layout.fragment_split_editor, container, false);
-        ButterKnife.bind(this, view);
-        return view;
+    public @Nullable View onCreateView(@NonNull LayoutInflater inflater,
+                                       @Nullable ViewGroup container,
+                                       @Nullable Bundle savedInstanceState) {
+        binding = FragmentSplitEditorBinding.inflate(inflater, container, false);
+
+        mSplitsLinearLayout = binding.splitListLayout;
+        mKeyboardView = binding.calculatorKeyboard;
+        mImbalanceTextView = binding.imbalanceTextview;
+
+        return binding.getRoot();
     }
 
     @Override
-    public void onActivityCreated(Bundle savedInstanceState) {
-        super.onActivityCreated(savedInstanceState);
+    public void onDestroyView() {
+        super.onDestroyView();
+        binding = null;
+    }
+
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
 
         ActionBar actionBar = ((AppCompatActivity) getActivity()).getSupportActionBar();
         assert actionBar != null;
         actionBar.setTitle(R.string.title_split_editor);
         setHasOptionsMenu(true);
+
+        initArgs();
 
         mCalculatorKeyboard = new CalculatorKeyboard(getActivity(), mKeyboardView, R.xml.calculator_keyboard);
         mSplitItemViewList = new ArrayList<>();
@@ -135,10 +150,9 @@ public class SplitEditorFragment extends Fragment {
         //we are editing splits for a new transaction.
         // But the user may have already created some splits before. Let's check
 
-        List<Split> splitList = getArguments().getParcelableArrayList(UxArgument.SPLIT_LIST);
+        List<Split> splitList = getArguments().getParcelableArrayList(UxArgument.SPLIT_LIST, Split.class);
         assert splitList != null;
 
-        initArgs();
         if (!splitList.isEmpty()) {
             //aha! there are some splits. Let's load those instead
             loadSplitViews(splitList);
@@ -149,16 +163,16 @@ public class SplitEditorFragment extends Fragment {
             AccountType accountType = mAccountsDbAdapter.getAccountType(mAccountUID);
             TransactionType transactionType = Transaction.getTypeForBalance(accountType, mBaseAmount.signum() < 0);
             split.setType(transactionType);
-            View view = addSplitView(split);
-            view.findViewById(R.id.input_accounts_spinner).setEnabled(false);
-            view.findViewById(R.id.btn_remove_split).setVisibility(View.GONE);
+            View splitView = addSplitView(split);
+            splitView.findViewById(R.id.input_accounts_spinner).setEnabled(false);
+            splitView.findViewById(R.id.btn_remove_split).setVisibility(View.GONE);
             TransactionsActivity.displayBalance(mImbalanceTextView, new Money(mBaseAmount.negate(), mCommodity));
         }
 
     }
 
     @Override
-    public void onConfigurationChanged(Configuration newConfig) {
+    public void onConfigurationChanged(@NonNull Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
         mCalculatorKeyboard = new CalculatorKeyboard(getActivity(), mKeyboardView, R.xml.calculator_keyboard);
     }
@@ -170,7 +184,7 @@ public class SplitEditorFragment extends Fragment {
     }
 
     @Override
-    public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
+    public void onCreateOptionsMenu(@NonNull Menu menu, @NonNull MenuInflater inflater) {
         inflater.inflate(R.menu.split_editor_actions, menu);
     }
 
@@ -179,8 +193,10 @@ public class SplitEditorFragment extends Fragment {
 
         switch (item.getItemId()) {
             case android.R.id.home:
-                getActivity().setResult(Activity.RESULT_CANCELED);
-                getActivity().finish();
+                if (getActivity() != null) {
+                    getActivity().setResult(Activity.RESULT_CANCELED);
+                    getActivity().finish();
+                }
                 return true;
 
             case R.id.menu_save:
@@ -203,7 +219,7 @@ public class SplitEditorFragment extends Fragment {
      * @return Returns the split view which was added
      */
     private View addSplitView(Split split) {
-        LayoutInflater layoutInflater = getActivity().getLayoutInflater();
+        LayoutInflater layoutInflater = getLayoutInflater();
         View splitView = layoutInflater.inflate(R.layout.item_split_entry, mSplitsLinearLayout, false);
         mSplitsLinearLayout.addView(splitView, 0);
         SplitViewHolder viewHolder = new SplitViewHolder(splitView, split);
@@ -213,8 +229,8 @@ public class SplitEditorFragment extends Fragment {
         if (split == null ) {
             // Only request focus on newly created split.
             splitView.requestFocus();
-        }
 
+        }
         return splitView;
     }
 
@@ -224,9 +240,8 @@ public class SplitEditorFragment extends Fragment {
     private void initArgs() {
         mAccountsDbAdapter = AccountsDbAdapter.getInstance();
 
-        Bundle args = getArguments();
         mAccountUID = ((FormActivity) getActivity()).getCurrentAccountUID();
-        mBaseAmount = new BigDecimal(args.getString(UxArgument.AMOUNT_STRING));
+        mBaseAmount = new BigDecimal(getArguments().getString(UxArgument.AMOUNT_STRING));
 
         String conditions = "("
                 + DatabaseSchema.AccountEntry.COLUMN_HIDDEN + " = 0 AND "
@@ -240,26 +255,27 @@ public class SplitEditorFragment extends Fragment {
      * Holds a split item view and binds the items in it
      */
     class SplitViewHolder implements OnTransferFundsListener {
-        @BindView(R.id.input_split_memo)
         EditText splitMemoEditText;
-        @BindView(R.id.input_split_amount)
         CalculatorEditText splitAmountEditText;
-        @BindView(R.id.btn_remove_split)
         ImageView removeSplitButton;
-        @BindView(R.id.input_accounts_spinner)
         Spinner accountsSpinner;
-        @BindView(R.id.split_currency_symbol)
         TextView splitCurrencyTextView;
-        @BindView(R.id.split_uid)
         TextView splitUidTextView;
-        @BindView(R.id.btn_split_type)
         TransactionTypeSwitch splitTypeSwitch;
 
         View splitView;
         Money quantity;
 
         public SplitViewHolder(View splitView, Split split) {
-            ButterKnife.bind(this, splitView);
+            ItemSplitEntryBinding itemSplitEntryBinding = ItemSplitEntryBinding.bind(splitView);
+            splitMemoEditText = itemSplitEntryBinding.inputSplitMemo;
+            splitAmountEditText = itemSplitEntryBinding.inputSplitAmount;
+            removeSplitButton = itemSplitEntryBinding.btnRemoveSplit;
+            accountsSpinner = itemSplitEntryBinding.inputAccountsSpinner;
+            splitCurrencyTextView = itemSplitEntryBinding.splitCurrencySymbol;
+            splitUidTextView = itemSplitEntryBinding.splitUid;
+            splitTypeSwitch = itemSplitEntryBinding.btnSplitType;
+
             this.splitView = splitView;
             if (split != null && !split.getQuantity().equals(split.getValue()))
                 this.quantity = split.getQuantity();
@@ -297,6 +313,7 @@ public class SplitEditorFragment extends Fragment {
                 splitMemoEditText.setText(split.getMemo());
                 splitUidTextView.setText(split.getUID());
                 String splitAccountUID = split.getAccountUID();
+                assert splitAccountUID != null;
                 setSelectedTransferAccount(mAccountsDbAdapter.getID(splitAccountUID), accountsSpinner);
                 splitTypeSwitch.setAccountType(mAccountsDbAdapter.getAccountType(splitAccountUID));
                 splitTypeSwitch.setChecked(split.getType());
@@ -334,7 +351,7 @@ public class SplitEditorFragment extends Fragment {
             }
 
             if (expression != null && expression.validate().isValid()) {
-                return new BigDecimal(expression.evaluate());
+                return BigDecimal.valueOf(expression.evaluate());
             } else {
                 Log.v(SplitEditorFragment.this.getClass().getSimpleName(),
                         "Incomplete expression for updating imbalance: " + expression);
@@ -378,7 +395,7 @@ public class SplitEditorFragment extends Fragment {
             if (viewHolder.splitAmountEditText.getError() != null) {
                 return false;
             }
-            //TODO: also check that multicurrency splits have a conversion amount present
+            //TODO: also check that multi-currency splits have a conversion amount present
         }
         return true;
     }
@@ -475,7 +492,7 @@ public class SplitEditorFragment extends Fragment {
 
     /**
      * Listens to changes in the transfer account and updates the currency symbol, the label of the
-     * transaction type and if neccessary
+     * transaction type and if necessary
      */
     private class SplitAccountListener implements AdapterView.OnItemSelectedListener {
         TransactionTypeSwitch mTypeToggleButton;
@@ -515,7 +532,7 @@ public class SplitEditorFragment extends Fragment {
             Money amount = new Money(amountBigD, Commodity.getInstance(fromCurrencyCode));
             TransferFundsDialogFragment fragment
                     = TransferFundsDialogFragment.getInstance(amount, targetCurrencyCode, mSplitViewHolder);
-            fragment.show(getFragmentManager(), "tranfer_funds_editor");
+            fragment.show(getActivity().getSupportFragmentManager(), "transfer_funds_editor");
         }
 
         @Override
