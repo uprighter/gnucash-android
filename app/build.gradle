@@ -25,7 +25,7 @@ static def buildTime() {
 }
 
 static def gitSha() {
-    return 'git rev-parse --short HEAD'.execute().text.trim()
+    return 'git rev-parse --short HEAD'.execute().getText().trim()
 }
 
 kotlin {
@@ -157,6 +157,7 @@ android {
     }
     buildFeatures {
         viewBinding true
+        dataBinding true
     }
     allprojects {
         tasks.withType(JavaCompile) {

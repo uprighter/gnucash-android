@@ -51,23 +51,14 @@ limitations under the License.
         android:layout_below="@id/imbalance_layout"
         layout="@layout/horizontal_line" />
 
-    <ScrollView
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/split_list_recycler"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_below="@id/imbalance_layout"
         android:layout_above="@+id/calculator_keyboard"
         android:contentDescription="@string/title_split_editor"
-        android:padding="@dimen/dialog_padding">
-
-        <LinearLayout
-            android:id="@+id/split_list_layout"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:minHeight="200dp"
-            android:orientation="vertical">
-            <!-- Split edit views will be added here at runtime-->
-        </LinearLayout>
-    </ScrollView>
+        android:padding="@dimen/dialog_padding" />
 
     <android.inputmethodservice.KeyboardView
         android:id="@+id/calculator_keyboard"
