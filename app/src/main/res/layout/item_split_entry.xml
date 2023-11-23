@@ -18,7 +18,9 @@ limitations under the License.
     xmlns:tools="http://schemas.android.com/tools">
 
     <data>
-
+        <variable
+            name="splitEntryViewModel"
+            type="org.gnucash.android.ui.transaction.SplitEntryViewModel" />
     </data>
 
     <LinearLayout
@@ -54,12 +56,13 @@ limitations under the License.
                     android:gravity="center"
                     android:paddingStart="5dp"
                     android:paddingEnd="5dp"
-                    android:text="$"
+                    android:text="@={splitEntryViewModel.splitCurrencySymbol}"
                     android:textColor="@color/debit_red"
                     android:textSize="22sp" />
 
                 <org.gnucash.android.ui.util.widget.CalculatorEditText
                     android:id="@+id/input_split_amount"
+                    android:text="@={splitEntryViewModel.inputSplitAmount}"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_marginBottom="@dimen/dialog_padding"
@@ -78,7 +81,7 @@ limitations under the License.
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="3"
-                    android:checked="true"
+                    android:checked="@={splitEntryViewModel.splitType}"
                     android:gravity="end"
                     android:textAppearance="?android:attr/textAppearanceMedium"
                     android:textColor="@color/debit_red"
@@ -107,6 +110,7 @@ limitations under the License.
 
                 <EditText
                     android:id="@+id/input_split_memo"
+                    android:text="@={splitEntryViewModel.inputSplitMemo}"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:background="@android:color/transparent"
@@ -120,12 +124,14 @@ limitations under the License.
 
             <Spinner
                 android:id="@+id/input_accounts_spinner"
+                android:selectedItemPosition="@={splitEntryViewModel.inputAccountPos}"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content" />
 
             <!-- Only serves to store the split UID for background processing. Not relevant to user-->
             <TextView
                 android:id="@+id/split_uid"
+                android:text="@={splitEntryViewModel.splitUid}"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:visibility="gone" />

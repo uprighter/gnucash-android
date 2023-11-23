@@ -42,7 +42,7 @@ import java.util.List;
 public class TransactionTypeSwitch extends SwitchCompat {
     private AccountType mAccountType = AccountType.EXPENSE;
 
-    List<OnCheckedChangeListener> mOnCheckedChangeListeners = new ArrayList<>();
+    private final List<OnCheckedChangeListener> mOnCheckedChangeListeners = new ArrayList<>();
 
     public TransactionTypeSwitch(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
@@ -113,11 +113,11 @@ public class TransactionTypeSwitch extends SwitchCompat {
     /**
      * Set a checked change listener to monitor the amount view and currency views and update the display (color & balance accordingly)
      *
-     * @param amoutView        Amount string {@link android.widget.EditText}
+     * @param amountView        Amount string {@link android.widget.EditText}
      * @param currencyTextView Currency symbol text view
      */
-    public void setAmountFormattingListener(CalculatorEditText amoutView, TextView currencyTextView) {
-        setOnCheckedChangeListener(new OnTypeChangedListener(amoutView, currencyTextView));
+    public void setAmountFormattingListener(CalculatorEditText amountView, TextView currencyTextView) {
+        setOnCheckedChangeListener(new OnTypeChangedListener(amountView, currencyTextView));
     }
 
     /**
@@ -156,8 +156,8 @@ public class TransactionTypeSwitch extends SwitchCompat {
     }
 
     private class OnTypeChangedListener implements OnCheckedChangeListener {
-        private CalculatorEditText mAmountEditText;
-        private TextView mCurrencyTextView;
+        private final CalculatorEditText mAmountEditText;
+        private final TextView mCurrencyTextView;
 
         /**
          * Constructor with the amount view
