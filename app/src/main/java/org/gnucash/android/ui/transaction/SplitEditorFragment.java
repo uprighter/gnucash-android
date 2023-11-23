@@ -269,6 +269,7 @@ public class SplitEditorFragment extends Fragment {
     }
 
     private void loadSplitViews(List<Split> splitList) {
+        Collections.reverse(splitList);
         for (Split split : splitList) {
             Log.d(LOG_TAG, "load split: " + split);
             addSplitView(split);
@@ -286,6 +287,7 @@ public class SplitEditorFragment extends Fragment {
         mSplitEntryViewModelList.add(0, viewModel);
         mRecyclerViewAdaptor.notifyItemInserted(0);
         mRecyclerView.scrollToPosition(0);
+
         Log.d(LOG_TAG, mSplitEntryViewModelList.size() + " splits, after added " + split);
     }
 
