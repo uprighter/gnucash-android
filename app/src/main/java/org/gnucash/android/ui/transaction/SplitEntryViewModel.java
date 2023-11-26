@@ -1,34 +1,46 @@
 package org.gnucash.android.ui.transaction;
 
+import android.util.Log;
+
 import androidx.databinding.BaseObservable;
 import androidx.databinding.Bindable;
 import androidx.databinding.library.baseAdapters.BR;
 
+import org.gnucash.android.model.Split;
+
 public class SplitEntryViewModel extends BaseObservable {
     public static final String LOG_TAG = "SplitEntryViewModel";
 
-    private String splitCurrencySymbol;
-    private String inputSplitAmount;
-    private boolean splitType;
-    private String inputSplitMemo;
-    private int inputAccountPos;
-    private String splitUid;
+
+    // Enabled 2-way binding.
+    private String splitCurrencySymbol = "$";
+    private String inputSplitMemo = "";
+    private String splitUid = "";
+    private String inputSplitAmount = "";
+
+    // Enabled normal data binding.
+    private boolean splitType = true;
+    private int inputAccountPos = 0;
 
     private Object viewHolder;
+    private final Split split;
 
-    public Object getSplit() {
-        return split;
+    public SplitEntryViewModel() {
+        this.split = null;
     }
 
-    public void setSplit(Object split) {
+    public SplitEntryViewModel(Split split) {
         this.split = split;
     }
 
-    private Object split;
+    public Split getSplit() {
+        return split;
+    }
 
     public Object getViewHolder() {
         return viewHolder;
     }
+
     public void setViewHolder(Object viewHolder) {
         this.viewHolder = viewHolder;
     }
@@ -45,6 +57,7 @@ public class SplitEntryViewModel extends BaseObservable {
 
     @Bindable
     public boolean getSplitType() {
+        Log.d(LOG_TAG, "getSplitType for " + this + " type: " + this.splitType);
         return splitType;
     }
 
@@ -64,32 +77,45 @@ public class SplitEntryViewModel extends BaseObservable {
     }
 
     public void setSplitCurrencySymbol(String splitCurrencySymbol) {
-        this.splitCurrencySymbol = splitCurrencySymbol;
-        notifyPropertyChanged(BR.splitCurrencySymbol);
+        if (!this.splitCurrencySymbol.equals(splitCurrencySymbol)) {
+            this.splitCurrencySymbol = splitCurrencySymbol;
+            notifyPropertyChanged(BR.splitCurrencySymbol);
+        }
     }
 
     public void setInputSplitAmount(String inputSplitAmount) {
-        this.inputSplitAmount = inputSplitAmount;
-        notifyPropertyChanged(BR.inputSplitAmount);
+        if (!this.inputSplitAmount.equals(inputSplitAmount)) {
+            this.inputSplitAmount = inputSplitAmount;
+            notifyPropertyChanged(BR.inputSplitAmount);
+        }
     }
 
     public void setSplitType(boolean splitType) {
-        this.splitType = splitType;
-        notifyPropertyChanged(BR.splitType);
+        Log.d(LOG_TAG, "setSplitType for " + this + " old type: " + this.splitType + ", new type: " + splitType);
+        if (this.splitType != splitType) {
+            this.splitType = splitType;
+            notifyPropertyChanged(BR.splitType);
+        }
     }
 
     public void setInputSplitMemo(String inputSplitMemo) {
-        this.inputSplitMemo = inputSplitMemo;
-        notifyPropertyChanged(BR.inputSplitMemo);
+        if (!this.inputSplitMemo.equals(inputSplitMemo)) {
+            this.inputSplitMemo = inputSplitMemo;
+            notifyPropertyChanged(BR.inputSplitMemo);
+        }
     }
 
     public void setInputAccountPos(int inputAccountPos) {
-        this.inputAccountPos = inputAccountPos;
-        notifyPropertyChanged(BR.inputAccountPos);
+        if (this.inputAccountPos != inputAccountPos) {
+            this.inputAccountPos = inputAccountPos;
+            notifyPropertyChanged(BR.inputAccountPos);
+        }
     }
 
     public void setSplitUid(String splitUid) {
-        this.splitUid = splitUid;
-        notifyPropertyChanged(BR.splitUid);
+        if (!this.splitUid.equals(splitUid)) {
+            this.splitUid = splitUid;
+            notifyPropertyChanged(BR.splitUid);
+        }
     }
 }

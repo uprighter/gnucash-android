@@ -42,6 +42,7 @@ import org.gnucash.android.ui.common.FormActivity;
 import org.gnucash.android.util.AmountParser;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.text.ParseException;
@@ -322,6 +323,9 @@ public class CalculatorEditText extends AppCompatEditText {
      */
     public @Nullable BigDecimal getValue() {
         evaluate();
+        if (getText().length() == 0 ) {
+            return null;
+        }
         try { //catch any exceptions in the conversion e.g. if a string with only "-" is entered
             return AmountParser.parse(getText().toString());
         } catch (ParseException e) {
@@ -339,7 +343,7 @@ public class CalculatorEditText extends AppCompatEditText {
      * @param amount BigDecimal amount
      */
     public void setValue(BigDecimal amount) {
-        BigDecimal newAmount = amount.setScale(mCommodity.getSmallestFractionDigits(), BigDecimal.ROUND_HALF_EVEN);
+        BigDecimal newAmount = amount.setScale(mCommodity.getSmallestFractionDigits(), RoundingMode.HALF_EVEN);
 
         DecimalFormat formatter = (DecimalFormat) NumberFormat.getInstance(Locale.getDefault());
         formatter.setMinimumFractionDigits(0);

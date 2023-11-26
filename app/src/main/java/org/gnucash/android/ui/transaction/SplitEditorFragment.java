@@ -32,7 +32,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.CompoundButton;
-import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -43,9 +43,6 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.cursoradapter.widget.SimpleCursorAdapter;
-
-import androidx.databinding.ViewDataBinding;
-import androidx.databinding.library.baseAdapters.BR;
 
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.ItemTouchHelper;
@@ -95,22 +92,23 @@ public class SplitEditorFragment extends Fragment {
 
     KeyboardView mKeyboardView;
     TextView mImbalanceTextView;
+    BigDecimal mImbalance = BigDecimal.ZERO;
+
 
     private RecyclerView mRecyclerView;
     private RecyclerViewAdapter mRecyclerViewAdaptor;
     private ArrayList<SplitEntryViewModel> mSplitEntryViewModelList;
 
     private AccountsDbAdapter mAccountsDbAdapter;
-    private Cursor mCursor;
     private SimpleCursorAdapter mCursorAdapter;
     private String mAccountUID;
     private Commodity mCommodity;
 
     private BigDecimal mBaseAmount = BigDecimal.ZERO;
 
-    CalculatorKeyboard mCalculatorKeyboard;
+    private CalculatorKeyboard mCalculatorKeyboard;
 
-    BalanceTextWatcher mImbalanceWatcher = new BalanceTextWatcher();
+    private final BalanceTextWatcher mImbalanceWatcher = new BalanceTextWatcher();
 
     /**
      * Create and return a new instance of the fragment with the appropriate parameters
@@ -130,6 +128,7 @@ public class SplitEditorFragment extends Fragment {
                                        @Nullable ViewGroup container,
                                        @Nullable Bundle savedInstanceState) {
         binding = FragmentSplitEditorBinding.inflate(inflater, container, false);
+        Log.d(LOG_TAG, "onCreateView: binding = " + binding + ", savedInstanceState = " + savedInstanceState);
 
         mKeyboardView = binding.calculatorKeyboard;
         mImbalanceTextView = binding.imbalanceTextview;
@@ -137,14 +136,14 @@ public class SplitEditorFragment extends Fragment {
 
         mRecyclerViewAdaptor = new RecyclerViewAdapter();
         mRecyclerView.setAdapter(mRecyclerViewAdaptor);
-        LinearLayoutManager recyclerViewManager = new LinearLayoutManager(getActivity());
-        mRecyclerView.setLayoutManager(recyclerViewManager);
+        mRecyclerView.setLayoutManager(new LinearLayoutManager(getActivity()));
 
         return binding.getRoot();
     }
 
     @Override
     public void onDestroyView() {
+        Log.d(LOG_TAG, "onDestroyView: binding = " + binding);
         super.onDestroyView();
         binding = null;
     }
@@ -158,7 +157,7 @@ public class SplitEditorFragment extends Fragment {
         actionBar.setTitle(R.string.title_split_editor);
         setHasOptionsMenu(true);
 
-        initArgs();
+        initAdaptersAndArgs();
 
         mCalculatorKeyboard = new CalculatorKeyboard(getActivity(), mKeyboardView, R.xml.calculator_keyboard);
 
@@ -183,14 +182,14 @@ public class SplitEditorFragment extends Fragment {
             TransactionsActivity.displayBalance(mImbalanceTextView, new Money(mBaseAmount.negate(), mCommodity));
         }
 
-
+        // Add drag-to-reorder feature.
         ItemTouchHelper touchHelper = new ItemTouchHelper(new ItemTouchHelper.Callback() {
             public boolean onMove(@NonNull RecyclerView recyclerView,
                                   @NonNull RecyclerView.ViewHolder viewHolder,
                                   @NonNull RecyclerView.ViewHolder target) {
 
                 Collections.swap(mSplitEntryViewModelList, viewHolder.getAbsoluteAdapterPosition(), target.getAbsoluteAdapterPosition());
-                Log.i(LOG_TAG, "onMove: " + viewHolder.getAbsoluteAdapterPosition() + ", " +
+                Log.d(LOG_TAG, "onMove: " + viewHolder.getAbsoluteAdapterPosition() + ", " +
                         target.getAbsoluteAdapterPosition());
                 mRecyclerViewAdaptor.notifyItemMoved(viewHolder.getAbsoluteAdapterPosition(), target.getAbsoluteAdapterPosition());
                 return true;
@@ -206,7 +205,7 @@ public class SplitEditorFragment extends Fragment {
             @Override
             public int getMovementFlags(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder) {
                 return makeFlag(ItemTouchHelper.ACTION_STATE_DRAG,
-                        ItemTouchHelper.DOWN | ItemTouchHelper.UP | ItemTouchHelper.START | ItemTouchHelper.END);
+                        ItemTouchHelper.DOWN | ItemTouchHelper.UP);
             }
         });
         touchHelper.attachToRecyclerView(mRecyclerView);
@@ -216,21 +215,22 @@ public class SplitEditorFragment extends Fragment {
     /**
      * Extracts arguments passed to the view and initializes necessary adapters and cursors
      */
-    private void initArgs() {
+    private void initAdaptersAndArgs() {
         mAccountsDbAdapter = AccountsDbAdapter.getInstance();
 
         mAccountUID = ((FormActivity) getActivity()).getCurrentAccountUID();
+        mCommodity = CommoditiesDbAdapter.getInstance().getCommodity(mAccountsDbAdapter.getCurrencyCode(mAccountUID));
         mBaseAmount = new BigDecimal(getArguments().getString(UxArgument.AMOUNT_STRING));
 
         String conditions = "("
                 + DatabaseSchema.AccountEntry.COLUMN_HIDDEN + " = 0 AND "
                 + DatabaseSchema.AccountEntry.COLUMN_PLACEHOLDER + " = 0"
                 + ")";
-        mCursor = mAccountsDbAdapter.fetchAccountsOrderedByFullName(conditions, null);
-        mCommodity = CommoditiesDbAdapter.getInstance().getCommodity(mAccountsDbAdapter.getCurrencyCode(mAccountUID));
+        Cursor cursor = mAccountsDbAdapter.fetchAccountsOrderedByFullName(conditions, null);
+        mCursorAdapter = new QualifiedAccountNameCursorAdapter(getActivity(), cursor);
 
-        Log.d(LOG_TAG, "mCursor: " + mCursor);
         Log.d(LOG_TAG, "mCommodity: " + mCommodity);
+        Log.d(LOG_TAG, "mCursorAdapter: " + mCursorAdapter);
     }
 
     @Override
@@ -282,8 +282,7 @@ public class SplitEditorFragment extends Fragment {
      * @param split Split to initialize the contents to
      */
     private void addSplitView(Split split) {
-        SplitEntryViewModel viewModel = new SplitEntryViewModel();
-        viewModel.setSplit(split);
+        SplitEntryViewModel viewModel = new SplitEntryViewModel(split);
         mSplitEntryViewModelList.add(0, viewModel);
         mRecyclerViewAdaptor.notifyItemInserted(0);
         mRecyclerView.scrollToPosition(0);
@@ -298,22 +297,20 @@ public class SplitEditorFragment extends Fragment {
 
         @Override
         public @NonNull SplitEntryViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            Log.d(LOG_TAG, "onCreateViewHolder, viewType " + viewType);
-
-            ViewDataBinding binding = ItemSplitEntryBinding.inflate(
+            ItemSplitEntryBinding binding = ItemSplitEntryBinding.inflate(
                     LayoutInflater.from(parent.getContext()), parent, false);
+            Log.d(LOG_TAG, "onCreateViewHolder, binding: " + binding);
             return new SplitEntryViewHolder(binding);
         }
 
         @Override
         public void onBindViewHolder(@NonNull SplitEntryViewHolder splitEntryViewHolder, int position) {
             Log.d(LOG_TAG, "onBindViewHolder at position " + position + " for binding " + splitEntryViewHolder.binding);
-            Log.d(LOG_TAG, "onBindViewHolder view: " + mSplitEntryViewModelList.get(position));
+            Log.d(LOG_TAG, "onBindViewHolder viewModel: " + mSplitEntryViewModelList.get(position));
 
             SplitEntryViewModel viewModel = mSplitEntryViewModelList.get(position);
             splitEntryViewHolder.bind(viewModel);
-            viewModel.setViewHolder(splitEntryViewHolder);
-            splitEntryViewHolder.setListeners((Split)viewModel.getSplit());
+            splitEntryViewHolder.setListeners();
         }
 
         @Override
@@ -327,94 +324,132 @@ public class SplitEditorFragment extends Fragment {
      */
     class SplitEntryViewHolder extends RecyclerView.ViewHolder implements OnTransferFundsListener {
 
-        private final ViewDataBinding binding;
-        private SplitEntryViewModel bindedViewModel;
+        private final ItemSplitEntryBinding binding;
 
         Money quantity;
-        EditText splitMemoEditText;
+
         CalculatorEditText splitAmountEditText;
         ImageView removeSplitButton;
         Spinner accountsSpinner;
         TextView splitCurrencyTextView;
-        TextView splitUidTextView;
         TransactionTypeSwitch splitTypeSwitch;
 
-        public SplitEntryViewHolder(ViewDataBinding binding) {
+        ImageButton copyImbalanceButton;
+        ImageButton copyAboveButton;
+        ImageButton copyBelowButton;
+
+        public SplitEntryViewHolder(ItemSplitEntryBinding binding) {
             super(binding.getRoot());
             this.binding = binding;
         }
 
-        public void bind(Object obj) {
-            bindedViewModel = (SplitEntryViewModel)obj;
-            binding.setVariable(BR.splitEntryViewModel, obj);
+        public void bind(SplitEntryViewModel bindedViewModel) {
+            bindedViewModel.setViewHolder(this);
+            binding.setSplitEntryViewModel(bindedViewModel);
             binding.executePendingBindings();
 
-            ItemSplitEntryBinding itemSplitEntryBinding = (ItemSplitEntryBinding)binding;
-            splitMemoEditText = itemSplitEntryBinding.inputSplitMemo;
-            splitAmountEditText = itemSplitEntryBinding.inputSplitAmount;
-            removeSplitButton = itemSplitEntryBinding.btnRemoveSplit;
-            accountsSpinner = itemSplitEntryBinding.inputAccountsSpinner;
-            splitCurrencyTextView = itemSplitEntryBinding.splitCurrencySymbol;
-            splitUidTextView = itemSplitEntryBinding.splitUid;
-            splitTypeSwitch = itemSplitEntryBinding.btnSplitType;
+            splitAmountEditText = binding.inputSplitAmount;
+            removeSplitButton = binding.btnRemoveSplit;
+            accountsSpinner = binding.inputAccountsSpinner;
+            splitCurrencyTextView = binding.splitCurrencySymbol;
+            splitTypeSwitch = binding.btnSplitType;
+            copyImbalanceButton = binding.copyImbalanceButton;
+            copyAboveButton = binding.copyAboveButton;
+            copyBelowButton = binding.copyBelowButton;
+        }
+
+        public SplitEntryViewModel getBindedViewModel() {
+            return binding.getSplitEntryViewModel();
+        }
+
+        public void setListeners() {
+            SplitEntryViewModel bindedViewModel = getBindedViewModel();
+
+            Log.d(LOG_TAG, "SplitEntryViewHolder.setListeners: this = " + this + ", bindedViewModel = " + bindedViewModel);
+
+            splitAmountEditText.bindListeners(mCalculatorKeyboard);
+            splitAmountEditText.addTextChangedListener(mImbalanceWatcher);
+
+            removeSplitButton.setOnClickListener((View _view) -> {
+                int clickedPosition = SplitEntryViewHolder.this.getAbsoluteAdapterPosition();
+                if (clickedPosition < mSplitEntryViewModelList.size()) {
+                    mSplitEntryViewModelList.remove(bindedViewModel);
+                    mRecyclerViewAdaptor.notifyItemRemoved(clickedPosition);
+                    mImbalanceWatcher.afterTextChanged(null);
+                }
+            });
+
+            splitTypeSwitch.setAmountFormattingListener(splitAmountEditText, splitCurrencyTextView);
+            splitTypeSwitch.addOnCheckedChangeListener((CompoundButton buttonView, boolean isChecked) -> {
+                bindedViewModel.setSplitType(isChecked);
+                mImbalanceWatcher.afterTextChanged(null);
+            });
+
+            // Updates the list of possible transfer accounts. Only accounts with the same currency can be transferred to
+            accountsSpinner.setAdapter(mCursorAdapter);
+            accountsSpinner.setOnItemSelectedListener(new SplitAccountListener(splitTypeSwitch, this));
+
+            copyImbalanceButton.setOnClickListener((View _view) -> {
+                // First, set current value to zero (if it's not) and recalculate the imbalance.
+                splitAmountEditText.setValue(BigDecimal.ZERO);
+                mImbalanceWatcher.afterTextChanged(null);
+
+                // Copy the imbalance.
+                if (mImbalance.signum() > 0) {
+                    splitTypeSwitch.setChecked(TransactionType.DEBIT);
+                } else {
+                    splitTypeSwitch.setChecked(TransactionType.CREDIT);
+                }
+                splitAmountEditText.setValue(mImbalance.abs());
+                mImbalanceWatcher.afterTextChanged(null);
+            });
+
+            copyAboveButton.setOnClickListener((View _view) -> {
+                int clickedPosition = SplitEntryViewHolder.this.getAbsoluteAdapterPosition();
+                if (clickedPosition <= 0) {
+                    // Do nothing if this is the first split.
+                    return;
+                }
+                SplitEntryViewModel aboveViewModel = mSplitEntryViewModelList.get(clickedPosition - 1);
+                bindedViewModel.setInputSplitAmount(aboveViewModel.getInputSplitAmount());
+                mImbalanceWatcher.afterTextChanged(null);
+            });
+
+            copyBelowButton.setOnClickListener((View _view) -> {
+                int clickedPosition = SplitEntryViewHolder.this.getAbsoluteAdapterPosition();
+                if (clickedPosition >= (mSplitEntryViewModelList.size() - 1)) {
+                    // Do nothing if this is the last split.
+                    return;
+                }
+                SplitEntryViewModel belowViewModel = mSplitEntryViewModelList.get(clickedPosition + 1);
+                bindedViewModel.setInputSplitAmount(belowViewModel.getInputSplitAmount());
+                mImbalanceWatcher.afterTextChanged(null);
+            });
+
+            bindedViewModel.setSplitCurrencySymbol(mCommodity.getSymbol());
+            bindedViewModel.setSplitUid(BaseModel.generateUID());
+            Split split = bindedViewModel.getSplit();
+            if (split != null) {
+                bindedViewModel.setSplitCurrencySymbol(split.getValue().getCommodity().getSymbol());
+                bindedViewModel.setInputSplitAmount(split.getValue().toPlainString());
+//                splitAmountEditText.setValue(split.getFormattedValue().asBigDecimal());
+
+                String splitAccountUID = split.getAccountUID();
+                assert splitAccountUID != null;
+                splitTypeSwitch.setAccountType(mAccountsDbAdapter.getAccountType(splitAccountUID));
+                splitTypeSwitch.setChecked(split.getType());
+                int accountPos = getSelectedTransferAccountPos(mAccountsDbAdapter.getID(splitAccountUID), mCursorAdapter);
+                bindedViewModel.setInputAccountPos(accountPos);
+                bindedViewModel.setInputSplitMemo(split.getMemo());
+                bindedViewModel.setSplitUid(split.getUID());
+            } else {
+                binding.getRoot().requestFocus();
+            }
         }
 
         @Override
         public void transferComplete(Money amount) {
             quantity = amount;
-        }
-
-        public void setListeners(Split split) {
-            splitAmountEditText.bindListeners(mCalculatorKeyboard);
-
-            removeSplitButton.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View _view) {
-                    int removedPosition = 0;
-                    for (SplitEntryViewModel viewModel : mSplitEntryViewModelList) {
-                        if (viewModel == bindedViewModel) {
-                            break;
-                        }
-                        removedPosition ++;
-                    }
-                    if (removedPosition < mSplitEntryViewModelList.size()) {
-                        mSplitEntryViewModelList.remove(bindedViewModel);
-                        mRecyclerViewAdaptor.notifyItemRemoved(removedPosition);
-                        mImbalanceWatcher.afterTextChanged(null);
-                    }
-                }
-            });
-
-            updateTransferAccountsList(accountsSpinner);
-
-            splitCurrencyTextView.setText(mCommodity.getSymbol());
-            splitTypeSwitch.setAmountFormattingListener(splitAmountEditText, splitCurrencyTextView);
-            splitTypeSwitch.setChecked(mBaseAmount.signum() > 0);
-            splitUidTextView.setText(BaseModel.generateUID());
-
-            if (split != null) {
-                splitAmountEditText.setCommodity(split.getValue().getCommodity());
-                splitAmountEditText.setValue(split.getFormattedValue().asBigDecimal());
-                splitCurrencyTextView.setText(split.getValue().getCommodity().getSymbol());
-                splitMemoEditText.setText(split.getMemo());
-                splitUidTextView.setText(split.getUID());
-                String splitAccountUID = split.getAccountUID();
-                assert splitAccountUID != null;
-                setSelectedTransferAccount(mAccountsDbAdapter.getID(splitAccountUID), accountsSpinner);
-                splitTypeSwitch.setAccountType(mAccountsDbAdapter.getAccountType(splitAccountUID));
-                splitTypeSwitch.setChecked(split.getType());
-            } else {
-                binding.getRoot().requestFocus();
-            }
-
-            accountsSpinner.setOnItemSelectedListener(new SplitAccountListener(splitTypeSwitch, this));
-            splitTypeSwitch.addOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-                @Override
-                public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                    mImbalanceWatcher.afterTextChanged(null);
-                }
-            });
-            splitAmountEditText.addTextChangedListener(mImbalanceWatcher);
         }
 
         /**
@@ -449,26 +484,18 @@ public class SplitEditorFragment extends Fragment {
     }
 
     /**
-     * Updates the spinner to the selected transfer account
+     * Get the position of the selected transfer account in account list.
      *
      * @param accountId Database ID of the transfer account
+     * @return the postion.
      */
-    private void setSelectedTransferAccount(long accountId, final Spinner accountsSpinner) {
-        for (int pos = 0; pos < mCursorAdapter.getCount(); pos++) {
-            if (mCursorAdapter.getItemId(pos) == accountId) {
-                accountsSpinner.setSelection(pos);
-                break;
+    private int getSelectedTransferAccountPos(long accountId, final SimpleCursorAdapter cursorAdapter) {
+        for (int pos = 0; pos < cursorAdapter.getCount(); pos++) {
+            if (cursorAdapter.getItemId(pos) == accountId) {
+                return pos;
             }
         }
-    }
-
-    /**
-     * Updates the list of possible transfer accounts.
-     * Only accounts with the same currency can be transferred to
-     */
-    private void updateTransferAccountsList(Spinner transferAccountSpinner) {
-        mCursorAdapter = new QualifiedAccountNameCursorAdapter(getActivity(), mCursor);
-        transferAccountSpinner.setAdapter(mCursorAdapter);
+        return 0;
     }
 
     /**
@@ -510,8 +537,7 @@ public class SplitEditorFragment extends Fragment {
      */
     private ArrayList<Split> extractSplitsFromView() {
         ArrayList<Split> splitList = new ArrayList<>();
-        for (int i=0; i<mSplitEntryViewModelList.size(); i++) {
-            SplitEntryViewModel splitEntryViewModel = mSplitEntryViewModelList.get(i);
+        for (SplitEntryViewModel splitEntryViewModel : mSplitEntryViewModelList) {
             SplitEntryViewHolder viewHolder = (SplitEntryViewHolder) splitEntryViewModel.getViewHolder();
             if (viewHolder.splitAmountEditText.getValue() == null)
                 continue;
@@ -523,9 +549,9 @@ public class SplitEditorFragment extends Fragment {
 
             String accountUID = mAccountsDbAdapter.getUID(viewHolder.accountsSpinner.getSelectedItemId());
             Split split = new Split(valueAmount, accountUID);
-            split.setMemo(viewHolder.splitMemoEditText.getText().toString());
+            split.setMemo(viewHolder.getBindedViewModel().getInputSplitMemo());
             split.setType(viewHolder.splitTypeSwitch.getTransactionType());
-            split.setUID(viewHolder.splitUidTextView.getText().toString().trim());
+            split.setUID(viewHolder.getBindedViewModel().getSplitUid().trim());
             if (viewHolder.quantity != null)
                 split.setQuantity(viewHolder.quantity.abs());
             splitList.add(split);
@@ -549,20 +575,19 @@ public class SplitEditorFragment extends Fragment {
         }
 
         @Override
-        public void afterTextChanged(Editable editable) {
+        public void afterTextChanged(Editable _editable) {
             BigDecimal imbalance = BigDecimal.ZERO;
 
-            for (int i=0; i<mSplitEntryViewModelList.size(); i++) {
-                SplitEntryViewModel viewModel = mSplitEntryViewModelList.get(i);
+            for (SplitEntryViewModel viewModel : mSplitEntryViewModelList) {
                 SplitEntryViewHolder viewHolder = (SplitEntryViewHolder) viewModel.getViewHolder();
                 if (viewHolder == null) {
-                    Split split = (Split) viewModel.getSplit();
+                    Split split = viewModel.getSplit();
                     if (split == null) {
                         continue;
                     }
                     boolean hasDebitNormalBalance = AccountsDbAdapter.getInstance()
                             .getAccountType(split.getAccountUID()).hasDebitNormalBalance();
-                    BigDecimal amount = split.getValue().asBigDecimal();
+                    BigDecimal amount = split.getValue().abs().asBigDecimal();
                     if (split.getType() == TransactionType.CREDIT) {
                         if (hasDebitNormalBalance)
                             imbalance = imbalance.add(amount);
@@ -594,6 +619,7 @@ public class SplitEditorFragment extends Fragment {
                 }
             }
 
+            mImbalance = imbalance;
             TransactionsActivity.displayBalance(mImbalanceTextView, new Money(imbalance, mCommodity));
         }
     }

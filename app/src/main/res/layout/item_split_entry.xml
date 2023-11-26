@@ -18,6 +18,7 @@ limitations under the License.
     xmlns:tools="http://schemas.android.com/tools">
 
     <data>
+
         <variable
             name="splitEntryViewModel"
             type="org.gnucash.android.ui.transaction.SplitEntryViewModel" />
@@ -25,11 +26,11 @@ limitations under the License.
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="120dp"
+        android:layout_height="140dp"
         android:orientation="horizontal">
 
         <ImageButton
-            android:id="@+id/dragButton"
+            android:id="@+id/drag_button"
             android:layout_width="48dp"
             android:layout_height="match_parent"
             android:scaleType="center"
@@ -45,7 +46,7 @@ limitations under the License.
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:maxHeight="72dp"
+                android:maxHeight="60dp"
                 android:minHeight="48dp">
 
                 <TextView
@@ -62,7 +63,6 @@ limitations under the License.
 
                 <org.gnucash.android.ui.util.widget.CalculatorEditText
                     android:id="@+id/input_split_amount"
-                    android:text="@={splitEntryViewModel.inputSplitAmount}"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_marginBottom="@dimen/dialog_padding"
@@ -72,6 +72,7 @@ limitations under the License.
                     android:hint="@string/label_transaction_amount"
                     android:inputType="none"
                     android:nextFocusDown="@+id/input_split_memo"
+                    android:text="@={splitEntryViewModel.inputSplitAmount}"
                     android:textColor="@color/debit_red"
                     android:textSize="18sp"
                     gnucash:keyboardKeysLayout="@xml/calculator_keyboard" />
@@ -102,38 +103,70 @@ limitations under the License.
                     tools:ignore="ContentDescription" />
             </LinearLayout>
 
-            <com.google.android.material.textfield.TextInputLayout
-                android:id="@+id/name_text_input_layout"
+            <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="7dp">
+                android:layout_height="48dp">
 
-                <EditText
-                    android:id="@+id/input_split_memo"
-                    android:text="@={splitEntryViewModel.inputSplitMemo}"
-                    android:layout_width="match_parent"
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/name_text_input_layout"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:background="@android:color/transparent"
-                    android:gravity="top"
-                    android:hint="@string/hint_split_memo"
-                    android:importantForAutofill="no"
-                    android:inputType="textMultiLine|textCapSentences"
-                    android:singleLine="false"
-                    android:textSize="15sp" />
-            </com.google.android.material.textfield.TextInputLayout>
+                    android:layout_marginStart="7dp"
+                    android:layout_weight="6">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/input_split_memo"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@android:color/transparent"
+                        android:gravity="top"
+                        android:hint="@string/hint_split_memo"
+                        android:importantForAutofill="no"
+                        android:inputType="textMultiLine|textCapSentences"
+                        android:singleLine="false"
+                        android:text="@={splitEntryViewModel.inputSplitMemo}"
+                        android:textSize="15sp" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <ImageButton
+                    android:id="@+id/copy_imbalance_button"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:src="@android:drawable/ic_media_pause"
+                    tools:ignore="ContentDescription" />
+
+                <ImageButton
+                    android:id="@+id/copy_above_button"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:src="@android:drawable/stat_sys_upload_done"
+                    tools:ignore="ContentDescription" />
+
+                <ImageButton
+                    android:id="@+id/copy_below_button"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:src="@android:drawable/stat_sys_download_done"
+                    tools:ignore="ContentDescription" />
+
+            </LinearLayout>
 
             <Spinner
                 android:id="@+id/input_accounts_spinner"
-                android:selectedItemPosition="@={splitEntryViewModel.inputAccountPos}"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content" />
+                android:layout_height="match_parent"
+                android:minHeight="48dp"
+                android:selectedItemPosition="@={splitEntryViewModel.inputAccountPos}" />
 
             <!-- Only serves to store the split UID for background processing. Not relevant to user-->
             <TextView
                 android:id="@+id/split_uid"
-                android:text="@={splitEntryViewModel.splitUid}"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:text="@={splitEntryViewModel.splitUid}"
                 android:visibility="gone" />
 
             <View
