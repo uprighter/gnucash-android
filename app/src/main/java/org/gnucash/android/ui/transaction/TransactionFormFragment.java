@@ -22,6 +22,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.database.Cursor;
+import android.inputmethodservice.KeyboardView;
 import android.os.Bundle;
 import android.text.format.DateUtils;
 import android.util.Log;
@@ -202,6 +203,12 @@ public class TransactionFormFragment extends Fragment implements
     TextView mRecurrenceTextView;
 
     /**
+     * View which displays the calculator keyboard
+     */
+    @BindView(R.id.calculator_keyboard)
+    KeyboardView mKeyboardView;
+
+    /**
      * Open the split editor
      */
     @BindView(R.id.btn_split_editor)
@@ -264,6 +271,7 @@ public class TransactionFormFragment extends Fragment implements
                              Bundle savedInstanceState) {
         View v = inflater.inflate(R.layout.fragment_transaction_form, container, false);
         ButterKnife.bind(this, v);
+        mAmountEditText.bindListeners(mKeyboardView);
         mOpenSplitEditor.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -300,6 +308,7 @@ public class TransactionFormFragment extends Fragment implements
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
+        mAmountEditText.bindListeners(mKeyboardView);
     }
 
     @Override
@@ -539,6 +548,7 @@ public class TransactionFormFragment extends Fragment implements
     private void toggleAmountInputEntryMode(boolean enabled) {
         if (enabled) {
             mAmountEditText.setFocusable(true);
+            mAmountEditText.bindListeners(mKeyboardView);
         } else {
             mAmountEditText.setFocusable(false);
             mAmountEditText.setOnClickListener(new View.OnClickListener() {
@@ -848,6 +858,8 @@ public class TransactionFormFragment extends Fragment implements
      * and save a transaction
      */
     private void saveNewTransaction() {
+        mAmountEditText.getCalculatorKeyboard().hideCustomKeyboard();
+
         //determine whether we need to do currency conversion
 
         if (isMultiCurrencyTransaction() && !splitEditorUsed() && !mCurrencyConversionDone) {

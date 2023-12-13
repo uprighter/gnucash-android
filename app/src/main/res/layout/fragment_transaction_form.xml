@@ -190,4 +190,15 @@
             <!-- Not exposing the transaction template checkbox to the UI at this time -->
         </TableLayout>
     </ScrollView>
+
+    <android.inputmethodservice.KeyboardView
+        android:id="@+id/calculator_keyboard"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentEnd="true"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:visibility="gone" />
 </RelativeLayout>

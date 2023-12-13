@@ -62,7 +62,7 @@ public class TransactionDetailActivity extends PasscodeLockActivity {
     TextView mCreditBalance;
     TableLayout mDetailTableLayout;
     FloatingActionButton mFabEditTransaction;
-    private ActivityResultLauncher<Intent> launcher = registerForActivityResult(
+    private final ActivityResultLauncher<Intent> launcher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
             result -> {
                 Log.d(LOG_TAG, "launch createTransactionIntent: result = " + result);
