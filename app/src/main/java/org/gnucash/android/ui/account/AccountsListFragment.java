@@ -38,12 +38,16 @@ import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.PopupMenu;
 import androidx.appcompat.widget.SearchView;
-import androidx.core.view.MenuItemCompat;
 import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentResultListener;
 import androidx.loader.app.LoaderManager;
 import androidx.loader.content.Loader;
 import androidx.recyclerview.widget.GridLayoutManager;
@@ -52,6 +56,8 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
+import org.gnucash.android.databinding.CardviewAccountBinding;
+import org.gnucash.android.databinding.FragmentAccountsListBinding;
 import org.gnucash.android.db.DatabaseCursorLoader;
 import org.gnucash.android.db.DatabaseSchema;
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
@@ -69,9 +75,6 @@ import org.gnucash.android.util.BackupManager;
 
 import java.util.List;
 
-import butterknife.BindView;
-import butterknife.ButterKnife;
-
 /**
  * Fragment for displaying the list of accounts in the database
  *
@@ -83,11 +86,11 @@ public class AccountsListFragment extends Fragment implements
         SearchView.OnQueryTextListener,
         SearchView.OnCloseListener {
 
-    AccountRecyclerAdapter mAccountRecyclerAdapter;
-    @BindView(R.id.account_recycler_view)
-    EmptyRecyclerView mRecyclerView;
-    @BindView(R.id.empty_view)
-    TextView mEmptyTextView;
+    private FragmentAccountsListBinding binding;
+    private EmptyRecyclerView mRecyclerView;
+    private TextView mEmptyTextView;
+
+    private AccountRecyclerAdapter mAccountRecyclerAdapter;
 
     /**
      * Describes the kinds of accounts that should be loaded in the accounts list.
@@ -106,7 +109,7 @@ public class AccountsListFragment extends Fragment implements
     /**
      * Logging tag
      */
-    protected static final String TAG = "AccountsListFragment";
+    protected static final String LOG_TAG = "AccountsListFragment";
 
     /**
      * Tag to save {@link AccountsListFragment#mDisplayMode} to fragment state
@@ -138,6 +141,17 @@ public class AccountsListFragment extends Fragment implements
      */
     private SearchView mSearchView;
 
+    private final ActivityResultLauncher<Intent> launcher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                Log.d(LOG_TAG, "launch createTransactionIntent: result = " + result);
+                if (result.getResultCode() == Activity.RESULT_CANCELED) {
+                    return;
+                }
+                refresh();
+            }
+    );
+
     public static AccountsListFragment newInstance(DisplayMode displayMode) {
         AccountsListFragment fragment = new AccountsListFragment();
         fragment.mDisplayMode = displayMode;
@@ -145,12 +159,16 @@ public class AccountsListFragment extends Fragment implements
     }
 
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container,
-                             Bundle savedInstanceState) {
-        View v = inflater.inflate(R.layout.fragment_accounts_list, container,
-                false);
+    public @Nullable View onCreateView(
+            @NonNull LayoutInflater inflater,
+            @Nullable ViewGroup container,
+            @Nullable Bundle savedInstanceState
+    ) {
+        binding = FragmentAccountsListBinding.inflate(inflater, container, false);
+        mRecyclerView = binding.accountRecyclerView;
+        mEmptyTextView = binding.emptyView;
 
-        ButterKnife.bind(this, v);
+
         mRecyclerView.setHasFixedSize(true);
         mRecyclerView.setEmptyView(mEmptyTextView);
 
@@ -174,7 +192,7 @@ public class AccountsListFragment extends Fragment implements
             LinearLayoutManager mLayoutManager = new LinearLayoutManager(getActivity());
             mRecyclerView.setLayoutManager(mLayoutManager);
         }
-        return v;
+        return binding.getRoot();
     }
 
     @Override
@@ -182,27 +200,27 @@ public class AccountsListFragment extends Fragment implements
         super.onCreate(savedInstanceState);
 
         Bundle args = getArguments();
-        if (args != null)
+        if (args != null) {
             mParentAccountUID = args.getString(UxArgument.PARENT_ACCOUNT_UID);
+        }
 
-        if (savedInstanceState != null)
-            mDisplayMode = (DisplayMode) savedInstanceState.getSerializable(STATE_DISPLAY_MODE);
+        if (savedInstanceState != null) {
+            mDisplayMode = savedInstanceState.getSerializable(STATE_DISPLAY_MODE, DisplayMode.class);
+        }
     }
 
     @Override
-    public void onActivityCreated(Bundle savedInstanceState) {
-        super.onActivityCreated(savedInstanceState);
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
 
         ActionBar actionbar = ((AppCompatActivity) getActivity()).getSupportActionBar();
         actionbar.setTitle(R.string.title_accounts);
         actionbar.setDisplayHomeAsUpEnabled(true);
         setHasOptionsMenu(true);
 
-
         // specify an adapter (see also next example)
         mAccountRecyclerAdapter = new AccountRecyclerAdapter(null);
         mRecyclerView.setAdapter(mAccountRecyclerAdapter);
-
     }
 
     @Override
@@ -218,25 +236,17 @@ public class AccountsListFragment extends Fragment implements
     }
 
     @Override
-    public void onAttach(Activity activity) {
-        super.onAttach(activity);
+    public void onAttach(@NonNull Context context) {
+        super.onAttach(context);
         try {
-            mAccountSelectedListener = (OnAccountClickedListener) activity;
+            mAccountSelectedListener = (OnAccountClickedListener) context;
         } catch (ClassCastException e) {
-            throw new ClassCastException(activity.toString() + " must implement OnAccountSelectedListener");
+            throw new ClassCastException(context + " must implement OnAccountSelectedListener");
         }
     }
 
     public void onListItemClick(String accountUID) {
         mAccountSelectedListener.accountSelected(accountUID);
-    }
-
-    @Override
-    public void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (resultCode == Activity.RESULT_CANCELED)
-            return;
-
-        refresh();
     }
 
     /**
@@ -265,14 +275,24 @@ public class AccountsListFragment extends Fragment implements
      * @param id Record ID of account to be deleted after confirmation
      */
     public void showConfirmationDialog(long id) {
+        String accountUID = mAccountsDbAdapter.getUID(id);
         DeleteAccountDialogFragment alertFragment =
-                DeleteAccountDialogFragment.newInstance(mAccountsDbAdapter.getUID(id));
-        alertFragment.setTargetFragment(this, 0);
-        alertFragment.show(getActivity().getSupportFragmentManager(), "delete_confirmation_dialog");
+                DeleteAccountDialogFragment.newInstance(accountUID);
+
+        Log.d(LOG_TAG, "showConfirmationDialog delete_" + accountUID);
+        getParentFragmentManager().setFragmentResultListener(
+                "delete_" + accountUID, this, new FragmentResultListener() {
+                    @Override
+                    public void onFragmentResult(@NonNull String requestKey, @NonNull Bundle bundle) {
+                        Log.d(LOG_TAG, "onFragmentResult " + requestKey + ", " + bundle);
+                        refresh();
+                    }
+                });
+        alertFragment.show(getParentFragmentManager(), "delete_confirmation_dialog");
     }
 
     @Override
-    public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
+    public void onCreateOptionsMenu(@NonNull Menu menu, @NonNull MenuInflater inflater) {
         if (mParentAccountUID != null)
             inflater.inflate(R.menu.sub_account_actions, menu);
         else {
@@ -281,10 +301,10 @@ public class AccountsListFragment extends Fragment implements
 
             SearchManager searchManager =
                     (SearchManager) GnuCashApplication.getAppContext().getSystemService(Context.SEARCH_SERVICE);
-            mSearchView = (SearchView)
-                    MenuItemCompat.getActionView(menu.findItem(R.id.menu_search));
-            if (mSearchView == null)
+            mSearchView = (SearchView) menu.findItem(R.id.menu_search).getActionView();
+            if (mSearchView == null) {
                 return;
+            }
 
             mSearchView.setSearchableInfo(
                     searchManager.getSearchableInfo(getActivity().getComponentName()));
@@ -293,12 +313,12 @@ public class AccountsListFragment extends Fragment implements
         }
     }
 
-
-    @Override
     /**
      * Refresh the account list as a sublist of another account
+     *
      * @param parentAccountUID GUID of the parent account
      */
+    @Override
     public void refresh(String parentAccountUID) {
         getArguments().putString(UxArgument.PARENT_ACCOUNT_UID, parentAccountUID);
         refresh();
@@ -310,11 +330,11 @@ public class AccountsListFragment extends Fragment implements
      */
     @Override
     public void refresh() {
-        getLoaderManager().restartLoader(0, null, this);
+        LoaderManager.getInstance(this).restartLoader(0, null, this);
     }
 
     @Override
-    public void onSaveInstanceState(Bundle outState) {
+    public void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
         outState.putSerializable(STATE_DISPLAY_MODE, mDisplayMode);
     }
@@ -325,8 +345,10 @@ public class AccountsListFragment extends Fragment implements
     @Override
     public void onDestroy() {
         super.onDestroy();
-        if (mAccountRecyclerAdapter != null)
+        binding = null;
+        if (mAccountRecyclerAdapter != null) {
             mAccountRecyclerAdapter.swapCursor(null);
+        }
     }
 
     /**
@@ -340,12 +362,13 @@ public class AccountsListFragment extends Fragment implements
         editAccountIntent.setAction(Intent.ACTION_INSERT_OR_EDIT);
         editAccountIntent.putExtra(UxArgument.SELECTED_ACCOUNT_UID, mAccountsDbAdapter.getUID(accountId));
         editAccountIntent.putExtra(UxArgument.FORM_TYPE, FormActivity.FormType.ACCOUNT.name());
-        startActivityForResult(editAccountIntent, AccountsActivity.REQUEST_EDIT_ACCOUNT);
+        launcher.launch(editAccountIntent);
     }
 
     @Override
-    public Loader<Cursor> onCreateLoader(int id, Bundle args) {
-        Log.d(TAG, "Creating the accounts loader");
+    @NonNull
+    public Loader<Cursor> onCreateLoader(int id, @Nullable Bundle args) {
+        Log.d(LOG_TAG, "Creating the accounts loader");
         Bundle arguments = getArguments();
         String accountUID = arguments == null ? null : arguments.getString(UxArgument.PARENT_ACCOUNT_UID);
 
@@ -357,15 +380,15 @@ public class AccountsListFragment extends Fragment implements
     }
 
     @Override
-    public void onLoadFinished(Loader<Cursor> loaderCursor, Cursor cursor) {
-        Log.d(TAG, "Accounts loader finished. Swapping in cursor");
+    public void onLoadFinished(@NonNull Loader<Cursor> loaderCursor, Cursor cursor) {
+        Log.d(LOG_TAG, "Accounts loader finished. Swapping in cursor");
         mAccountRecyclerAdapter.swapCursor(cursor);
         mAccountRecyclerAdapter.notifyDataSetChanged();
     }
 
     @Override
-    public void onLoaderReset(Loader<Cursor> arg0) {
-        Log.d(TAG, "Resetting the accounts loader");
+    public void onLoaderReset(@NonNull Loader<Cursor> arg0) {
+        Log.d(LOG_TAG, "Resetting the accounts loader");
         mAccountRecyclerAdapter.swapCursor(null);
     }
 
@@ -386,7 +409,7 @@ public class AccountsListFragment extends Fragment implements
             return true;
         }
         mCurrentFilter = newFilter;
-        getLoaderManager().restartLoader(0, null, this);
+        LoaderManager.getInstance(this).restartLoader(0, null, this);
         return true;
     }
 
@@ -482,11 +505,13 @@ public class AccountsListFragment extends Fragment implements
         }
 
         @Override
-        public AccountViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-            View v = LayoutInflater.from(parent.getContext())
-                    .inflate(R.layout.cardview_account, parent, false);
+        @NonNull
+        public AccountViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            CardviewAccountBinding binding = CardviewAccountBinding.inflate(
+                    LayoutInflater.from(parent.getContext()), parent, false);
+            Log.d(LOG_TAG, "onCreateViewHolder, binding: " + binding);
+            return new AccountViewHolder(binding);
 
-            return new AccountViewHolder(v);
         }
 
         @Override
@@ -517,16 +542,14 @@ public class AccountsListFragment extends Fragment implements
             if (isPlaceholderAccount) {
                 holder.createTransaction.setVisibility(View.GONE);
             } else {
-                holder.createTransaction.setOnClickListener(new View.OnClickListener() {
+                holder.createTransaction.setOnClickListener((View view) -> {
+                    Intent createTransactionIntent = new Intent(getActivity(), FormActivity.class);
+                    createTransactionIntent.setAction(Intent.ACTION_INSERT_OR_EDIT);
+                    createTransactionIntent.putExtra(UxArgument.SELECTED_ACCOUNT_UID, accountUID);
+                    createTransactionIntent.putExtra(UxArgument.FORM_TYPE, FormActivity.FormType.TRANSACTION.name());
+//                    getActivity().startActivity(createTransactionIntent);
+                    launcher.launch(createTransactionIntent);
 
-                    @Override
-                    public void onClick(View v) {
-                        Intent intent = new Intent(getActivity(), FormActivity.class);
-                        intent.setAction(Intent.ACTION_INSERT_OR_EDIT);
-                        intent.putExtra(UxArgument.SELECTED_ACCOUNT_UID, accountUID);
-                        intent.putExtra(UxArgument.FORM_TYPE, FormActivity.FormType.TRANSACTION.name());
-                        getActivity().startActivity(intent);
-                    }
                 });
             }
 
@@ -550,71 +573,64 @@ public class AccountsListFragment extends Fragment implements
                 holder.favoriteStatus.setImageResource(R.drawable.ic_star_border_black_24dp);
             }
 
-            holder.favoriteStatus.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    boolean isFavoriteAccount = mAccountsDbAdapter.isFavoriteAccount(accountUID);
+            holder.favoriteStatus.setOnClickListener((View v) -> {
+                boolean isFavoriteAccount = mAccountsDbAdapter.isFavoriteAccount(accountUID);
 
-                    ContentValues contentValues = new ContentValues();
-                    contentValues.put(DatabaseSchema.AccountEntry.COLUMN_FAVORITE, !isFavoriteAccount);
-                    mAccountsDbAdapter.updateRecord(accountUID, contentValues);
+                ContentValues contentValues = new ContentValues();
+                contentValues.put(DatabaseSchema.AccountEntry.COLUMN_FAVORITE, !isFavoriteAccount);
+                mAccountsDbAdapter.updateRecord(accountUID, contentValues);
 
-                    int drawableResource = !isFavoriteAccount ?
-                            R.drawable.ic_star_black_24dp : R.drawable.ic_star_border_black_24dp;
-                    holder.favoriteStatus.setImageResource(drawableResource);
-                    if (mDisplayMode == DisplayMode.FAVORITES)
-                        refresh();
-                }
+                int drawableResource = !isFavoriteAccount ?
+                        R.drawable.ic_star_black_24dp : R.drawable.ic_star_border_black_24dp;
+                holder.favoriteStatus.setImageResource(drawableResource);
+                if (mDisplayMode == DisplayMode.FAVORITES)
+                    refresh();
             });
 
-            holder.itemView.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    onListItemClick(accountUID);
-                }
+            holder.itemView.setOnClickListener((View v) -> {
+                onListItemClick(accountUID);
             });
         }
 
 
         class AccountViewHolder extends RecyclerView.ViewHolder implements PopupMenu.OnMenuItemClickListener {
-            @BindView(R.id.primary_text)
+
             TextView accountName;
-            @BindView(R.id.secondary_text)
             TextView description;
-            @BindView(R.id.account_balance)
             TextView accountBalance;
-            @BindView(R.id.create_transaction)
             ImageView createTransaction;
-            @BindView(R.id.favorite_status)
             ImageView favoriteStatus;
-            @BindView(R.id.options_menu)
             ImageView optionsMenu;
-            @BindView(R.id.account_color_strip)
             View colorStripView;
-            @BindView(R.id.budget_indicator)
             ProgressBar budgetIndicator;
+
             long accoundId;
 
-            public AccountViewHolder(View itemView) {
-                super(itemView);
-                ButterKnife.bind(this, itemView);
+            public AccountViewHolder(CardviewAccountBinding binding) {
+                super(binding.getRoot());
 
-                optionsMenu.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        PopupMenu popup = new PopupMenu(getActivity(), v);
-                        popup.setOnMenuItemClickListener(AccountViewHolder.this);
-                        MenuInflater inflater = popup.getMenuInflater();
-                        inflater.inflate(R.menu.account_context_menu, popup.getMenu());
-                        popup.show();
-                    }
+                accountName = binding.listItem.primaryText;
+                description = binding.listItem.secondaryText;
+                accountBalance = binding.accountBalance;
+                createTransaction = binding.createTransaction;
+                favoriteStatus = binding.favoriteStatus;
+                optionsMenu = binding.optionsMenu;
+                colorStripView = binding.accountColorStrip;
+                budgetIndicator = binding.budgetIndicator;
+
+                optionsMenu.setOnClickListener((View v) -> {
+                    PopupMenu popup = new PopupMenu(requireActivity(), v);
+                    popup.setOnMenuItemClickListener(AccountViewHolder.this);
+                    MenuInflater inflater = popup.getMenuInflater();
+                    inflater.inflate(R.menu.account_context_menu, popup.getMenu());
+                    popup.show();
                 });
-
             }
 
 
             @Override
             public boolean onMenuItemClick(MenuItem item) {
+                Log.d(LOG_TAG, "onMenuItemClick, item: " + item);
                 switch (item.getItemId()) {
                     case R.id.context_menu_edit_accounts:
                         openCreateOrEditActivity(accoundId);

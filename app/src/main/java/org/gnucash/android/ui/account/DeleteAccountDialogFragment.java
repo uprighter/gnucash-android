@@ -27,6 +27,7 @@ import android.widget.RadioButton;
 import android.widget.Spinner;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.cursoradapter.widget.SimpleCursorAdapter;
 import androidx.fragment.app.DialogFragment;
@@ -38,7 +39,6 @@ import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.db.adapter.SplitsDbAdapter;
 import org.gnucash.android.db.adapter.TransactionsDbAdapter;
 import org.gnucash.android.model.AccountType;
-import org.gnucash.android.ui.common.Refreshable;
 import org.gnucash.android.ui.homescreen.WidgetConfigurationActivity;
 import org.gnucash.android.util.BackupManager;
 import org.gnucash.android.util.QualifiedAccountNameCursorAdapter;
@@ -134,8 +134,8 @@ public class DeleteAccountDialogFragment extends DialogFragment {
     }
 
     @Override
-    public void onActivityCreated(Bundle savedInstanceState) {
-        super.onActivityCreated(savedInstanceState);
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
         String accountName = AccountsDbAdapter.getInstance().getAccountName(mOriginAccountUID);
         getDialog().setTitle(getString(R.string.alert_dialog_ok_delete) + ": " + accountName);
         AccountsDbAdapter accountsDbAdapter = AccountsDbAdapter.getInstance();
@@ -236,7 +236,9 @@ public class DeleteAccountDialogFragment extends DialogFragment {
                 accountsDbAdapter.recursiveDeleteAccount(accountsDbAdapter.getID(mOriginAccountUID));
 
                 WidgetConfigurationActivity.updateAllWidgets(getActivity());
-                ((Refreshable) getTargetFragment()).refresh();
+
+                getParentFragmentManager().setFragmentResult("delete_" + mOriginAccountUID, new Bundle());
+
                 dismiss();
             }
         });

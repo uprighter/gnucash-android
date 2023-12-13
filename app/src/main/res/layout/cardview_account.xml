@@ -37,15 +37,15 @@
             android:layout_width="@dimen/strip_width"
             android:layout_height="match_parent"
             android:minHeight="@dimen/card_min_height"
-            android:layout_alignParentLeft="true"
             android:layout_alignParentStart="true" />
 
         <include
+            android:id = "@id/list_item"
             layout="@layout/list_item_2_lines"
             android:paddingTop="6dp"
             android:layout_height="wrap_content"
             android:layout_width="wrap_content"
-            android:layout_toRightOf="@id/account_color_strip"
+            android:layout_toEndOf="@id/account_color_strip"
             android:layout_marginTop="@dimen/edge_padding"
             android:layout_marginLeft="@dimen/edge_padding"
             android:layout_marginRight="@dimen/edge_padding" />
@@ -55,11 +55,12 @@
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:layout_alignParentBottom="true"
-            android:layout_alignParentRight="true"
+            android:layout_alignParentEnd="true"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:paddingTop="20dp"
             android:paddingBottom="4dp"
-            android:paddingLeft="24dp"
+            android:paddingStart="24dp"
+            android:paddingEnd="4dp"
             android:scaleType="centerInside"
             android:src="@drawable/ic_more_vert_black_24dp"
             tools:ignore="ContentDescription" />
@@ -69,11 +70,12 @@
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:layout_alignParentBottom="true"
-            android:layout_toLeftOf="@id/options_menu"
+            android:layout_toStartOf="@id/options_menu"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:paddingTop="20dp"
             android:paddingBottom="4dp"
-            android:paddingLeft="24dp"
+            android:paddingStart="24dp"
+            android:paddingEnd="4dp"
             android:scaleType="centerInside"
             android:src="@drawable/ic_add_black_24dp"
             tools:ignore="ContentDescription" />
@@ -82,11 +84,11 @@
             android:id="@+id/favorite_status"
             android:layout_width="48dp"
             android:layout_height="48dp"
-            android:layout_alignParentRight="true"
+            android:layout_alignParentEnd="true"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:paddingTop="6dp"
-            android:paddingRight="6dp"
-            android:paddingLeft="22dp"
+            android:paddingEnd="6dp"
+            android:paddingStart="22dp"
             android:paddingBottom="22dp"
             android:src="@drawable/ic_star_border_black_24dp"
             tools:ignore="ContentDescription" />
@@ -101,8 +103,8 @@
             android:textSize="18sp"
             tools:text="$ 2000.00"
             android:layout_alignBottom="@id/options_menu"
-            android:layout_toLeftOf="@id/create_transaction"
-            android:layout_marginRight="@dimen/edge_padding" />
+            android:layout_toStartOf="@id/create_transaction"
+            android:layout_marginEnd="@dimen/edge_padding" />
 
         <ProgressBar
             android:id="@+id/budget_indicator"
@@ -111,8 +113,7 @@
             android:layout_width="100dp"
             android:layout_height="8dp"
             android:layout_alignParentBottom="true"
-            android:layout_alignParentLeft="true"
-            android:layout_marginLeft="@dimen/strip_width"
+            android:layout_alignParentStart="true"
             android:layout_marginStart="@dimen/strip_width"
             android:max="100"
             tools:progress="50"
@@ -121,7 +122,7 @@
             android:background="@android:color/transparent"
             android:visibility="gone"
             android:layout_alignBottom="@id/options_menu"
-            android:layout_marginRight="@dimen/edge_padding" />
+            android:layout_marginEnd="@dimen/edge_padding" />
     </RelativeLayout>
 
 </androidx.cardview.widget.CardView>
