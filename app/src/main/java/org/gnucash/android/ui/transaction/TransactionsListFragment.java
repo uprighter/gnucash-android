@@ -39,7 +39,6 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.PopupMenu;
-import androidx.databinding.DataBindingUtil;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentResultListener;
 import androidx.loader.app.LoaderManager;
@@ -88,7 +87,7 @@ public class TransactionsListFragment extends Fragment implements
      */
     protected static final String LOG_TAG = "TransactionListFragment";
 
-    private FragmentTransactionsListBinding binding;
+    private FragmentTransactionsListBinding mBinding;
 
     private TransactionsDbAdapter mTransactionsDbAdapter;
     private String mAccountUID;
@@ -137,11 +136,11 @@ public class TransactionsListFragment extends Fragment implements
             @NonNull LayoutInflater inflater,
             @Nullable ViewGroup container,
             @Nullable Bundle savedInstanceState) {
-        binding = FragmentTransactionsListBinding.inflate(inflater, container, false);
-        mRecyclerView = binding.transactionRecyclerView;
+        mBinding = FragmentTransactionsListBinding.inflate(inflater, container, false);
+        mRecyclerView = mBinding.transactionRecyclerView;
 
         mRecyclerView.setHasFixedSize(true);
-        mRecyclerView.setEmptyView(binding.emptyView);
+        mRecyclerView.setEmptyView(mBinding.emptyView);
 
         if (getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE) {
             GridLayoutManager gridLayoutManager = new GridLayoutManager(getActivity(), 2);
@@ -151,13 +150,13 @@ public class TransactionsListFragment extends Fragment implements
             mRecyclerView.setLayoutManager(mLayoutManager);
         }
 
-        return binding.getRoot();
+        return mBinding.getRoot();
     }
 
     @Override
     public void onDestroy() {
         super.onDestroy();
-        binding = null;
+        mBinding = null;
     }
 
     @Override

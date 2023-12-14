@@ -88,7 +88,7 @@ public class SplitEditorFragment extends Fragment {
 
     public static final String LOG_TAG = "SplitEditorFragment";
 
-    private FragmentSplitEditorBinding binding;
+    private FragmentSplitEditorBinding mBinding;
 
     KeyboardView mKeyboardView;
     TextView mImbalanceTextView;
@@ -127,25 +127,25 @@ public class SplitEditorFragment extends Fragment {
     public @Nullable View onCreateView(@NonNull LayoutInflater inflater,
                                        @Nullable ViewGroup container,
                                        @Nullable Bundle savedInstanceState) {
-        binding = FragmentSplitEditorBinding.inflate(inflater, container, false);
-        Log.d(LOG_TAG, "onCreateView: binding = " + binding + ", savedInstanceState = " + savedInstanceState);
+        mBinding = FragmentSplitEditorBinding.inflate(inflater, container, false);
+        Log.d(LOG_TAG, "onCreateView: binding = " + mBinding + ", savedInstanceState = " + savedInstanceState);
 
-        mKeyboardView = binding.calculatorKeyboard;
-        mImbalanceTextView = binding.imbalanceTextview;
-        mRecyclerView = binding.splitListRecycler;
+        mKeyboardView = mBinding.calculatorKeyboard;
+        mImbalanceTextView = mBinding.imbalanceTextview;
+        mRecyclerView = mBinding.splitListRecycler;
 
         mRecyclerViewAdaptor = new RecyclerViewAdapter();
         mRecyclerView.setAdapter(mRecyclerViewAdaptor);
         mRecyclerView.setLayoutManager(new LinearLayoutManager(getActivity()));
 
-        return binding.getRoot();
+        return mBinding.getRoot();
     }
 
     @Override
     public void onDestroyView() {
-        Log.d(LOG_TAG, "onDestroyView: binding = " + binding);
+        Log.d(LOG_TAG, "onDestroyView: binding = " + mBinding);
         super.onDestroyView();
-        binding = null;
+        mBinding = null;
     }
 
     @Override

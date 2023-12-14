@@ -48,7 +48,7 @@ public class TransactionDetailActivity extends PasscodeLockActivity {
 
     public static final String LOG_TAG = "TransactionDetailActivity";
 
-    private ActivityTransactionDetailBinding binding;
+    private ActivityTransactionDetailBinding mBinding;
 
     TextView mTransactionDescription;
     TextView mTimeAndDate;
@@ -83,8 +83,8 @@ public class TransactionDetailActivity extends PasscodeLockActivity {
             throw new MissingFormatArgumentException("You must specify both the transaction and account GUID");
         }
 
-        binding = ActivityTransactionDetailBinding.inflate(getLayoutInflater());
-        Log.d(LOG_TAG, "onCreate: binding = " + binding + ", savedInstanceState = " + savedInstanceState);
+        mBinding = ActivityTransactionDetailBinding.inflate(getLayoutInflater());
+        Log.d(LOG_TAG, "onCreate: binding = " + mBinding + ", savedInstanceState = " + savedInstanceState);
 
         bindViews();
 
@@ -113,13 +113,13 @@ public class TransactionDetailActivity extends PasscodeLockActivity {
         mToolBar.setBackgroundColor(themeColor);
         getWindow().setStatusBarColor(GnuCashApplication.darken(themeColor));
 
-        setContentView(binding.getRoot());
+        setContentView(mBinding.getRoot());
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        binding = null;
+        mBinding = null;
     }
 
     private TableRow bindItemSplitAmountInfo(LayoutInflater inflater, Split split) {
@@ -140,18 +140,18 @@ public class TransactionDetailActivity extends PasscodeLockActivity {
      * Reads the transaction information from the database and binds it to the views
      */
     private void bindViews() {
-        mTransactionDescription = binding.trnDescription;
-        mTimeAndDate = binding.trnTimeAndDate;
-        mRecurrence = binding.trnRecurrence;
-        mRowTrnRecurrence = binding.rowTrnRecurrence;
-        mNotes = binding.trnNotes;
-        mRowTrnNotes = binding.rowTrnNotes;
-        mToolBar = binding.toolbar;
-        mTransactionAccount = binding.transactionAccount;
-        mDebitBalance = binding.balanceDebit;
-        mCreditBalance = binding.balanceCredit;
-        mDetailTableLayout = binding.fragmentTransactionDetails;
-        mFabEditTransaction = binding.fabEditTransaction;
+        mTransactionDescription = mBinding.trnDescription;
+        mTimeAndDate = mBinding.trnTimeAndDate;
+        mRecurrence = mBinding.trnRecurrence;
+        mRowTrnRecurrence = mBinding.rowTrnRecurrence;
+        mNotes = mBinding.trnNotes;
+        mRowTrnNotes = mBinding.rowTrnNotes;
+        mToolBar = mBinding.toolbar;
+        mTransactionAccount = mBinding.transactionAccount;
+        mDebitBalance = mBinding.balanceDebit;
+        mCreditBalance = mBinding.balanceCredit;
+        mDetailTableLayout = mBinding.fragmentTransactionDetails;
+        mFabEditTransaction = mBinding.fabEditTransaction;
 
         TransactionsDbAdapter transactionsDbAdapter = TransactionsDbAdapter.getInstance();
         Transaction transaction = transactionsDbAdapter.getRecord(mTransactionUID);

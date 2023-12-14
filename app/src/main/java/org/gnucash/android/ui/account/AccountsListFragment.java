@@ -86,7 +86,7 @@ public class AccountsListFragment extends Fragment implements
         SearchView.OnQueryTextListener,
         SearchView.OnCloseListener {
 
-    private FragmentAccountsListBinding binding;
+    private FragmentAccountsListBinding mBinding;
     private EmptyRecyclerView mRecyclerView;
 
     private AccountRecyclerAdapter mAccountRecyclerAdapter;
@@ -163,9 +163,9 @@ public class AccountsListFragment extends Fragment implements
             @Nullable ViewGroup container,
             @Nullable Bundle savedInstanceState
     ) {
-        binding = FragmentAccountsListBinding.inflate(inflater, container, false);
-        mRecyclerView = binding.accountRecyclerView;
-        TextView emptyTextView = binding.emptyView;
+        mBinding = FragmentAccountsListBinding.inflate(inflater, container, false);
+        mRecyclerView = mBinding.accountRecyclerView;
+        TextView emptyTextView = mBinding.emptyView;
 
         mRecyclerView.setHasFixedSize(true);
         mRecyclerView.setEmptyView(emptyTextView);
@@ -190,7 +190,7 @@ public class AccountsListFragment extends Fragment implements
             LinearLayoutManager mLayoutManager = new LinearLayoutManager(getActivity());
             mRecyclerView.setLayoutManager(mLayoutManager);
         }
-        return binding.getRoot();
+        return mBinding.getRoot();
     }
 
     @Override
@@ -343,7 +343,7 @@ public class AccountsListFragment extends Fragment implements
     @Override
     public void onDestroy() {
         super.onDestroy();
-        binding = null;
+        mBinding = null;
         if (mAccountRecyclerAdapter != null) {
             mAccountRecyclerAdapter.swapCursor(null);
         }
