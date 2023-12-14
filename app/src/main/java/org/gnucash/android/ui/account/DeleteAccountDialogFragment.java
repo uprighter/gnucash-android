@@ -237,7 +237,7 @@ public class DeleteAccountDialogFragment extends DialogFragment {
 
                 WidgetConfigurationActivity.updateAllWidgets(getActivity());
 
-                getParentFragmentManager().setFragmentResult("delete_" + mOriginAccountUID, new Bundle());
+                getParentFragmentManager().setFragmentResult("delete_account_" + mOriginAccountUID, new Bundle());
 
                 dismiss();
             }

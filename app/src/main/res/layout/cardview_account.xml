@@ -40,7 +40,7 @@
             android:layout_alignParentStart="true" />
 
         <include
-            android:id = "@id/list_item"
+            android:id = "@id/list_item_two_lines"
             layout="@layout/list_item_2_lines"
             android:paddingTop="6dp"
             android:layout_height="wrap_content"

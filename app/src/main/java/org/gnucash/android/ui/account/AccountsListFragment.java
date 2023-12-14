@@ -88,7 +88,6 @@ public class AccountsListFragment extends Fragment implements
 
     private FragmentAccountsListBinding binding;
     private EmptyRecyclerView mRecyclerView;
-    private TextView mEmptyTextView;
 
     private AccountRecyclerAdapter mAccountRecyclerAdapter;
 
@@ -144,7 +143,7 @@ public class AccountsListFragment extends Fragment implements
     private final ActivityResultLauncher<Intent> launcher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
             result -> {
-                Log.d(LOG_TAG, "launch createTransactionIntent: result = " + result);
+                Log.d(LOG_TAG, "launch intent: result = " + result);
                 if (result.getResultCode() == Activity.RESULT_CANCELED) {
                     return;
                 }
@@ -166,22 +165,21 @@ public class AccountsListFragment extends Fragment implements
     ) {
         binding = FragmentAccountsListBinding.inflate(inflater, container, false);
         mRecyclerView = binding.accountRecyclerView;
-        mEmptyTextView = binding.emptyView;
-
+        TextView emptyTextView = binding.emptyView;
 
         mRecyclerView.setHasFixedSize(true);
-        mRecyclerView.setEmptyView(mEmptyTextView);
+        mRecyclerView.setEmptyView(emptyTextView);
 
         switch (mDisplayMode) {
 
             case TOP_LEVEL:
-                mEmptyTextView.setText(R.string.label_no_accounts);
+                emptyTextView.setText(R.string.label_no_accounts);
                 break;
             case RECENT:
-                mEmptyTextView.setText(R.string.label_no_recent_accounts);
+                emptyTextView.setText(R.string.label_no_recent_accounts);
                 break;
             case FAVORITES:
-                mEmptyTextView.setText(R.string.label_no_favorite_accounts);
+                emptyTextView.setText(R.string.label_no_favorite_accounts);
                 break;
         }
 
@@ -279,9 +277,9 @@ public class AccountsListFragment extends Fragment implements
         DeleteAccountDialogFragment alertFragment =
                 DeleteAccountDialogFragment.newInstance(accountUID);
 
-        Log.d(LOG_TAG, "showConfirmationDialog delete_" + accountUID);
+        Log.d(LOG_TAG, "showConfirmationDialog delete_account_" + accountUID);
         getParentFragmentManager().setFragmentResultListener(
-                "delete_" + accountUID, this, new FragmentResultListener() {
+                "delete_account_" + accountUID, this, new FragmentResultListener() {
                     @Override
                     public void onFragmentResult(@NonNull String requestKey, @NonNull Bundle bundle) {
                         Log.d(LOG_TAG, "onFragmentResult " + requestKey + ", " + bundle);
@@ -547,7 +545,6 @@ public class AccountsListFragment extends Fragment implements
                     createTransactionIntent.setAction(Intent.ACTION_INSERT_OR_EDIT);
                     createTransactionIntent.putExtra(UxArgument.SELECTED_ACCOUNT_UID, accountUID);
                     createTransactionIntent.putExtra(UxArgument.FORM_TYPE, FormActivity.FormType.TRANSACTION.name());
-//                    getActivity().startActivity(createTransactionIntent);
                     launcher.launch(createTransactionIntent);
 
                 });
@@ -606,17 +603,18 @@ public class AccountsListFragment extends Fragment implements
 
             long accoundId;
 
-            public AccountViewHolder(CardviewAccountBinding binding) {
-                super(binding.getRoot());
+            public AccountViewHolder(CardviewAccountBinding cardviewBinding) {
+                super(cardviewBinding.getRoot());
+                Log.d(LOG_TAG, "ViewHolder, CardviewAccountBinding: " + cardviewBinding);
 
-                accountName = binding.listItem.primaryText;
-                description = binding.listItem.secondaryText;
-                accountBalance = binding.accountBalance;
-                createTransaction = binding.createTransaction;
-                favoriteStatus = binding.favoriteStatus;
-                optionsMenu = binding.optionsMenu;
-                colorStripView = binding.accountColorStrip;
-                budgetIndicator = binding.budgetIndicator;
+                accountName = cardviewBinding.listItemTwoLines.primaryText;
+                description = cardviewBinding.listItemTwoLines.secondaryText;
+                accountBalance = cardviewBinding.accountBalance;
+                createTransaction = cardviewBinding.createTransaction;
+                favoriteStatus = cardviewBinding.favoriteStatus;
+                optionsMenu = cardviewBinding.optionsMenu;
+                colorStripView = cardviewBinding.accountColorStrip;
+                budgetIndicator = cardviewBinding.budgetIndicator;
 
                 optionsMenu.setOnClickListener((View v) -> {
                     PopupMenu popup = new PopupMenu(requireActivity(), v);

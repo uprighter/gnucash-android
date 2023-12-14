@@ -26,6 +26,8 @@ import android.widget.Button;
 import android.widget.Spinner;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.cursoradapter.widget.SimpleCursorAdapter;
 import androidx.fragment.app.DialogFragment;
 
@@ -33,7 +35,6 @@ import org.gnucash.android.R;
 import org.gnucash.android.db.DatabaseSchema;
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.db.adapter.TransactionsDbAdapter;
-import org.gnucash.android.ui.common.Refreshable;
 import org.gnucash.android.ui.common.UxArgument;
 import org.gnucash.android.ui.homescreen.WidgetConfigurationActivity;
 import org.gnucash.android.ui.transaction.TransactionsActivity;
@@ -110,8 +111,8 @@ public class BulkMoveDialogFragment extends DialogFragment {
     }
 
     @Override
-    public void onActivityCreated(Bundle savedInstanceState) {
-        super.onActivityCreated(savedInstanceState);
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
         getDialog().getWindow().setLayout(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
 
         Bundle args = getArguments();
@@ -170,7 +171,8 @@ public class BulkMoveDialogFragment extends DialogFragment {
                 }
 
                 WidgetConfigurationActivity.updateAllWidgets(getActivity());
-                ((Refreshable) getTargetFragment()).refresh();
+                getParentFragmentManager().setFragmentResult("bulk_move_transactions_" + srcAccountUID, new Bundle());
+
                 dismiss();
             }
         });

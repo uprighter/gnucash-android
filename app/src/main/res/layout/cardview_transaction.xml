@@ -33,7 +33,7 @@
         android:minHeight="@dimen/card_min_height">
 
         <include
-            android:id="@+id/list_item_2_lines"
+            android:id="@+id/list_item_two_lines"
             layout="@layout/list_item_2_lines"
             android:paddingTop="6dp"
             android:layout_height="wrap_content"
@@ -88,8 +88,8 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:singleLine="true"
-            android:layout_below="@id/list_item_2_lines"
-            android:layout_alignLeft="@id/list_item_2_lines"
+            android:layout_below="@id/list_item_two_lines"
+            android:layout_alignLeft="@id/list_item_two_lines"
             android:layout_marginBottom="4dp"
             android:gravity="left|bottom|start"
             android:textSize="14sp"
