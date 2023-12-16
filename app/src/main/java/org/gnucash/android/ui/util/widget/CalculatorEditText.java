@@ -351,7 +351,16 @@ public class CalculatorEditText extends AppCompatEditText {
         formatter.setGroupingUsed(false);
         String resultString = formatter.format(newAmount.doubleValue());
 
-        super.setText(resultString);
-        setSelection(resultString.length());
+        setValue(resultString);
+    }
+
+    /**
+     * Set the text to {@code amountString} and move the cursor to the end.</p>
+     *
+     * @param amountString String amount
+     */
+    public void setValue(String amountString) {
+        super.setText(amountString);
+        setSelection(amountString.length());
     }
 }

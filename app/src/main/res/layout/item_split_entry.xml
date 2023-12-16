@@ -18,7 +18,6 @@ limitations under the License.
     xmlns:tools="http://schemas.android.com/tools">
 
     <data>
-
         <variable
             name="splitEntryViewModel"
             type="org.gnucash.android.ui.transaction.SplitEntryViewModel" />
@@ -57,7 +56,7 @@ limitations under the License.
                     android:gravity="center"
                     android:paddingStart="5dp"
                     android:paddingEnd="5dp"
-                    android:text="@={splitEntryViewModel.splitCurrencySymbol}"
+                    android:text="@{splitEntryViewModel.splitCurrencySymbol}"
                     android:textColor="@color/debit_red"
                     android:textSize="22sp" />
 
@@ -82,7 +81,7 @@ limitations under the License.
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="3"
-                    android:checked="@={splitEntryViewModel.splitType}"
+                    android:checked="@{splitEntryViewModel.splitTypeChecked}"
                     android:gravity="end"
                     android:textAppearance="?android:attr/textAppearanceMedium"
                     android:textColor="@color/debit_red"
@@ -159,14 +158,14 @@ limitations under the License.
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:minHeight="48dp"
-                android:selectedItemPosition="@={splitEntryViewModel.inputAccountPos}" />
+                android:selectedItemPosition="@{splitEntryViewModel.inputAccountPos}" />
 
             <!-- Only serves to store the split UID for background processing. Not relevant to user-->
             <TextView
                 android:id="@+id/split_uid"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@={splitEntryViewModel.splitUid}"
+                android:text="@{splitEntryViewModel.splitUid}"
                 android:visibility="gone" />
 
             <View

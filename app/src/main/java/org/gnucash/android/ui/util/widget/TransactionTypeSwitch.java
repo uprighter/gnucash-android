@@ -18,6 +18,7 @@ package org.gnucash.android.ui.util.widget;
 
 import android.content.Context;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.widget.CompoundButton;
 import android.widget.TextView;
 
@@ -40,6 +41,8 @@ import java.util.List;
  * @author Ngewi Fet <ngewif@gmail.com>
  */
 public class TransactionTypeSwitch extends SwitchCompat {
+    public static final String LOG_TAG = "TransactionTypeSwitch";
+
     private AccountType mAccountType = AccountType.EXPENSE;
 
     private final List<OnCheckedChangeListener> mOnCheckedChangeListeners = new ArrayList<>();
@@ -57,6 +60,7 @@ public class TransactionTypeSwitch extends SwitchCompat {
     }
 
     public void setAccountType(AccountType accountType) {
+//        Log.d(LOG_TAG, String.format("setAccountType from %s to %s.", mAccountType, accountType));
         this.mAccountType = accountType;
         Context context = getContext().getApplicationContext();
         switch (mAccountType) {
@@ -117,6 +121,7 @@ public class TransactionTypeSwitch extends SwitchCompat {
      * @param currencyTextView Currency symbol text view
      */
     public void setAmountFormattingListener(CalculatorEditText amountView, TextView currencyTextView) {
+//        Log.d(LOG_TAG, String.format("setAmountFormattingListener: %s, %s.", amountView.getText(), currencyTextView.getText()));
         setOnCheckedChangeListener(new OnTypeChangedListener(amountView, currencyTextView));
     }
 
@@ -172,6 +177,7 @@ public class TransactionTypeSwitch extends SwitchCompat {
 
         @Override
         public void onCheckedChanged(CompoundButton compoundButton, boolean isChecked) {
+            Log.d(LOG_TAG, String.format("onCheckedChanged: isChecked: %b, compoundButton=%s.", isChecked, compoundButton));
             setText(isChecked ? getTextOn() : getTextOff());
             if (isChecked) {
                 int red = ContextCompat.getColor(getContext(), R.color.debit_red);
