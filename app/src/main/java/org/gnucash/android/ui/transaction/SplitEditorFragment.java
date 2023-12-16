@@ -341,7 +341,7 @@ public class SplitEditorFragment extends Fragment {
             this.mViewBinding = binding;
         }
 
-        public SplitEntryViewModel getViewModel() { reutrn mViewModel; }
+        public SplitEntryViewModel getViewModel() { return mViewModel; }
 
         public void setListeners(SplitEntryViewModel viewModel) {
             this.mViewModel = viewModel;
@@ -383,12 +383,12 @@ public class SplitEditorFragment extends Fragment {
 
             copyImbalanceButton.setOnClickListener((View _view) -> {
                 // First, set current value to zero (if it's not) and recalculate the imbalance.
-                splitAmountEditText.setValue(BigDecimal.ZERO);
+                mViewModel.setInputSplitAmount(BigDecimal.ZERO);
                 mImbalanceWatcher.afterTextChanged(null);
 
                 // Copy the imbalance.
                 mViewModel.setSplitType(mImbalance.signum() > 0 ? TransactionType.DEBIT : TransactionType.CREDIT);
-                mViewModel.setInputSplitAmount(mImbalance.abs().toPlainString());
+                mViewModel.setInputSplitAmount(mImbalance.abs());
                 mImbalanceWatcher.afterTextChanged(null);
             });
 
@@ -413,18 +413,13 @@ public class SplitEditorFragment extends Fragment {
                 mViewModel.setInputSplitAmount(belowViewModel.getInputSplitAmount());
                 mImbalanceWatcher.afterTextChanged(null);
             });
-
-            Split split = mViewModel.getSplit();
-            if (split == null) {
-                mViewModel.setSplitCurrencySymbol(mCommodity.getSymbol());
-                mViewModel.setSplitUid(BaseModel.generateUID());
-                mViewBinding.getRoot().requestFocus();
-            }
         }
 
         public void bind() {
-            mViewModel.init(splitAmountEditText, splitTypeSwitch, mAccountUID, mCommodity);
+            // executePendingBindings first, so that any changes in ViewModel could trigger event listeners.
             mViewBinding.executePendingBindings();
+            mViewModel.init(splitAmountEditText, splitTypeSwitch, mAccountUID, mCommodity);
+            mViewBinding.getRoot().requestFocus();
         }
 
         @Override
@@ -441,8 +436,9 @@ public class SplitEditorFragment extends Fragment {
          */
         public BigDecimal getAmountValue() {
             String amountString = splitAmountEditText.getCleanString();
-            if (amountString.isEmpty())
+            if (amountString.isEmpty()) {
                 return BigDecimal.ZERO;
+            }
 
             ExpressionBuilder expressionBuilder = new ExpressionBuilder(amountString);
             Expression expression;

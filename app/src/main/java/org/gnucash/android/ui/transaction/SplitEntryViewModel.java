@@ -8,6 +8,7 @@ import androidx.databinding.Bindable;
 import androidx.databinding.library.baseAdapters.BR;
 
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
+import org.gnucash.android.model.BaseModel;
 import org.gnucash.android.model.Commodity;
 import org.gnucash.android.model.Money;
 import org.gnucash.android.model.Split;
@@ -70,7 +71,10 @@ public class SplitEntryViewModel extends BaseObservable {
             int accountPos = getSelectedTransferAccountPos(mAccountsDbAdapter.getID(splitAccountUID), mCursorAdapter);
             setInputAccountPos(accountPos);
             setInputSplitMemo(mSplit.getMemo());
-            setInputSplitAmount(mSplit.getValue().asBigDecimal().toPlainString());
+            setInputSplitAmount(mSplit.getValue().asBigDecimal());
+        } else {
+            setSplitCurrencySymbol(mCommodity.getSymbol());
+            setSplitUid(BaseModel.generateUID());
         }
     }
 
@@ -122,11 +126,15 @@ public class SplitEntryViewModel extends BaseObservable {
         return splitUid;
     }
 
+    public void setInputSplitAmount(BigDecimal amount) {
+        setInputSplitAmount(amount.toPlainString());
+    }
+
     public void setInputSplitAmount(String inputSplitAmount) {
 //        Log.d(LOG_TAG, String.format("setInputSplitAmount, old value %s, new value %s.", this.inputSplitAmount, inputSplitAmount));
         if (this.inputSplitAmount == null || !this.inputSplitAmount.equals(inputSplitAmount)) {
             this.inputSplitAmount = inputSplitAmount;
-//            notifyPropertyChanged(BR.inputSplitAmount);
+//            notifyPropertyChanged(BR.inputSplitAmount);  // No need to call notifyPropertyChanged as we set value below.
             mSplitAmountEditText.setValue(this.inputSplitAmount);
         }
     }
