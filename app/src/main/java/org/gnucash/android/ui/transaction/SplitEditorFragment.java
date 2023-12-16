@@ -392,6 +392,8 @@ public class SplitEditorFragment extends Fragment {
                 // Copy the imbalance.
                 mViewModel.setSplitType(mImbalance.signum() > 0 ? TransactionType.DEBIT : TransactionType.CREDIT);
                 mViewModel.setInputSplitAmount(mImbalance.abs());
+
+                splitAmountEditText.requestFocus();
                 mImbalanceWatcher.afterTextChanged(null);
             });
 
@@ -403,6 +405,8 @@ public class SplitEditorFragment extends Fragment {
                 }
                 SplitEntryViewModel aboveViewModel = mSplitEntryViewModelList.get(clickedPosition - 1);
                 mViewModel.setInputSplitAmount(aboveViewModel.getInputSplitAmount());
+
+                splitAmountEditText.requestFocus();
                 mImbalanceWatcher.afterTextChanged(null);
             });
 
@@ -414,6 +418,8 @@ public class SplitEditorFragment extends Fragment {
                 }
                 SplitEntryViewModel belowViewModel = mSplitEntryViewModelList.get(clickedPosition + 1);
                 mViewModel.setInputSplitAmount(belowViewModel.getInputSplitAmount());
+
+                splitAmountEditText.requestFocus();
                 mImbalanceWatcher.afterTextChanged(null);
             });
         }
@@ -422,7 +428,6 @@ public class SplitEditorFragment extends Fragment {
             // executePendingBindings first, so that any changes in ViewModel could trigger event listeners.
             mViewBinding.executePendingBindings();
             mViewModel.init(splitAmountEditText, splitTypeSwitch, mCommodity);
-            mViewBinding.inputSplitAmount.requestFocus();
         }
 
         @Override

@@ -70,6 +70,9 @@ public class SplitEntryViewModel extends BaseObservable {
         } else {
             setSplitCurrencySymbol(commodity.getSymbol());
             setSplitUid(BaseModel.generateUID());
+
+            // requestFocus for newly added split.
+            mSplitAmountEditText.requestFocus();
         }
     }
 
