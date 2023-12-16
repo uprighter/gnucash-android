@@ -221,14 +221,13 @@ public class TransactionsListFragment extends Fragment implements
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        switch (item.getItemId()) {
-            case R.id.menu_compact_trn_view:
-                item.setChecked(!item.isChecked());
-                mUseCompactView = !mUseCompactView;
-                refresh();
-                return true;
-            default:
-                return super.onOptionsItemSelected(item);
+        if (item.getItemId() == R.id.menu_compact_trn_view) {
+            item.setChecked(!item.isChecked());
+            mUseCompactView = !mUseCompactView;
+            refresh();
+            return true;
+        } else {
+            return super.onOptionsItemSelected(item);
         }
     }
 
@@ -332,7 +331,7 @@ public class TransactionsListFragment extends Fragment implements
 
                 if (splits.size() == 2 && splits.get(0).isPairOf(splits.get(1))) {
                     for (Split split : splits) {
-                        if (!split.getAccountUID().equals(mAccountUID)) {
+                        if (!mAccountUID.equals(split.getAccountUID())) {
                             text = AccountsDbAdapter.getInstance().getFullyQualifiedAccountName(split.getAccountUID());
                             break;
                         }
@@ -411,41 +410,37 @@ public class TransactionsListFragment extends Fragment implements
 
             @Override
             public boolean onMenuItemClick(MenuItem item) {
-                switch (item.getItemId()) {
-                    case R.id.context_menu_delete:
-                        BackupManager.backupActiveBook();
-                        mTransactionsDbAdapter.deleteRecord(transactionId);
-                        WidgetConfigurationActivity.updateAllWidgets(getActivity());
-                        refresh();
-                        return true;
+                if (item.getItemId() == R.id.context_menu_delete) {
+                    BackupManager.backupActiveBook();
+                    mTransactionsDbAdapter.deleteRecord(transactionId);
+                    WidgetConfigurationActivity.updateAllWidgets(getActivity());
+                    refresh();
+                    return true;
+                } else if (item.getItemId() == R.id.context_menu_duplicate_transaction) {
+                    Transaction transaction = mTransactionsDbAdapter.getRecord(transactionId);
+                    Transaction duplicate = new Transaction(transaction, true);
+                    duplicate.setTime(System.currentTimeMillis());
+                    mTransactionsDbAdapter.addRecord(duplicate, DatabaseAdapter.UpdateMethod.insert);
+                    refresh();
+                    return true;
+                } else if (item.getItemId() == R.id.context_menu_move_transaction) {
+                    long[] ids = new long[]{transactionId};
+                    BulkMoveDialogFragment fragment = BulkMoveDialogFragment.newInstance(ids, mAccountUID);
 
-                    case R.id.context_menu_duplicate_transaction:
-                        Transaction transaction = mTransactionsDbAdapter.getRecord(transactionId);
-                        Transaction duplicate = new Transaction(transaction, true);
-                        duplicate.setTime(System.currentTimeMillis());
-                        mTransactionsDbAdapter.addRecord(duplicate, DatabaseAdapter.UpdateMethod.insert);
-                        refresh();
-                        return true;
+                    Log.d(LOG_TAG, "context_menu_move_transaction_" + mAccountUID);
+                    getParentFragmentManager().setFragmentResultListener(
+                            "bulk_move_transactions_" + mAccountUID, TransactionsListFragment.this, new FragmentResultListener() {
+                                @Override
+                                public void onFragmentResult(@NonNull String requestKey, @NonNull Bundle bundle) {
+                                    Log.d(LOG_TAG, "onFragmentResult " + requestKey + ", " + bundle);
+                                    refresh();
+                                }
+                            });
+                    fragment.show(getParentFragmentManager(), "bulk_move_transactions");
+                    return true;
 
-                    case R.id.context_menu_move_transaction:
-                        long[] ids = new long[]{transactionId};
-                        BulkMoveDialogFragment fragment = BulkMoveDialogFragment.newInstance(ids, mAccountUID);
-
-                        Log.d(LOG_TAG, "context_menu_move_transaction_" + mAccountUID);
-                        getParentFragmentManager().setFragmentResultListener(
-                                "bulk_move_transactions_" + mAccountUID, TransactionsListFragment.this, new FragmentResultListener() {
-                                    @Override
-                                    public void onFragmentResult(@NonNull String requestKey, @NonNull Bundle bundle) {
-                                        Log.d(LOG_TAG, "onFragmentResult " + requestKey + ", " + bundle);
-                                        refresh();
-                                    }
-                                });
-                        fragment.show(getParentFragmentManager(), "bulk_move_transactions");
-                        return true;
-
-                    default:
-                        return false;
-
+                } else {
+                    return false;
                 }
             }
         }

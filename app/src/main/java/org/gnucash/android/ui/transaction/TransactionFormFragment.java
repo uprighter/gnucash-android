@@ -45,6 +45,8 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
@@ -60,6 +62,7 @@ import com.google.android.material.snackbar.Snackbar;
 
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
+import org.gnucash.android.databinding.FragmentTransactionFormBinding;
 import org.gnucash.android.db.DatabaseSchema;
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.db.adapter.CommoditiesDbAdapter;
@@ -95,9 +98,6 @@ import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.List;
 
-import butterknife.BindView;
-import butterknife.ButterKnife;
-
 /**
  * Fragment for creating or editing transactions
  *
@@ -107,7 +107,7 @@ public class TransactionFormFragment extends Fragment implements
         CalendarDatePickerDialogFragment.OnDateSetListener, RadialTimePickerDialogFragment.OnTimeSetListener,
         RecurrencePickerDialogFragment.OnRecurrenceSetListener, OnTransferFundsListener {
 
-    private static final int REQUEST_SPLIT_EDITOR = 0x11;
+    public static final String LOG_TAG = "TransactionFormFragment";
 
     /**
      * Transactions database adapter
@@ -144,80 +144,69 @@ public class TransactionFormFragment extends Fragment implements
      */
     public final static DateFormat TIME_FORMATTER = DateFormat.getTimeInstance();
 
+    private FragmentTransactionFormBinding mBinding;
+
     /**
      * Button for setting the transaction type, either credit or debit
      */
-    @BindView(R.id.input_transaction_type)
     TransactionTypeSwitch mTransactionTypeSwitch;
 
     /**
      * Input field for the transaction name (description)
      */
-    @BindView(R.id.input_transaction_name)
     AutoCompleteTextView mDescriptionEditText;
 
     /**
      * Input field for the transaction amount
      */
-    @BindView(R.id.input_transaction_amount)
     CalculatorEditText mAmountEditText;
 
     /**
      * Field for the transaction currency.
      * The transaction uses the currency of the account
      */
-    @BindView(R.id.currency_symbol)
     TextView mCurrencyTextView;
 
     /**
      * Input field for the transaction description (note)
      */
-    @BindView(R.id.input_description)
     EditText mNotesEditText;
 
     /**
      * Input field for the transaction date
      */
-    @BindView(R.id.input_date)
     TextView mDateTextView;
 
     /**
      * Input field for the transaction time
      */
-    @BindView(R.id.input_time)
     TextView mTimeTextView;
 
     /**
      * Spinner for selecting the transfer account
      */
-    @BindView(R.id.input_transfer_account_spinner)
     Spinner mTransferAccountSpinner;
 
     /**
      * Checkbox indicating if this transaction should be saved as a template or not
      */
-    @BindView(R.id.checkbox_save_template)
     CheckBox mSaveTemplateCheckbox;
 
-    @BindView(R.id.input_recurrence)
     TextView mRecurrenceTextView;
 
     /**
      * View which displays the calculator keyboard
      */
-    @BindView(R.id.calculator_keyboard)
     KeyboardView mKeyboardView;
 
     /**
      * Open the split editor
      */
-    @BindView(R.id.btn_split_editor)
     ImageView mOpenSplitEditor;
 
     /**
      * Layout for transfer account and associated views
      */
-    @BindView(R.id.layout_double_entry)
     View mDoubleEntryLayout;
 
     /**
@@ -241,9 +230,8 @@ public class TransactionFormFragment extends Fragment implements
      */
     AccountType mAccountType;
 
-
     private String mRecurrenceRule;
-    private EventRecurrence mEventRecurrence = new EventRecurrence();
+    private final EventRecurrence mEventRecurrence = new EventRecurrence();
 
     private String mAccountUID;
 
@@ -263,14 +251,44 @@ public class TransactionFormFragment extends Fragment implements
      */
     private Money mSplitQuantity;
 
+    private final ActivityResultLauncher<Intent> launcher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                Log.d(LOG_TAG, "launch intent: result = " + result);
+                if (result.getResultCode() == Activity.RESULT_OK) {
+                    List<Split> splitList = result.getData().getParcelableArrayListExtra(UxArgument.SPLIT_LIST, Split.class);
+                    setSplitList(splitList);
+
+                    //once split editor has been used and saved, only allow editing through it
+                    toggleAmountInputEntryMode(false);
+                    setDoubleEntryViewsVisibility(View.GONE);
+                    mOpenSplitEditor.setVisibility(View.VISIBLE);
+                }
+            }
+    );
+
     /**
      * Create the view and retrieve references to the UI elements
      */
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container,
+    public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
-        View v = inflater.inflate(R.layout.fragment_transaction_form, container, false);
-        ButterKnife.bind(this, v);
+        mBinding = FragmentTransactionFormBinding.inflate(inflater, container, false);
+
+        mTransactionTypeSwitch = mBinding.inputTransactionType;
+        mDescriptionEditText = mBinding.inputTransactionName;
+        mAmountEditText = mBinding.inputTransactionAmount;
+        mCurrencyTextView = mBinding.currencySymbol;
+        mNotesEditText = mBinding.inputDescription;
+        mDateTextView = mBinding.inputDate;
+        mTimeTextView = mBinding.inputTime;
+        mTransferAccountSpinner = mBinding.inputTransferAccountSpinner;
+        mSaveTemplateCheckbox = mBinding.checkboxSaveTemplate;
+        mRecurrenceTextView = mBinding.inputRecurrence;
+        mKeyboardView = mBinding.calculatorKeyboard;
+        mOpenSplitEditor = mBinding.btnSplitEditor;
+        mDoubleEntryLayout = mBinding.layoutDoubleEntry;
+
         mAmountEditText.bindListeners(mKeyboardView);
         mOpenSplitEditor.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -279,7 +297,13 @@ public class TransactionFormFragment extends Fragment implements
             }
         });
 
-        return v;
+        return mBinding.getRoot();
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        mBinding = null;
     }
 
     /**
@@ -302,18 +326,18 @@ public class TransactionFormFragment extends Fragment implements
 
         TransferFundsDialogFragment fragment
                 = TransferFundsDialogFragment.getInstance(amount, targetCurrencyCode, this);
-        fragment.show(getFragmentManager(), "transfer_funds_editor");
+        fragment.show(getParentFragmentManager(), "transfer_funds_editor");
     }
 
     @Override
-    public void onConfigurationChanged(Configuration newConfig) {
+    public void onConfigurationChanged(@NonNull Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
         mAmountEditText.bindListeners(mKeyboardView);
     }
 
     @Override
-    public void onActivityCreated(Bundle savedInstanceState) {
-        super.onActivityCreated(savedInstanceState);
+    public void onViewCreated(@NonNull View view, Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
         setHasOptionsMenu(true);
 
         SharedPreferences sharedPrefs = PreferenceActivity.getActiveBookSharedPreferences();
@@ -350,7 +374,7 @@ public class TransactionFormFragment extends Fragment implements
 
                 if (mSplitsList.size() == 2) { //when handling simple transfer to one account
                     for (Split split : mSplitsList) {
-                        if (!split.getAccountUID().equals(mAccountUID)) {
+                        if (!mAccountUID.equals(split.getAccountUID())) {
                             split.setAccountUID(mAccountsDbAdapter.getUID(id));
                         }
                         // else case is handled when saving the transactions
@@ -414,7 +438,8 @@ public class TransactionFormFragment extends Fragment implements
                     DateUtils.FORMAT_SHOW_WEEKDAY | DateUtils.FORMAT_SHOW_DATE | DateUtils.FORMAT_SHOW_YEAR);
 
             TextView secondaryTextView = (TextView) view.findViewById(R.id.secondary_text);
-            secondaryTextView.setText(balance.formattedString() + " on " + dateString); //TODO: Extract string
+            String sedondaryText = String.format("%s on %s", balance.formattedString(), dateString);
+            secondaryTextView.setText(sedondaryText);
         }
     }
 
@@ -503,8 +528,8 @@ public class TransactionFormFragment extends Fragment implements
 
         if (mSplitsList.size() == 2) {
             for (Split split : mSplitsList) {
-                if (split.getAccountUID().equals(mAccountUID)) {
-                    if (!split.getQuantity().getCommodity().equals(mTransaction.getCommodity())) {
+                if (mAccountUID.equals(split.getAccountUID())) {
+                    if (!mTransaction.getCommodity().equals(split.getQuantity().getCommodity())) {
                         mSplitQuantity = split.getQuantity();
                     }
                 }
@@ -515,7 +540,7 @@ public class TransactionFormFragment extends Fragment implements
         if (mSplitsList.size() == 2 && mSplitsList.get(0).isPairOf(mSplitsList.get(1))) {
             for (Split split : mTransaction.getSplits()) {
                 //two splits, one belongs to this account and the other to another account
-                if (mUseDoubleEntry && !split.getAccountUID().equals(mAccountUID)) {
+                if (mUseDoubleEntry && !mAccountUID.equals(split.getAccountUID())) {
                     setSelectedTransferAccount(mAccountsDbAdapter.getID(split.getAccountUID()));
                 }
             }
@@ -644,8 +669,7 @@ public class TransactionFormFragment extends Fragment implements
         intent.putExtra(UxArgument.SELECTED_ACCOUNT_UID, mAccountUID);
         intent.putExtra(UxArgument.AMOUNT_STRING, baseAmountString);
         intent.putParcelableArrayListExtra(UxArgument.SPLIT_LIST, (ArrayList<Split>) extractSplitsFromView());
-
-        startActivityForResult(intent, REQUEST_SPLIT_EDITOR);
+        launcher.launch(intent);
     }
 
     /**
@@ -674,7 +698,7 @@ public class TransactionFormFragment extends Fragment implements
                 CalendarDatePickerDialogFragment datePickerDialog = new CalendarDatePickerDialogFragment()
                         .setOnDateSetListener(TransactionFormFragment.this)
                         .setPreselectedDate(year, monthOfYear, dayOfMonth);
-                datePickerDialog.show(getFragmentManager(), "date_picker_fragment");
+                datePickerDialog.show(getParentFragmentManager(), "date_picker_fragment");
             }
         });
 
@@ -697,7 +721,7 @@ public class TransactionFormFragment extends Fragment implements
                         .setOnTimeSetListener(TransactionFormFragment.this)
                         .setStartTime(calendar.get(Calendar.HOUR_OF_DAY),
                                 calendar.get(Calendar.MINUTE));
-                timePickerDialog.show(getFragmentManager(), "time_picker_dialog_fragment");
+                timePickerDialog.show(getParentFragmentManager(), "time_picker_dialog_fragment");
             }
         });
 
@@ -950,7 +974,7 @@ public class TransactionFormFragment extends Fragment implements
     }
 
     @Override
-    public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
+    public void onCreateOptionsMenu(@NonNull Menu menu, @NonNull MenuInflater inflater) {
         inflater.inflate(R.menu.default_save_actions, menu);
     }
 
@@ -960,29 +984,25 @@ public class TransactionFormFragment extends Fragment implements
         InputMethodManager imm = (InputMethodManager) getActivity().getSystemService(Context.INPUT_METHOD_SERVICE);
         imm.hideSoftInputFromWindow(mDescriptionEditText.getApplicationWindowToken(), 0);
 
-        switch (item.getItemId()) {
-            case android.R.id.home:
-                finish(Activity.RESULT_CANCELED);
-                return true;
-
-            case R.id.menu_save:
-                View parentLayout = getActivity().findViewById(android.R.id.content);
-
-                if (canSave()) {
-                    saveNewTransaction();
-                } else {
-                    if (mAmountEditText.getValue() == null) {
-                        Snackbar.make(parentLayout, R.string.toast_transanction_amount_required, Snackbar.LENGTH_LONG).show();
-                    }
-                    if (mUseDoubleEntry && mTransferAccountSpinner.getCount() == 0) {
-                        Snackbar.make(parentLayout,
-                                R.string.toast_disable_double_entry_to_save_transaction,
-                                Snackbar.LENGTH_LONG).show();
-                    }
+        if (item.getItemId() == android.R.id.home) {
+            finish(Activity.RESULT_CANCELED);
+            return true;
+        } else if (item.getItemId() == R.id.menu_save) {
+            View parentLayout = getActivity().findViewById(android.R.id.content);
+            if (canSave()) {
+                saveNewTransaction();
+            } else {
+                if (mAmountEditText.getValue() == null) {
+                    Snackbar.make(parentLayout, R.string.toast_transanction_amount_required, Snackbar.LENGTH_LONG).show();
                 }
-                return true;
-
-            default:
+                if (mUseDoubleEntry && mTransferAccountSpinner.getCount() == 0) {
+                    Snackbar.make(parentLayout,
+                            R.string.toast_disable_double_entry_to_save_transaction,
+                            Snackbar.LENGTH_LONG).show();
+                }
+            }
+            return true;
+        } else {
                 return super.onOptionsItemSelected(item);
         }
     }
@@ -1099,18 +1119,5 @@ public class TransactionFormFragment extends Fragment implements
         }
 
         mRecurrenceTextView.setText(repeatString);
-    }
-
-    @Override
-    public void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (resultCode == Activity.RESULT_OK) {
-            List<Split> splitList = data.getParcelableArrayListExtra(UxArgument.SPLIT_LIST);
-            setSplitList(splitList);
-
-            //once split editor has been used and saved, only allow editing through it
-            toggleAmountInputEntryMode(false);
-            setDoubleEntryViewsVisibility(View.GONE);
-            mOpenSplitEditor.setVisibility(View.VISIBLE);
-        }
     }
 }
