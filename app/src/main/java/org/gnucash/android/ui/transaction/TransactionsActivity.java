@@ -25,26 +25,26 @@ import android.os.AsyncTask;
 import android.os.Bundle;
 import android.text.format.DateUtils;
 import android.util.Log;
-import android.util.SparseArray;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.Spinner;
 import android.widget.SpinnerAdapter;
 import android.widget.TextView;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
-import androidx.fragment.app.FragmentManager;
-import androidx.fragment.app.FragmentStatePagerAdapter;
+import androidx.fragment.app.FragmentActivity;
 import androidx.viewbinding.ViewBinding;
-import androidx.viewpager.widget.PagerAdapter;
-import androidx.viewpager.widget.ViewPager;
+import androidx.viewpager2.adapter.FragmentStateAdapter;
+import androidx.viewpager2.widget.ViewPager2;
 
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.material.tabs.TabLayout;
+import com.google.android.material.tabs.TabLayoutMediator;
 
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
@@ -81,7 +81,7 @@ public class TransactionsActivity extends BaseDrawerActivity implements
     /**
      * Logging tag
      */
-    protected static final String TAG = "TransactionsActivity";
+    protected static final String LOG_TAG = "TransactionsActivity";
 
     /**
      * ViewPager index for sub-accounts fragment
@@ -113,13 +113,22 @@ public class TransactionsActivity extends BaseDrawerActivity implements
      */
     private Cursor mAccountsCursor = null;
 
-    ViewPager mViewPager;
+    ViewPager2 mViewPager;
     Spinner mToolbarSpinner;
     TabLayout mTabLayout;
     TextView mSumTextView;
     FloatingActionButton mCreateFloatingButton;
 
-    private final SparseArray<Refreshable> mFragmentPageReferenceMap = new SparseArray<>();
+    private final ActivityResultLauncher<Intent> launcher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                Log.d(LOG_TAG, "launch intent: result = " + result);
+//                if (result.getResultCode() == Activity.RESULT_CANCELED) {
+//                    return;
+//                }
+//                refresh();
+            }
+    );
 
     /**
      * Flag for determining is the currently displayed account is a placeholder account or not.
@@ -159,65 +168,34 @@ public class TransactionsActivity extends BaseDrawerActivity implements
         }
     };
 
-    private PagerAdapter mPagerAdapter;
+    private FragmentStateAdapter mPagerAdapter;
 
 
     /**
      * Adapter for managing the sub-account and transaction fragment pages in the accounts view
      */
-    private class AccountViewPagerAdapter extends FragmentStatePagerAdapter {
+    private class AccountViewPagerAdapter extends FragmentStateAdapter {
 
-        public AccountViewPagerAdapter(FragmentManager fm) {
-            super(fm);
+        public AccountViewPagerAdapter(FragmentActivity fa) {
+            super(fa);
         }
 
         @Override
-        public Fragment getItem(int i) {
+        @NonNull
+        public Fragment createFragment(int position) {
             if (mIsPlaceholderAccount) {
-                Fragment transactionsListFragment = prepareSubAccountsListFragment();
-                mFragmentPageReferenceMap.put(i, (Refreshable) transactionsListFragment);
-                return transactionsListFragment;
-            }
-
-            Fragment currentFragment;
-            switch (i) {
-                case INDEX_SUB_ACCOUNTS_FRAGMENT:
-                    currentFragment = prepareSubAccountsListFragment();
-                    break;
-
-                case INDEX_TRANSACTIONS_FRAGMENT:
-                default:
-                    currentFragment = prepareTransactionsListFragment();
-                    break;
-            }
-
-            mFragmentPageReferenceMap.put(i, (Refreshable) currentFragment);
-            return currentFragment;
-        }
-
-        @Override
-        public void destroyItem(@NonNull ViewGroup container, int position, @NonNull Object object) {
-            super.destroyItem(container, position, object);
-            mFragmentPageReferenceMap.remove(position);
-        }
-
-        @Override
-        public CharSequence getPageTitle(int position) {
-            if (mIsPlaceholderAccount)
-                return getString(R.string.section_header_subaccounts);
-
-            switch (position) {
-                case INDEX_SUB_ACCOUNTS_FRAGMENT:
-                    return getString(R.string.section_header_subaccounts);
-
-                case INDEX_TRANSACTIONS_FRAGMENT:
-                default:
-                    return getString(R.string.section_header_transactions);
+                return prepareSubAccountsListFragment();
+            } else {
+                if (position == INDEX_SUB_ACCOUNTS_FRAGMENT) {
+                    return prepareSubAccountsListFragment();
+                } else { // INDEX_TRANSACTIONS_FRAGMENT:
+                    return prepareTransactionsListFragment();
+                }
             }
         }
 
         @Override
-        public int getCount() {
+        public int getItemCount() {
             if (mIsPlaceholderAccount)
                 return 1;
             else
@@ -247,7 +225,7 @@ public class TransactionsActivity extends BaseDrawerActivity implements
             Bundle args = new Bundle();
             args.putString(UxArgument.SELECTED_ACCOUNT_UID, mAccountUID);
             transactionsListFragment.setArguments(args);
-            Log.i(TAG, "Opening transactions for account:  " + mAccountUID);
+            Log.i(LOG_TAG, "Opening transactions for account:  " + mAccountUID);
             return transactionsListFragment;
         }
     }
@@ -257,9 +235,6 @@ public class TransactionsActivity extends BaseDrawerActivity implements
      */
     @Override
     public void refresh(String accountUID) {
-        for (int i = 0; i < mFragmentPageReferenceMap.size(); i++) {
-            mFragmentPageReferenceMap.valueAt(i).refresh(accountUID);
-        }
 
         if (mPagerAdapter != null)
             mPagerAdapter.notifyDataSetChanged();
@@ -314,11 +289,28 @@ public class TransactionsActivity extends BaseDrawerActivity implements
 
         setupActionBarNavigation();
 
-        mPagerAdapter = new AccountViewPagerAdapter(getSupportFragmentManager());
+        mPagerAdapter = new AccountViewPagerAdapter(this);
         mViewPager.setAdapter(mPagerAdapter);
-        mViewPager.addOnPageChangeListener(new TabLayout.TabLayoutOnPageChangeListener(mTabLayout));
+//        mViewPager.addOnPageChangeListener(new TabLayout.TabLayoutOnPageChangeListener(mTabLayout));
 
-        mTabLayout.setOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
+        new TabLayoutMediator(mTabLayout, mViewPager,
+                (@NonNull TabLayout.Tab tab, int position) -> {
+                    if (mIsPlaceholderAccount) {
+                        tab.setText(R.string.section_header_subaccounts);
+                    } else {
+                        switch (position) {
+                            case INDEX_SUB_ACCOUNTS_FRAGMENT:
+                                tab.setText(R.string.section_header_subaccounts);
+
+                            case INDEX_TRANSACTIONS_FRAGMENT:
+                            default:
+                                tab.setText(R.string.section_header_transactions);
+                        }
+                    }
+                }
+        ).attach();
+
+        mTabLayout.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
             @Override
             public void onTabSelected(TabLayout.Tab tab) {
                 mViewPager.setCurrentItem(tab.getPosition());
@@ -352,7 +344,7 @@ public class TransactionsActivity extends BaseDrawerActivity implements
                         addAccountIntent.setAction(Intent.ACTION_INSERT_OR_EDIT);
                         addAccountIntent.putExtra(UxArgument.FORM_TYPE, FormActivity.FormType.ACCOUNT.name());
                         addAccountIntent.putExtra(UxArgument.PARENT_ACCOUNT_UID, mAccountUID);
-                        startActivityForResult(addAccountIntent, AccountsActivity.REQUEST_EDIT_ACCOUNT);
+                        launcher.launch(addAccountIntent);
                         break;
 
                     case INDEX_TRANSACTIONS_FRAGMENT:
@@ -539,7 +531,7 @@ public class TransactionsActivity extends BaseDrawerActivity implements
         createTransactionIntent.setAction(Intent.ACTION_INSERT_OR_EDIT);
         createTransactionIntent.putExtra(UxArgument.SELECTED_ACCOUNT_UID, accountUID);
         createTransactionIntent.putExtra(UxArgument.FORM_TYPE, FormActivity.FormType.TRANSACTION.name());
-        startActivity(createTransactionIntent);
+        launcher.launch(createTransactionIntent);
     }
 
     @Override
@@ -549,7 +541,7 @@ public class TransactionsActivity extends BaseDrawerActivity implements
         createTransactionIntent.putExtra(UxArgument.SELECTED_ACCOUNT_UID, mAccountUID);
         createTransactionIntent.putExtra(UxArgument.SELECTED_TRANSACTION_UID, transactionUID);
         createTransactionIntent.putExtra(UxArgument.FORM_TYPE, FormActivity.FormType.TRANSACTION.name());
-        startActivity(createTransactionIntent);
+        launcher.launch(createTransactionIntent);
     }
 
     @Override
@@ -557,6 +549,6 @@ public class TransactionsActivity extends BaseDrawerActivity implements
         Intent restartIntent = new Intent(this.getApplicationContext(), TransactionsActivity.class);
         restartIntent.setAction(Intent.ACTION_VIEW);
         restartIntent.putExtra(UxArgument.SELECTED_ACCOUNT_UID, accountUID);
-        startActivity(restartIntent);
+        launcher.launch(restartIntent);
     }
 }
