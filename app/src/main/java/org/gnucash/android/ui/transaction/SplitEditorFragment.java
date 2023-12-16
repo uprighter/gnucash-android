@@ -28,7 +28,6 @@ import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
-import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
@@ -61,7 +60,6 @@ import org.gnucash.android.db.DatabaseSchema;
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.db.adapter.CommoditiesDbAdapter;
 import org.gnucash.android.model.AccountType;
-import org.gnucash.android.model.BaseModel;
 import org.gnucash.android.model.Commodity;
 import org.gnucash.android.model.Money;
 import org.gnucash.android.model.Split;
@@ -190,8 +188,6 @@ public class SplitEditorFragment extends Fragment {
                                   @NonNull RecyclerView.ViewHolder target) {
 
                 Collections.swap(mSplitEntryViewModelList, viewHolder.getAbsoluteAdapterPosition(), target.getAbsoluteAdapterPosition());
-//                Log.d(LOG_TAG, "onMove: " + viewHolder.getAbsoluteAdapterPosition() + ", " +
-//                        target.getAbsoluteAdapterPosition());
                 mRecyclerViewAdaptor.notifyItemMoved(viewHolder.getAbsoluteAdapterPosition(), target.getAbsoluteAdapterPosition());
                 return true;
             }
@@ -361,12 +357,10 @@ public class SplitEditorFragment extends Fragment {
             copyAboveButton = mViewBinding.copyAboveButton;
             copyBelowButton = mViewBinding.copyBelowButton;
 
-            dragButton.setOnTouchListener((View v, MotionEvent event) -> {
-                // Hide the calculator keyboard to drag item up or down.
+            dragButton.setOnClickListener((View view) -> {
+                // Hide the calculator keyboard to drag item up or down more easily.
                 mCalculatorKeyboard.hideCustomKeyboard();
-                return true;
             });
-
 
             splitAmountEditText.bindListeners(mCalculatorKeyboard);
             splitAmountEditText.addTextChangedListener(mImbalanceWatcher);
@@ -427,7 +421,7 @@ public class SplitEditorFragment extends Fragment {
         public void bind() {
             // executePendingBindings first, so that any changes in ViewModel could trigger event listeners.
             mViewBinding.executePendingBindings();
-            mViewModel.init(splitAmountEditText, splitTypeSwitch, mAccountUID, mCommodity);
+            mViewModel.init(splitAmountEditText, splitTypeSwitch, mCommodity);
             mViewBinding.inputSplitAmount.requestFocus();
         }
 
@@ -559,8 +553,6 @@ public class SplitEditorFragment extends Fragment {
                         Log.d(LOG_TAG, "viewModel has no Split: " + viewModel);
                         continue;
                     }
-                    boolean hasDebitNormalBalance = AccountsDbAdapter.getInstance()
-                            .getAccountType(split.getAccountUID()).hasDebitNormalBalance();
                     BigDecimal amount = split.getValue().abs().asBigDecimal();
                     if (split.getType() == TransactionType.CREDIT) {
                         imbalance = imbalance.add(amount);

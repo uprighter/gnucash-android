@@ -2,6 +2,7 @@ package org.gnucash.android.ui.transaction;
 
 import android.util.Log;
 
+import androidx.annotation.NonNull;
 import androidx.cursoradapter.widget.SimpleCursorAdapter;
 import androidx.databinding.BaseObservable;
 import androidx.databinding.Bindable;
@@ -10,13 +11,13 @@ import androidx.databinding.library.baseAdapters.BR;
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.model.BaseModel;
 import org.gnucash.android.model.Commodity;
-import org.gnucash.android.model.Money;
 import org.gnucash.android.model.Split;
 import org.gnucash.android.model.TransactionType;
 import org.gnucash.android.ui.util.widget.CalculatorEditText;
 import org.gnucash.android.ui.util.widget.TransactionTypeSwitch;
 
 import java.math.BigDecimal;
+import java.util.Locale;
 
 public class SplitEntryViewModel extends BaseObservable {
     public static final String LOG_TAG = "SplitEntryViewModel";
@@ -36,9 +37,6 @@ public class SplitEntryViewModel extends BaseObservable {
     private final SimpleCursorAdapter mCursorAdapter;
     private CalculatorEditText mSplitAmountEditText;
     private TransactionTypeSwitch mSplitTypeSwitch;
-    private String mAccountUID;
-    private Commodity mCommodity;
-
 
     private Object mViewHolder;
     private final Split mSplit;
@@ -54,12 +52,9 @@ public class SplitEntryViewModel extends BaseObservable {
     public void init(
             CalculatorEditText splitAmountEditText,
             TransactionTypeSwitch splitTypeSwitch,
-            String accountUID,
             Commodity commodity) {
         this.mSplitAmountEditText = splitAmountEditText;
         this.mSplitTypeSwitch = splitTypeSwitch;
-        this.mAccountUID = accountUID;
-        this.mCommodity = commodity;
         if (mSplit != null) {
             setSplitCurrencySymbol(mSplit.getValue().getCommodity().getSymbol());
             setSplitUid(mSplit.getUID());
@@ -73,7 +68,7 @@ public class SplitEntryViewModel extends BaseObservable {
             setInputSplitMemo(mSplit.getMemo());
             setInputSplitAmount(mSplit.getValue().asBigDecimal());
         } else {
-            setSplitCurrencySymbol(mCommodity.getSymbol());
+            setSplitCurrencySymbol(commodity.getSymbol());
             setSplitUid(BaseModel.generateUID());
         }
     }
@@ -91,8 +86,9 @@ public class SplitEntryViewModel extends BaseObservable {
     }
 
     @Override
+    @NonNull
     public String toString() {
-        return String.format("ViewModel(%s, %s, %b, %d).", inputSplitAmount, inputSplitMemo, splitTypeChecked, inputAccountPos);
+        return String.format(Locale.getDefault(), "ViewModel(%s, %s, %b, %d).", inputSplitAmount, inputSplitMemo, splitTypeChecked, inputAccountPos);
     }
 
     @Bindable
@@ -171,15 +167,6 @@ public class SplitEntryViewModel extends BaseObservable {
         this.splitUid = splitUid;
         notifyPropertyChanged(BR.splitUid);
     }
-
-    public void setSplitAmountEditText(CalculatorEditText splitAmountEditText) {
-        this.mSplitAmountEditText = splitAmountEditText;
-    }
-
-    public void setSplitTypeSwitch(TransactionTypeSwitch splitTypeSwitch) {
-        this.mSplitTypeSwitch = splitTypeSwitch;
-    }
-
 
     /**
      * Get the position of the selected transfer account in account list.
