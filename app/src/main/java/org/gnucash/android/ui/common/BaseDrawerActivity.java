@@ -15,7 +15,6 @@
  */
 package org.gnucash.android.ui.common;
 
-import android.app.Activity;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.database.Cursor;
@@ -28,13 +27,14 @@ import android.view.View;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
-import androidx.annotation.LayoutRes;
+import androidx.annotation.NonNull;
 import androidx.annotation.StringRes;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.ActionBarDrawerToggle;
 import androidx.appcompat.widget.PopupMenu;
 import androidx.appcompat.widget.Toolbar;
 import androidx.drawerlayout.widget.DrawerLayout;
+import androidx.viewbinding.ViewBinding;
 
 import com.google.android.material.navigation.NavigationView;
 
@@ -49,9 +49,6 @@ import org.gnucash.android.ui.settings.PreferenceActivity;
 import org.gnucash.android.ui.transaction.ScheduledActionsActivity;
 import org.gnucash.android.util.BookUtils;
 
-import butterknife.BindView;
-import butterknife.ButterKnife;
-
 
 /**
  * Base activity implementing the navigation drawer, to be extended by all activities requiring one.
@@ -60,9 +57,7 @@ import butterknife.ButterKnife;
  * (above the action bar) which can be used to display busy operations. See {@link #getProgressBar()}
  * </p>
  *
- * <p>Sub-classes should simply provide their layout using {@link #getContentView()} and then annotate
- * any variables they wish to use with {@link ButterKnife#bind(Activity)} annotations. The view
- * binding will be done in this base abstract class.<br>
+ * <p>Sub-classes should provide their layout and bind the views using {@link #bindViews()}.<br>
  * The activity layout of the subclass is expected to contain {@code DrawerLayout} and
  * a {@code NavigationView}.<br>
  * Sub-class should also consider using the {@code toolbar.xml} or {@code toolbar_with_spinner.xml}
@@ -76,14 +71,11 @@ public abstract class BaseDrawerActivity extends PasscodeLockActivity implements
         PopupMenu.OnMenuItemClickListener {
 
     public static final int ID_MANAGE_BOOKS = 0xB00C;
-    @BindView(R.id.drawer_layout)
-    DrawerLayout mDrawerLayout;
-    @BindView(R.id.nav_view)
-    NavigationView mNavigationView;
-    @BindView(R.id.toolbar)
-    Toolbar mToolbar;
-    @BindView(R.id.toolbar_progress)
-    ProgressBar mToolbarProgress;
+    protected DrawerLayout mDrawerLayout;
+    protected NavigationView mNavigationView;
+    protected Toolbar mToolbar;
+    protected ProgressBar mToolbarProgress;
+
     protected TextView mBookNameTextView;
 
     protected ActionBarDrawerToggle mDrawerToggle;
@@ -103,7 +95,8 @@ public abstract class BaseDrawerActivity extends PasscodeLockActivity implements
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(getContentView());
+        ViewBinding viewBinding = bindViews();
+        setContentView(viewBinding.getRoot());
 
         //if a parameter was passed to open an account within a specific book, then switch
         String bookUID = getIntent().getStringExtra(UxArgument.BOOK_UID);
@@ -111,7 +104,6 @@ public abstract class BaseDrawerActivity extends PasscodeLockActivity implements
             BookUtils.activateBook(bookUID);
         }
 
-        ButterKnife.bind(this);
         setSupportActionBar(mToolbar);
         final ActionBar actionBar = getSupportActionBar();
         if (actionBar != null) {
@@ -130,7 +122,7 @@ public abstract class BaseDrawerActivity extends PasscodeLockActivity implements
             }
         });
 
-        mBookNameTextView = (TextView) headerView.findViewById(R.id.book_name);
+        mBookNameTextView = headerView.findViewById(R.id.book_name);
         mBookNameTextView.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -147,12 +139,7 @@ public abstract class BaseDrawerActivity extends PasscodeLockActivity implements
         updateActiveBookName();
     }
 
-    /**
-     * Return the layout to inflate for this activity
-     *
-     * @return Layout resource identifier
-     */
-    public abstract @LayoutRes int getContentView();
+    public abstract ViewBinding bindViews();
 
     /**
      * Return the title for this activity.
@@ -208,7 +195,7 @@ public abstract class BaseDrawerActivity extends PasscodeLockActivity implements
     }
 
     @Override
-    public void onConfigurationChanged(Configuration newConfig) {
+    public void onConfigurationChanged(@NonNull Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
         mDrawerToggle.onConfigurationChanged(newConfig);
     }

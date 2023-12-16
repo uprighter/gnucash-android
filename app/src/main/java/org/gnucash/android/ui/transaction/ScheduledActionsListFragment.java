@@ -384,7 +384,7 @@ public class ScheduledActionsListFragment extends ListFragment implements
      */
     private void stopActionMode() {
         int checkedCount = getListView().getCheckedItemIds().length;
-        if (checkedCount <= 0 && mActionMode != null) {
+        if (checkedCount == 0 && mActionMode != null) {
             mActionMode.finish();
             setDefaultStatusBarColor();
         }

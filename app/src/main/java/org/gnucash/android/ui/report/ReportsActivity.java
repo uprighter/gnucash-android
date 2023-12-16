@@ -31,15 +31,18 @@ import android.widget.ArrayAdapter;
 import android.widget.DatePicker;
 import android.widget.Spinner;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.ActionBar;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.DialogFragment;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
+import androidx.viewbinding.ViewBinding;
 
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
+import org.gnucash.android.databinding.ActivityReportsBinding;
 import org.gnucash.android.db.adapter.TransactionsDbAdapter;
 import org.gnucash.android.model.AccountType;
 import org.gnucash.android.ui.common.BaseDrawerActivity;
@@ -50,8 +53,6 @@ import org.joda.time.LocalDate;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
-
-import butterknife.BindView;
 
 /**
  * Activity for displaying report fragments (which must implement {@link BaseReportFragment})
@@ -77,11 +78,8 @@ public class ReportsActivity extends BaseDrawerActivity implements AdapterView.O
     };
     private static final String STATE_REPORT_TYPE = "STATE_REPORT_TYPE";
 
-    @BindView(R.id.time_range_spinner)
     Spinner mTimeRangeSpinner;
-    @BindView(R.id.report_account_type_spinner)
     Spinner mAccountTypeSpinner;
-    @BindView(R.id.toolbar_spinner)
     Spinner mReportTypeSpinner;
 
     private TransactionsDbAdapter mTransactionsDbAdapter;
@@ -117,8 +115,18 @@ public class ReportsActivity extends BaseDrawerActivity implements AdapterView.O
     };
 
     @Override
-    public int getContentView() {
-        return R.layout.activity_reports;
+    public ViewBinding bindViews() {
+        ActivityReportsBinding viewBinding = ActivityReportsBinding.inflate(getLayoutInflater());
+        mDrawerLayout = viewBinding.drawerLayout;
+        mNavigationView = viewBinding.navView;
+        mToolbar = viewBinding.toolbarLayout.toolbar;
+        mToolbarProgress = viewBinding.toolbarLayout.actionbarProgressIndicator.toolbarProgress;
+
+        mTimeRangeSpinner = viewBinding.timeRangeSpinner;
+        mAccountTypeSpinner = viewBinding.reportAccountTypeSpinner;
+        mReportTypeSpinner = viewBinding.toolbarLayout.toolbarSpinner;
+
+        return viewBinding;
     }
 
     @Override
@@ -418,16 +426,16 @@ public class ReportsActivity extends BaseDrawerActivity implements AdapterView.O
         }
     }
 
-    @Override
     /**
      * Just another call to refresh
      */
+    @Override
     public void refresh(String uid) {
         refresh();
     }
 
     @Override
-    protected void onSaveInstanceState(Bundle outState) {
+    protected void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
 
         outState.putSerializable(STATE_REPORT_TYPE, mReportType);

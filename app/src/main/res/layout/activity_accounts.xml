@@ -31,7 +31,9 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content">
 
-            <include layout="@layout/toolbar" />
+            <include
+                android:id="@+id/toolbar_layout"
+                layout="@layout/toolbar" />
 
             <com.google.android.material.tabs.TabLayout
                 android:id="@+id/tab_layout"
@@ -55,9 +57,8 @@
             android:id="@+id/fab_create_account"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_gravity="end|bottom|right"
+            android:layout_gravity="end|bottom"
             android:layout_alignParentBottom="true"
-            android:layout_alignParentRight="true"
             android:layout_alignParentEnd="true"
             android:layout_margin="20dp"
             app:elevation="10dp"

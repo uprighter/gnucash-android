@@ -22,7 +22,6 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.graphics.drawable.ColorDrawable;
 import android.os.AsyncTask;
-import android.os.Build;
 import android.os.Bundle;
 import android.text.format.DateUtils;
 import android.util.Log;
@@ -40,6 +39,7 @@ import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentStatePagerAdapter;
+import androidx.viewbinding.ViewBinding;
 import androidx.viewpager.widget.PagerAdapter;
 import androidx.viewpager.widget.ViewPager;
 
@@ -48,6 +48,7 @@ import com.google.android.material.tabs.TabLayout;
 
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
+import org.gnucash.android.databinding.ActivityTransactionsBinding;
 import org.gnucash.android.db.DatabaseSchema;
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.db.adapter.TransactionsDbAdapter;
@@ -67,8 +68,7 @@ import org.joda.time.LocalDate;
 import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-
-import butterknife.BindView;
+import java.util.Locale;
 
 /**
  * Activity for displaying, creating and editing transactions
@@ -97,7 +97,6 @@ public class TransactionsActivity extends BaseDrawerActivity implements
      * Number of pages to show
      */
     private static final int DEFAULT_NUM_PAGES = 2;
-    private static SimpleDateFormat mDayMonthDateFormat = new SimpleDateFormat("EEE, d MMM");
 
     /**
      * GUID of {@link Account} whose transactions are displayed
@@ -114,18 +113,13 @@ public class TransactionsActivity extends BaseDrawerActivity implements
      */
     private Cursor mAccountsCursor = null;
 
-    @BindView(R.id.pager)
     ViewPager mViewPager;
-    @BindView(R.id.toolbar_spinner)
     Spinner mToolbarSpinner;
-    @BindView(R.id.tab_layout)
     TabLayout mTabLayout;
-    @BindView(R.id.transactions_sum)
     TextView mSumTextView;
-    @BindView(R.id.fab_create_transaction)
     FloatingActionButton mCreateFloatingButton;
 
-    private SparseArray<Refreshable> mFragmentPageReferenceMap = new SparseArray<>();
+    private final SparseArray<Refreshable> mFragmentPageReferenceMap = new SparseArray<>();
 
     /**
      * Flag for determining is the currently displayed account is a placeholder account or not.
@@ -133,7 +127,7 @@ public class TransactionsActivity extends BaseDrawerActivity implements
      */
     private boolean mIsPlaceholderAccount;
 
-    private AdapterView.OnItemSelectedListener mTransactionListNavigationListener = new AdapterView.OnItemSelectedListener() {
+    private final AdapterView.OnItemSelectedListener mTransactionListNavigationListener = new AdapterView.OnItemSelectedListener() {
 
         @Override
         public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
@@ -202,7 +196,7 @@ public class TransactionsActivity extends BaseDrawerActivity implements
         }
 
         @Override
-        public void destroyItem(ViewGroup container, int position, Object object) {
+        public void destroyItem(@NonNull ViewGroup container, int position, @NonNull Object object) {
             super.destroyItem(container, position, object);
             mFragmentPageReferenceMap.remove(position);
         }
@@ -281,8 +275,20 @@ public class TransactionsActivity extends BaseDrawerActivity implements
     }
 
     @Override
-    public int getContentView() {
-        return R.layout.activity_transactions;
+    public ViewBinding bindViews() {
+        ActivityTransactionsBinding viewBinding = ActivityTransactionsBinding.inflate(getLayoutInflater());
+        mDrawerLayout = viewBinding.drawerLayout;
+        mNavigationView = viewBinding.navView;
+        mToolbar = viewBinding.toolbarLayout.toolbar;
+        mToolbarProgress = viewBinding.toolbarLayout.actionbarProgressIndicator.toolbarProgress;
+
+        mViewPager = viewBinding.pager;
+        mToolbarSpinner = viewBinding.toolbarLayout.toolbarSpinner;
+        mTabLayout = viewBinding.tabLayout;
+        mSumTextView = viewBinding.accountBalanceToolbar.transactionsSum;
+        mCreateFloatingButton = viewBinding.fabCreateTransaction;
+
+        return viewBinding;
     }
 
     @Override
@@ -347,7 +353,6 @@ public class TransactionsActivity extends BaseDrawerActivity implements
                         addAccountIntent.putExtra(UxArgument.FORM_TYPE, FormActivity.FormType.ACCOUNT.name());
                         addAccountIntent.putExtra(UxArgument.PARENT_ACCOUNT_UID, mAccountUID);
                         startActivityForResult(addAccountIntent, AccountsActivity.REQUEST_EDIT_ACCOUNT);
-                        ;
                         break;
 
                     case INDEX_TRANSACTIONS_FRAGMENT:
@@ -376,8 +381,7 @@ public class TransactionsActivity extends BaseDrawerActivity implements
         if (getSupportActionBar() != null)
             getSupportActionBar().setBackgroundDrawable(new ColorDrawable(iColor));
 
-        if (Build.VERSION.SDK_INT > 20)
-            getWindow().setStatusBarColor(GnuCashApplication.darken(iColor));
+        getWindow().setStatusBarColor(GnuCashApplication.darken(iColor));
     }
 
     /**
@@ -509,18 +513,19 @@ public class TransactionsActivity extends BaseDrawerActivity implements
      * of today. Else it shows the actual date formatted as short string. <br>
      * It also shows "today", "yesterday" or "tomorrow" if the date is on any of those days
      *
-     * @param dateMillis
-     * @return
+     * @param dateMillis date in milliseconds.
+     * @return pretty date format.
      */
     @NonNull
     public static String getPrettyDateFormat(Context context, long dateMillis) {
         LocalDate transactionTime = new LocalDate(dateMillis);
         LocalDate today = new LocalDate();
-        String prettyDateText = null;
+        String prettyDateText;
         if (transactionTime.compareTo(today.minusDays(1)) >= 0 && transactionTime.compareTo(today.plusDays(1)) <= 0) {
             prettyDateText = DateUtils.getRelativeTimeSpanString(dateMillis, System.currentTimeMillis(), DateUtils.DAY_IN_MILLIS).toString();
         } else if (transactionTime.getYear() == today.getYear()) {
-            prettyDateText = mDayMonthDateFormat.format(new Date(dateMillis));
+            SimpleDateFormat dayMonthDateFormat = new SimpleDateFormat("EEE, d MMM", Locale.getDefault());
+            prettyDateText = dayMonthDateFormat.format(new Date(dateMillis));
         } else {
             prettyDateText = DateUtils.formatDateTime(context, dateMillis, DateUtils.FORMAT_ABBREV_MONTH | DateUtils.FORMAT_SHOW_YEAR);
         }

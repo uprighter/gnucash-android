@@ -39,12 +39,14 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.coordinatorlayout.widget.CoordinatorLayout;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentPagerAdapter;
 import androidx.preference.PreferenceManager;
+import androidx.viewbinding.ViewBinding;
 import androidx.viewpager.widget.ViewPager;
 
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
@@ -54,6 +56,7 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics;
 import org.gnucash.android.BuildConfig;
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
+import org.gnucash.android.databinding.ActivityAccountsBinding;
 import org.gnucash.android.db.DatabaseSchema;
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.db.adapter.BooksDbAdapter;
@@ -66,8 +69,6 @@ import org.gnucash.android.ui.transaction.TransactionsActivity;
 import org.gnucash.android.ui.util.TaskDelegate;
 import org.gnucash.android.ui.wizard.FirstRunWizardActivity;
 import org.gnucash.android.util.BackupManager;
-
-import butterknife.BindView;
 
 /**
  * Manages actions related to accounts, displaying, exporting and creating new accounts
@@ -126,16 +127,13 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
     /**
      * Map containing fragments for the different tabs
      */
-    private SparseArray<Refreshable> mFragmentPageReferenceMap = new SparseArray<>();
+    private final SparseArray<Refreshable> mFragmentPageReferenceMap = new SparseArray<>();
 
     /**
      * ViewPager which manages the different tabs
      */
-    @BindView(R.id.pager)
     ViewPager mViewPager;
-    @BindView(R.id.fab_create_account)
     FloatingActionButton mFloatingActionButton;
-    @BindView(R.id.coordinatorLayout)
     CoordinatorLayout mCoordinatorLayout;
 
     private AccountViewPagerAdapter mPagerAdapter;
@@ -150,6 +148,7 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
         }
 
         @Override
+        @NonNull
         public Fragment getItem(int i) {
             AccountsListFragment currentFragment = (AccountsListFragment) mFragmentPageReferenceMap.get(i);
             if (currentFragment == null) {
@@ -173,7 +172,7 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
         }
 
         @Override
-        public void destroyItem(ViewGroup container, int position, Object object) {
+        public void destroyItem(@NonNull ViewGroup container, int position, @NonNull Object object) {
             super.destroyItem(container, position, object);
             mFragmentPageReferenceMap.remove(position);
         }
@@ -208,8 +207,18 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
     }
 
     @Override
-    public int getContentView() {
-        return R.layout.activity_accounts;
+    public ViewBinding bindViews() {
+        ActivityAccountsBinding viewBinding = ActivityAccountsBinding.inflate(getLayoutInflater());
+        mDrawerLayout = viewBinding.drawerLayout;
+        mNavigationView = viewBinding.navView;
+        mToolbar = viewBinding.toolbarLayout.toolbar;
+        mToolbarProgress = viewBinding.toolbarLayout.actionbarProgressIndicator.toolbarProgress;
+
+        mViewPager = viewBinding.pager;
+        mFloatingActionButton = viewBinding.fabCreateAccount;
+        mCoordinatorLayout = viewBinding.coordinatorLayout;
+
+        return viewBinding;
     }
 
     @Override
@@ -226,7 +235,7 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
 
         init();
 
-        TabLayout tabLayout = (TabLayout) findViewById(R.id.tab_layout);
+        TabLayout tabLayout = findViewById(R.id.tab_layout);
         tabLayout.addTab(tabLayout.newTab().setText(R.string.title_recent_accounts));
         tabLayout.addTab(tabLayout.newTab().setText(R.string.title_all_accounts));
         tabLayout.addTab(tabLayout.newTab().setText(R.string.title_favorite_accounts));

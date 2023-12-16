@@ -21,10 +21,12 @@ import android.view.View;
 
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
+import androidx.viewbinding.ViewBinding;
 
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
+import org.gnucash.android.databinding.ActivityBudgetsBinding;
 import org.gnucash.android.ui.common.BaseDrawerActivity;
 import org.gnucash.android.ui.common.FormActivity;
 import org.gnucash.android.ui.common.UxArgument;
@@ -37,8 +39,14 @@ public class BudgetsActivity extends BaseDrawerActivity implements View.OnClickL
     public static final int REQUEST_CREATE_BUDGET = 0xA;
 
     @Override
-    public int getContentView() {
-        return R.layout.activity_budgets;
+    public ViewBinding bindViews() {
+        ActivityBudgetsBinding viewBinding = ActivityBudgetsBinding.inflate(getLayoutInflater());
+        mDrawerLayout = viewBinding.drawerLayout;
+        mNavigationView = viewBinding.navView;
+        mToolbar = viewBinding.toolbarLayout.toolbar;
+        mToolbarProgress = viewBinding.toolbarLayout.actionbarProgressIndicator.toolbarProgress;
+
+        return viewBinding;
     }
 
     @Override
