@@ -28,6 +28,7 @@ import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
@@ -189,8 +190,8 @@ public class SplitEditorFragment extends Fragment {
                                   @NonNull RecyclerView.ViewHolder target) {
 
                 Collections.swap(mSplitEntryViewModelList, viewHolder.getAbsoluteAdapterPosition(), target.getAbsoluteAdapterPosition());
-                Log.d(LOG_TAG, "onMove: " + viewHolder.getAbsoluteAdapterPosition() + ", " +
-                        target.getAbsoluteAdapterPosition());
+//                Log.d(LOG_TAG, "onMove: " + viewHolder.getAbsoluteAdapterPosition() + ", " +
+//                        target.getAbsoluteAdapterPosition());
                 mRecyclerViewAdaptor.notifyItemMoved(viewHolder.getAbsoluteAdapterPosition(), target.getAbsoluteAdapterPosition());
                 return true;
             }
@@ -268,7 +269,6 @@ public class SplitEditorFragment extends Fragment {
     private void loadSplitViews(List<Split> splitList) {
         Collections.reverse(splitList);
         for (Split split : splitList) {
-            Log.d(LOG_TAG, "load split: " + split);
             addSplitView(split);
         }
     }
@@ -284,7 +284,7 @@ public class SplitEditorFragment extends Fragment {
         mRecyclerViewAdaptor.notifyItemInserted(0);
         mRecyclerView.scrollToPosition(0);
 
-        Log.d(LOG_TAG, mSplitEntryViewModelList.size() + " splits, after added " + split);
+//        Log.d(LOG_TAG, mSplitEntryViewModelList.size() + " splits, after added " + split);
     }
 
     /**
@@ -324,17 +324,18 @@ public class SplitEditorFragment extends Fragment {
         private final ItemSplitEntryBinding mViewBinding;
         private SplitEntryViewModel mViewModel;
 
-        Money quantity;
+        private Money quantity;
 
-        CalculatorEditText splitAmountEditText;
-        ImageView removeSplitButton;
-        Spinner accountsSpinner;
-        TextView splitCurrencyTextView;
-        TransactionTypeSwitch splitTypeSwitch;
+        private ImageButton dragButton;
+        private CalculatorEditText splitAmountEditText;
+        private ImageView removeSplitButton;
+        private Spinner accountsSpinner;
+        private TextView splitCurrencyTextView;
+        private TransactionTypeSwitch splitTypeSwitch;
 
-        ImageButton copyImbalanceButton;
-        ImageButton copyAboveButton;
-        ImageButton copyBelowButton;
+        private ImageButton copyImbalanceButton;
+        private ImageButton copyAboveButton;
+        private ImageButton copyBelowButton;
 
         public SplitEntryViewHolder(ItemSplitEntryBinding binding) {
             super(binding.getRoot());
@@ -350,6 +351,7 @@ public class SplitEditorFragment extends Fragment {
             mViewBinding.setSplitEntryViewModel(mViewModel);
             mViewModel.setViewHolder(this);
 
+            dragButton = mViewBinding.dragButton;
             splitAmountEditText = mViewBinding.inputSplitAmount;
             removeSplitButton = mViewBinding.btnRemoveSplit;
             accountsSpinner = mViewBinding.inputAccountsSpinner;
@@ -358,6 +360,13 @@ public class SplitEditorFragment extends Fragment {
             copyImbalanceButton = mViewBinding.copyImbalanceButton;
             copyAboveButton = mViewBinding.copyAboveButton;
             copyBelowButton = mViewBinding.copyBelowButton;
+
+            dragButton.setOnTouchListener((View v, MotionEvent event) -> {
+                // Hide the calculator keyboard to drag item up or down.
+                mCalculatorKeyboard.hideCustomKeyboard();
+                return true;
+            });
+
 
             splitAmountEditText.bindListeners(mCalculatorKeyboard);
             splitAmountEditText.addTextChangedListener(mImbalanceWatcher);
@@ -419,7 +428,7 @@ public class SplitEditorFragment extends Fragment {
             // executePendingBindings first, so that any changes in ViewModel could trigger event listeners.
             mViewBinding.executePendingBindings();
             mViewModel.init(splitAmountEditText, splitTypeSwitch, mAccountUID, mCommodity);
-            mViewBinding.getRoot().requestFocus();
+            mViewBinding.inputSplitAmount.requestFocus();
         }
 
         @Override
