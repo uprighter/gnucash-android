@@ -196,10 +196,10 @@ public class TransactionsActivity extends BaseDrawerActivity implements
 
         @Override
         public int getItemCount() {
-            if (mIsPlaceholderAccount)
+            if (mIsPlaceholderAccount) {
                 return 1;
-            else
-                return DEFAULT_NUM_PAGES;
+            }
+            return DEFAULT_NUM_PAGES;
         }
 
         /**
@@ -236,11 +236,11 @@ public class TransactionsActivity extends BaseDrawerActivity implements
     @Override
     public void refresh(String accountUID) {
 
-        if (mPagerAdapter != null)
+        if (mPagerAdapter != null) {
             mPagerAdapter.notifyDataSetChanged();
+        }
 
         new AccountBalanceTask(mSumTextView).executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, mAccountUID);
-
     }
 
     @Override
@@ -450,7 +450,7 @@ public class TransactionsActivity extends BaseDrawerActivity implements
                 editAccountIntent.setAction(Intent.ACTION_INSERT_OR_EDIT);
                 editAccountIntent.putExtra(UxArgument.SELECTED_ACCOUNT_UID, mAccountUID);
                 editAccountIntent.putExtra(UxArgument.FORM_TYPE, FormActivity.FormType.ACCOUNT.name());
-                startActivityForResult(editAccountIntent, AccountsActivity.REQUEST_EDIT_ACCOUNT);
+                launcher.launch(editAccountIntent);
                 return true;
 
             default:
@@ -493,10 +493,11 @@ public class TransactionsActivity extends BaseDrawerActivity implements
         balanceTextView.setText(balance.formattedString());
         Context context = GnuCashApplication.getAppContext();
         int fontColor = balance.isNegative() ?
-                context.getResources().getColor(R.color.debit_red) :
-                context.getResources().getColor(R.color.credit_green);
-        if (balance.asBigDecimal().compareTo(BigDecimal.ZERO) == 0)
-            fontColor = context.getResources().getColor(android.R.color.black);
+                context.getResources().getColor(R.color.debit_red, context.getTheme()) :
+                context.getResources().getColor(R.color.credit_green, context.getTheme());
+        if (balance.asBigDecimal().compareTo(BigDecimal.ZERO) == 0) {
+            fontColor = context.getResources().getColor(android.R.color.black, context.getTheme());
+        }
         balanceTextView.setTextColor(fontColor);
     }
 
