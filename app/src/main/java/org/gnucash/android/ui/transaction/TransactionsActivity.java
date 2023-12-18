@@ -146,7 +146,7 @@ public class TransactionsActivity extends BaseDrawerActivity implements
             if (mIsPlaceholderAccount) {
                 if (mTabLayout.getTabCount() > 1) {
                     mPagerAdapter.notifyDataSetChanged();
-                    mTabLayout.removeTabAt(1);
+                    mTabLayout.removeTabAt(INDEX_TRANSACTIONS_FRAGMENT);
                 }
             } else {
                 if (mTabLayout.getTabCount() < 2) {
@@ -291,17 +291,17 @@ public class TransactionsActivity extends BaseDrawerActivity implements
 
         mPagerAdapter = new AccountViewPagerAdapter(this);
         mViewPager.setAdapter(mPagerAdapter);
-//        mViewPager.addOnPageChangeListener(new TabLayout.TabLayoutOnPageChangeListener(mTabLayout));
-
+        mViewPager.setUserInputEnabled(false); // Don't switch tab when user swipes left or right.
         new TabLayoutMediator(mTabLayout, mViewPager,
                 (@NonNull TabLayout.Tab tab, int position) -> {
+                    Log.d(LOG_TAG, String.format("TabLayoutMediator, position %d, tab.getText()  %s.", position, tab.getText()));
                     if (mIsPlaceholderAccount) {
                         tab.setText(R.string.section_header_subaccounts);
                     } else {
                         switch (position) {
                             case INDEX_SUB_ACCOUNTS_FRAGMENT:
                                 tab.setText(R.string.section_header_subaccounts);
-
+                                break;
                             case INDEX_TRANSACTIONS_FRAGMENT:
                             default:
                                 tab.setText(R.string.section_header_transactions);
