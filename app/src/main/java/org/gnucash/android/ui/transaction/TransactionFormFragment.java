@@ -39,7 +39,6 @@ import android.widget.AdapterView;
 import android.widget.AutoCompleteTextView;
 import android.widget.CheckBox;
 import android.widget.EditText;
-import android.widget.FilterQueryProvider;
 import android.widget.ImageView;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -97,6 +96,7 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Fragment for creating or editing transactions
@@ -240,9 +240,9 @@ public class TransactionFormFragment extends Fragment implements
     private boolean mEditMode = false;
 
     /**
-     * Flag which is set if another action is triggered during a transaction save (which interrrupts the save process).
+     * Flag which is set if another action is triggered during a transaction save (which interrupts the save process).
      * Allows the fragment to check and resume the save operation.
-     * Primarily used for multicurrency transactions when the currency transfer dialog is opened during save
+     * Primarily used for multi-currency transactions when the currency transfer dialog is opened during save
      */
     private boolean onSaveAttempt = false;
 
@@ -256,7 +256,7 @@ public class TransactionFormFragment extends Fragment implements
             result -> {
                 Log.d(LOG_TAG, "launch intent: result = " + result);
                 if (result.getResultCode() == Activity.RESULT_OK) {
-                    List<Split> splitList = result.getData().getParcelableArrayListExtra(UxArgument.SPLIT_LIST, Split.class);
+                    List<Split> splitList = Objects.requireNonNull(result.getData()).getParcelableArrayListExtra(UxArgument.SPLIT_LIST, Split.class);
                     setSplitList(splitList);
 
                     //once split editor has been used and saved, only allow editing through it
@@ -290,12 +290,7 @@ public class TransactionFormFragment extends Fragment implements
         mDoubleEntryLayout = mBinding.layoutDoubleEntry;
 
         mAmountEditText.bindListeners(mKeyboardView);
-        mOpenSplitEditor.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                openSplitEditor();
-            }
-        });
+        mOpenSplitEditor.setOnClickListener(v -> openSplitEditor());
 
         return mBinding.getRoot();
     }
@@ -347,12 +342,12 @@ public class TransactionFormFragment extends Fragment implements
             mOpenSplitEditor.setVisibility(View.GONE);
         }
 
-        mAccountUID = getArguments().getString(UxArgument.SELECTED_ACCOUNT_UID);
+        mAccountUID = requireArguments().getString(UxArgument.SELECTED_ACCOUNT_UID);
         assert (mAccountUID != null);
         mAccountsDbAdapter = AccountsDbAdapter.getInstance();
         mAccountType = mAccountsDbAdapter.getAccountType(mAccountUID);
 
-        String transactionUID = getArguments().getString(UxArgument.SELECTED_TRANSACTION_UID);
+        String transactionUID = requireArguments().getString(UxArgument.SELECTED_TRANSACTION_UID);
         mTransactionsDbAdapter = TransactionsDbAdapter.getInstance();
         if (transactionUID != null) {
             mTransaction = mTransactionsDbAdapter.getRecord(transactionUID);
@@ -400,13 +395,13 @@ public class TransactionFormFragment extends Fragment implements
             }
         });
 
-        ActionBar actionBar = ((AppCompatActivity) getActivity()).getSupportActionBar();
+        ActionBar actionBar = ((AppCompatActivity) requireActivity()).getSupportActionBar();
         assert actionBar != null;
 //        actionBar.setSubtitle(mAccountsDbAdapter.getFullyQualifiedAccountName(mAccountUID));
 
         if (mTransaction == null) {
             actionBar.setTitle(R.string.title_add_transaction);
-            initalizeViews();
+            initializeViews();
             initTransactionNameAutocomplete();
         } else {
             actionBar.setTitle(R.string.title_edit_transaction);
@@ -414,7 +409,7 @@ public class TransactionFormFragment extends Fragment implements
             mEditMode = true;
         }
 
-        getActivity().getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
+        requireActivity().getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
     }
 
     /**
@@ -437,9 +432,9 @@ public class TransactionFormFragment extends Fragment implements
             String dateString = DateUtils.formatDateTime(getActivity(), timestamp,
                     DateUtils.FORMAT_SHOW_WEEKDAY | DateUtils.FORMAT_SHOW_DATE | DateUtils.FORMAT_SHOW_YEAR);
 
-            TextView secondaryTextView = (TextView) view.findViewById(R.id.secondary_text);
-            String sedondaryText = String.format("%s on %s", balance.formattedString(), dateString);
-            secondaryTextView.setText(sedondaryText);
+            TextView secondaryTextView = view.findViewById(R.id.secondary_text);
+            String secondaryText = String.format("%s on %s", balance.formattedString(), dateString);
+            secondaryTextView.setText(secondaryText);
         }
     }
 
@@ -453,47 +448,36 @@ public class TransactionFormFragment extends Fragment implements
         SimpleCursorAdapter adapter = new DropDownCursorAdapter(
                 getActivity(), R.layout.dropdown_item_2lines, null, from, to);
 
-        adapter.setCursorToStringConverter(new SimpleCursorAdapter.CursorToStringConverter() {
-            @Override
-            public CharSequence convertToString(Cursor cursor) {
-                final int colIndex = cursor.getColumnIndexOrThrow(DatabaseSchema.TransactionEntry.COLUMN_DESCRIPTION);
-                return cursor.getString(colIndex);
-            }
+        adapter.setCursorToStringConverter(cursor -> {
+            final int colIndex = cursor.getColumnIndexOrThrow(DatabaseSchema.TransactionEntry.COLUMN_DESCRIPTION);
+            return cursor.getString(colIndex);
         });
 
-        adapter.setFilterQueryProvider(new FilterQueryProvider() {
-            @Override
-            public Cursor runQuery(CharSequence name) {
-                return mTransactionsDbAdapter.fetchTransactionSuggestions(name == null ? "" : name.toString(), mAccountUID);
-            }
-        });
+        adapter.setFilterQueryProvider(name -> mTransactionsDbAdapter.fetchTransactionSuggestions(name == null ? "" : name.toString(), mAccountUID));
 
-        mDescriptionEditText.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-            @Override
-            public void onItemClick(AdapterView<?> adapterView, View view, int position, long id) {
-                mTransaction = new Transaction(mTransactionsDbAdapter.getRecord(id), true);
-                mTransaction.setTime(System.currentTimeMillis());
-                //we check here because next method will modify it and we want to catch user-modification
-                boolean amountEntered = mAmountEditText.isInputModified();
-                initializeViewsWithTransaction();
-                List<Split> splitList = mTransaction.getSplits();
-                boolean isSplitPair = splitList.size() == 2 && splitList.get(0).isPairOf(splitList.get(1));
-                if (isSplitPair) {
+        mDescriptionEditText.setOnItemClickListener((adapterView, view, position, id) -> {
+            mTransaction = new Transaction(mTransactionsDbAdapter.getRecord(id), true);
+            mTransaction.setTime(System.currentTimeMillis());
+            //we check here because next method will modify it and we want to catch user-modification
+            boolean amountEntered = mAmountEditText.isInputModified();
+            initializeViewsWithTransaction();
+            List<Split> splitList = mTransaction.getSplits();
+            boolean isSplitPair = splitList.size() == 2 && splitList.get(0).isPairOf(splitList.get(1));
+            if (isSplitPair) {
+                mSplitsList.clear();
+                if (!amountEntered) //if user already entered an amount
+                    mAmountEditText.setValue(Objects.requireNonNull(splitList.get(0).getValue()).asBigDecimal());
+            } else {
+                if (amountEntered) { //if user entered own amount, clear loaded splits and use the user value
                     mSplitsList.clear();
-                    if (!amountEntered) //if user already entered an amount
-                        mAmountEditText.setValue(splitList.get(0).getValue().asBigDecimal());
+                    setDoubleEntryViewsVisibility(View.VISIBLE);
                 } else {
-                    if (amountEntered) { //if user entered own amount, clear loaded splits and use the user value
-                        mSplitsList.clear();
-                        setDoubleEntryViewsVisibility(View.VISIBLE);
-                    } else {
-                        if (mUseDoubleEntry) { //don't hide the view in single entry mode
-                            setDoubleEntryViewsVisibility(View.GONE);
-                        }
+                    if (mUseDoubleEntry) { //don't hide the view in single entry mode
+                        setDoubleEntryViewsVisibility(View.GONE);
                     }
                 }
-                mTransaction = null; //we are creating a new transaction after all
             }
+            mTransaction = null; //we are creating a new transaction after all
         });
 
         mDescriptionEditText.setAdapter(adapter);
@@ -529,7 +513,7 @@ public class TransactionFormFragment extends Fragment implements
         if (mSplitsList.size() == 2) {
             for (Split split : mSplitsList) {
                 if (mAccountUID.equals(split.getAccountUID())) {
-                    if (!mTransaction.getCommodity().equals(split.getQuantity().getCommodity())) {
+                    if (!mTransaction.getCommodity().equals(Objects.requireNonNull(split.getQuantity()).getCommodity())) {
                         mSplitQuantity = split.getQuantity();
                     }
                 }
@@ -541,7 +525,7 @@ public class TransactionFormFragment extends Fragment implements
             for (Split split : mTransaction.getSplits()) {
                 //two splits, one belongs to this account and the other to another account
                 if (mUseDoubleEntry && !mAccountUID.equals(split.getAccountUID())) {
-                    setSelectedTransferAccount(mAccountsDbAdapter.getID(split.getAccountUID()));
+                    setSelectedTransferAccount(mAccountsDbAdapter.getID(Objects.requireNonNull(split.getAccountUID())));
                 }
             }
         } else {
@@ -556,7 +540,7 @@ public class TransactionFormFragment extends Fragment implements
         mAmountEditText.setCommodity(commodity);
 
         mSaveTemplateCheckbox.setChecked(mTransaction.isTemplate());
-        String scheduledActionUID = getArguments().getString(UxArgument.SCHEDULED_ACTION_UID);
+        String scheduledActionUID = requireArguments().getString(UxArgument.SCHEDULED_ACTION_UID);
         if (scheduledActionUID != null && !scheduledActionUID.isEmpty()) {
             ScheduledAction scheduledAction = ScheduledActionDbAdapter.getInstance().getRecord(scheduledActionUID);
             mRecurrenceRule = scheduledAction.getRuleString();
@@ -576,19 +560,14 @@ public class TransactionFormFragment extends Fragment implements
             mAmountEditText.bindListeners(mKeyboardView);
         } else {
             mAmountEditText.setFocusable(false);
-            mAmountEditText.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    openSplitEditor();
-                }
-            });
+            mAmountEditText.setOnClickListener(v -> openSplitEditor());
         }
     }
 
     /**
      * Initialize views with default data for new transactions
      */
-    private void initalizeViews() {
+    private void initializeViews() {
         Date time = new Date(System.currentTimeMillis());
         mDateTextView.setText(DATE_FORMATTER.format(time));
         mTimeTextView.setText(TIME_FORMATTER.format(time));
@@ -658,7 +637,7 @@ public class TransactionFormFragment extends Fragment implements
         } else {
             Money biggestAmount = Money.createZeroInstance(mTransaction.getCurrencyCode());
             for (Split split : mTransaction.getSplits()) {
-                if (split.getValue().asBigDecimal().compareTo(biggestAmount.asBigDecimal()) > 0)
+                if (Objects.requireNonNull(split.getValue()).asBigDecimal().compareTo(biggestAmount.asBigDecimal()) > 0)
                     biggestAmount = split.getValue();
             }
             baseAmountString = biggestAmount.toPlainString();
@@ -678,51 +657,43 @@ public class TransactionFormFragment extends Fragment implements
     private void setListeners() {
         mTransactionTypeSwitch.setAmountFormattingListener(mAmountEditText, mCurrencyTextView);
 
-        mDateTextView.setOnClickListener(new View.OnClickListener() {
-
-            @Override
-            public void onClick(View v) {
-                long dateMillis = 0;
-                try {
-                    Date date = DATE_FORMATTER.parse(mDateTextView.getText().toString());
-                    dateMillis = date.getTime();
-                } catch (ParseException e) {
-                    Log.e(getTag(), "Error converting input time to Date object");
-                }
-                Calendar calendar = Calendar.getInstance();
-                calendar.setTimeInMillis(dateMillis);
-
-                int year = calendar.get(Calendar.YEAR);
-                int monthOfYear = calendar.get(Calendar.MONTH);
-                int dayOfMonth = calendar.get(Calendar.DAY_OF_MONTH);
-                CalendarDatePickerDialogFragment datePickerDialog = new CalendarDatePickerDialogFragment()
-                        .setOnDateSetListener(TransactionFormFragment.this)
-                        .setPreselectedDate(year, monthOfYear, dayOfMonth);
-                datePickerDialog.show(getParentFragmentManager(), "date_picker_fragment");
+        mDateTextView.setOnClickListener(v -> {
+            long dateMillis = 0;
+            try {
+                Date date = DATE_FORMATTER.parse(mDateTextView.getText().toString());
+                dateMillis = Objects.requireNonNull(date).getTime();
+            } catch (ParseException e) {
+                Log.e(getTag(), "Error converting input time to Date object");
             }
+            Calendar calendar = Calendar.getInstance();
+            calendar.setTimeInMillis(dateMillis);
+
+            int year = calendar.get(Calendar.YEAR);
+            int monthOfYear = calendar.get(Calendar.MONTH);
+            int dayOfMonth = calendar.get(Calendar.DAY_OF_MONTH);
+            CalendarDatePickerDialogFragment datePickerDialog = new CalendarDatePickerDialogFragment()
+                    .setOnDateSetListener(TransactionFormFragment.this)
+                    .setPreselectedDate(year, monthOfYear, dayOfMonth);
+            datePickerDialog.show(getParentFragmentManager(), "date_picker_fragment");
         });
 
-        mTimeTextView.setOnClickListener(new View.OnClickListener() {
-
-            @Override
-            public void onClick(View v) {
-                long timeMillis = 0;
-                try {
-                    Date date = TIME_FORMATTER.parse(mTimeTextView.getText().toString());
-                    timeMillis = date.getTime();
-                } catch (ParseException e) {
-                    Log.e(getTag(), "Error converting input time to Date object");
-                }
-
-                Calendar calendar = Calendar.getInstance();
-                calendar.setTimeInMillis(timeMillis);
-
-                RadialTimePickerDialogFragment timePickerDialog = new RadialTimePickerDialogFragment()
-                        .setOnTimeSetListener(TransactionFormFragment.this)
-                        .setStartTime(calendar.get(Calendar.HOUR_OF_DAY),
-                                calendar.get(Calendar.MINUTE));
-                timePickerDialog.show(getParentFragmentManager(), "time_picker_dialog_fragment");
+        mTimeTextView.setOnClickListener(v -> {
+            long timeMillis = 0;
+            try {
+                Date date = TIME_FORMATTER.parse(mTimeTextView.getText().toString());
+                timeMillis = Objects.requireNonNull(date).getTime();
+            } catch (ParseException e) {
+                Log.e(getTag(), "Error converting input time to Date object");
             }
+
+            Calendar calendar = Calendar.getInstance();
+            calendar.setTimeInMillis(timeMillis);
+
+            RadialTimePickerDialogFragment timePickerDialog = new RadialTimePickerDialogFragment()
+                    .setOnTimeSetListener(TransactionFormFragment.this)
+                    .setStartTime(calendar.get(Calendar.HOUR_OF_DAY),
+                            calendar.get(Calendar.MINUTE));
+            timePickerDialog.show(getParentFragmentManager(), "time_picker_dialog_fragment");
         });
 
         mRecurrenceTextView.setOnClickListener(new RecurrenceViewClickListener((AppCompatActivity) getActivity(), mRecurrenceRule, this));
@@ -915,7 +886,7 @@ public class TransactionFormFragment extends Fragment implements
                 } else
                     scheduleRecurringTransaction(mTransaction.getUID());
             } else {
-                String scheduledActionUID = getArguments().getString(UxArgument.SCHEDULED_ACTION_UID);
+                String scheduledActionUID = requireArguments().getString(UxArgument.SCHEDULED_ACTION_UID);
                 if (scheduledActionUID != null) { //we were editing a schedule and it was turned off
                     ScheduledActionDbAdapter.getInstance().deleteRecord(scheduledActionUID);
                 }
@@ -927,7 +898,7 @@ public class TransactionFormFragment extends Fragment implements
         }
 
         //update widgets, if any
-        WidgetConfigurationActivity.updateAllWidgets(getActivity().getApplicationContext());
+        WidgetConfigurationActivity.updateAllWidgets(requireActivity().getApplicationContext());
 
         finish(Activity.RESULT_OK);
     }
@@ -941,30 +912,23 @@ public class TransactionFormFragment extends Fragment implements
         ScheduledActionDbAdapter scheduledActionDbAdapter = ScheduledActionDbAdapter.getInstance();
 
         Recurrence recurrence = RecurrenceParser.parse(mEventRecurrence);
+        assert recurrence != null;
 
         ScheduledAction scheduledAction = new ScheduledAction(ScheduledAction.ActionType.TRANSACTION);
         scheduledAction.setRecurrence(recurrence);
 
-        String scheduledActionUID = getArguments().getString(UxArgument.SCHEDULED_ACTION_UID);
+        String scheduledActionUID = requireArguments().getString(UxArgument.SCHEDULED_ACTION_UID);
 
         if (scheduledActionUID != null) { //if we are editing an existing schedule
-            if (recurrence == null) {
-                scheduledActionDbAdapter.deleteRecord(scheduledActionUID);
-            } else {
-                scheduledAction.setUID(scheduledActionUID);
-                scheduledActionDbAdapter.updateRecurrenceAttributes(scheduledAction);
-                Toast.makeText(getActivity(), R.string.toast_updated_transaction_recurring_schedule, Toast.LENGTH_SHORT).show();
-            }
+            scheduledAction.setUID(scheduledActionUID);
+            scheduledActionDbAdapter.updateRecurrenceAttributes(scheduledAction);
+            Toast.makeText(getActivity(), R.string.toast_updated_transaction_recurring_schedule, Toast.LENGTH_SHORT).show();
         } else {
-            if (recurrence != null) {
                 scheduledAction.setActionUID(transactionUID);
                 scheduledActionDbAdapter.addRecord(scheduledAction, DatabaseAdapter.UpdateMethod.replace);
                 Toast.makeText(getActivity(), R.string.toast_scheduled_recurring_transaction, Toast.LENGTH_SHORT).show();
-            }
         }
-
     }
-
 
     @Override
     public void onDestroyView() {
@@ -981,14 +945,14 @@ public class TransactionFormFragment extends Fragment implements
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         //hide the keyboard if it is visible
-        InputMethodManager imm = (InputMethodManager) getActivity().getSystemService(Context.INPUT_METHOD_SERVICE);
+        InputMethodManager imm = (InputMethodManager) requireActivity().getSystemService(Context.INPUT_METHOD_SERVICE);
         imm.hideSoftInputFromWindow(mDescriptionEditText.getApplicationWindowToken(), 0);
 
         if (item.getItemId() == android.R.id.home) {
             finish(Activity.RESULT_CANCELED);
             return true;
         } else if (item.getItemId() == R.id.menu_save) {
-            View parentLayout = getActivity().findViewById(android.R.id.content);
+            View parentLayout = requireActivity().findViewById(android.R.id.content);
             if (canSave()) {
                 saveNewTransaction();
             } else {
@@ -1038,13 +1002,13 @@ public class TransactionFormFragment extends Fragment implements
      * Depends on how the fragment was loaded, it might have a backstack or not
      */
     private void finish(int resultCode) {
-        if (getActivity().getSupportFragmentManager().getBackStackEntryCount() == 0) {
-            getActivity().setResult(resultCode);
+        if (requireActivity().getSupportFragmentManager().getBackStackEntryCount() == 0) {
+            requireActivity().setResult(resultCode);
             //means we got here directly from the accounts list activity, need to finish
-            getActivity().finish();
+            requireActivity().finish();
         } else {
             //go back to transactions list
-            getActivity().getSupportFragmentManager().popBackStack();
+            requireActivity().getSupportFragmentManager().popBackStack();
         }
     }
 
