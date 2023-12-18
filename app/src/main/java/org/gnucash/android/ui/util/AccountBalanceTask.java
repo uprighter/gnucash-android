@@ -17,7 +17,8 @@
 
 package org.gnucash.android.ui.util;
 
-import android.os.AsyncTask;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.widget.TextView;
 
@@ -28,48 +29,48 @@ import org.gnucash.android.model.Money;
 import org.gnucash.android.ui.transaction.TransactionsActivity;
 
 import java.lang.ref.WeakReference;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * An asynchronous task for computing the account balance of an account.
  * This is done asynchronously because in cases of deeply nested accounts,
  * it can take some time and would block the UI thread otherwise.
  */
-public class AccountBalanceTask extends AsyncTask<String, Void, Money> {
+public class AccountBalanceTask {
     public static final String LOG_TAG = AccountBalanceTask.class.getName();
 
+    private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private final Handler handler = new Handler(Looper.getMainLooper());
     private final WeakReference<TextView> accountBalanceTextViewReference;
     private final AccountsDbAdapter accountsDbAdapter;
+    private final String accountUID;
 
-    public AccountBalanceTask(TextView balanceTextView) {
-        accountBalanceTextViewReference = new WeakReference<>(balanceTextView);
-        accountsDbAdapter = AccountsDbAdapter.getInstance();
+    public AccountBalanceTask(TextView balanceTextView, String accountUID) {
+        this.accountBalanceTextViewReference = new WeakReference<>(balanceTextView);
+        this.accountsDbAdapter = AccountsDbAdapter.getInstance();
+        this.accountUID = accountUID;
     }
 
-    @Override
-    protected Money doInBackground(String... params) {
-        //if the view for which we are doing this job is dead, kill the job as well
-        if (accountBalanceTextViewReference.get() == null) {
-            cancel(true);
-            return Money.getZeroInstance();
-        }
+    public void asyncExecute() {
+        executor.submit(() -> {
+                //if the view for which we are doing this job is dead, kill the job as well
+                if (accountBalanceTextViewReference.get() == null) {
+                    return;
+                }
 
-        Money balance = Money.getZeroInstance();
-        try {
-            balance = accountsDbAdapter.getAccountBalance(params[0], -1, -1);
-        } catch (Exception ex) {
-            Log.e(LOG_TAG, "Error computing account balance ", ex);
-            FirebaseCrashlytics.getInstance().recordException(ex);
-        }
-        return balance;
-    }
-
-    @Override
-    protected void onPostExecute(Money balance) {
-        if (accountBalanceTextViewReference.get() != null && balance != null) {
-            final TextView balanceTextView = accountBalanceTextViewReference.get();
-            if (balanceTextView != null) {
-                TransactionsActivity.displayBalance(balanceTextView, balance);
-            }
-        }
+                try {
+                    final Money balance = accountsDbAdapter.getAccountBalance(accountUID, -1, -1);
+                    handler.post(() -> {
+                        final TextView balanceTextView = accountBalanceTextViewReference.get();
+                        if (balanceTextView != null) {
+                            TransactionsActivity.displayBalance(balanceTextView, balance);
+                        }
+                    });
+                } catch (Exception ex) {
+                    Log.e(LOG_TAG, "Error computing account balance ", ex);
+                    FirebaseCrashlytics.getInstance().recordException(ex);
+                }
+        });
     }
 }
