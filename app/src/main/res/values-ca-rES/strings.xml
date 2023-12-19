@@ -48,7 +48,6 @@
     <string name="label_account_balance">Saldo:</string>
     <string name="label_export_destination">Exporta a:</string>
     <string name="title_export_dialog">Exporta els assentaments</string>
-    <string name="hint_export_choice">Per defecte, només s\'exportaran les transaccions noves des de l\'última exportació. Marqueu aquesta opció per exportar totes les transaccions</string>
     <string name="toast_export_error">S\'ha produït un error en exportar el fitxer %1$s</string>
     <string name="btn_export">Exporta</string>
     <string name="option_delete_after_export">Suprimeix les transaccions després d\'exportar</string>
@@ -56,8 +55,6 @@
     <string name="title_settings">Preferències</string>
     <string-array name="export_destinations">
         <item>Save As&#8230;</item>
-        <item>Dropbox</item>
-        <item>ownCloud</item>
         <item>Send to&#8230;</item>
     </string-array>
     <string name="btn_move">Mou</string>
@@ -173,6 +170,7 @@
         <item>TRADING</item>
     </string-array>
     <string-array name="export_formats">
+        <item>CSV</item>
         <item>QIF</item>
         <item>OFX</item>
         <item>XML</item>
@@ -248,8 +246,6 @@
     <string name="title_dropbox_sync_preference">Habilita el DropBox</string>
     <string name="title_owncloud_sync_preference">Habilita l\'ownCloud</string>
     <string name="title_backup_preference_category">Còpia de seguretat</string>
-    <string name="summary_dropbox_sync">Habilita l\'exportació a DropBox</string>
-    <string name="summary_owncloud_sync">Habilita l\'exportació a ownCloud</string>
     <string name="title_backup_prefs">Preferències de còpia de seguretat</string>
     <string name="title_create_backup_pref">Fer una còpia de seguretat</string>
     <string name="summary_create_backup_pref">Create a backup of the active book</string>
@@ -266,14 +262,6 @@
     <string name="nav_menu_settings">Preferències</string>
     <string name="username">Nom d\'usuari</string>
     <string name="password">Contrasenya</string>
-    <string name="owncloud_pref">ownCloud</string>
-    <string name="owncloud_server">https://</string>
-    <string name="owncloud_server_invalid">No s\'ha trobat el servidor d\'OC</string>
-    <string name="owncloud_user_invalid">El nom d\'usuari/contrasenya d\'OC no és correcte</string>
-    <string name="owncloud_dir_invalid">Caràcters invalids: \\ &lt; &gt; : \&quot; | * ? </string>
-    <string name="owncloud_server_ok">Servidor d\'OC correcte</string>
-    <string name="owncloud_user_ok">Nom d\'usuari/contrasenya d\'OC correcte</string>
-    <string name="owncloud_dir_ok">Nom de carpeta correcte</string>
     <plurals name="label_every_x_hours">
         <item quantity="one">Hourly</item>
         <item quantity="other">Every %d hours</item>
@@ -356,7 +344,6 @@
     <string name="label_balance_sheet_total">Total:</string>
     <string name="title_google_plus_community">Google+ Community</string>
     <string name="title_translate_gnucash">Traduiu el GnuCash</string>
-    <string name="summary_google_plus">Share ideas, discuss changes or report problems</string>
     <string name="summary_translate_gnucash">Translate or proof-read on CrowdIn</string>
     <string name="toast_no_compatible_apps_to_receive_export">No compatible apps to receive the exported transactions!</string>
     <string name="menu_move_transaction">Move&#8230;</string>

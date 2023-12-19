@@ -48,7 +48,6 @@
     <string name="label_account_balance">Баланс:</string>
     <string name="label_export_destination">Експортувати до:</string>
     <string name="title_export_dialog">Експортування транзакцій</string>
-    <string name="hint_export_choice">Експортувати всі транзакції, а не тільки нові.</string>
     <string name="toast_export_error">Помилка при експорті файлу %1$s</string>
     <string name="btn_export">Експорт</string>
     <string name="option_delete_after_export">Видалити транзакцій після експорту</string>
@@ -56,8 +55,6 @@
     <string name="title_settings">Налаштування</string>
     <string-array name="export_destinations">
         <item>Зберегти як...</item>
-        <item>Dropbox</item>
-        <item>ownCloud</item>
         <item>Надіслати до...</item>
     </string-array>
     <string name="btn_move">Перенести</string>
@@ -172,6 +169,7 @@
         <item>ТОРГІВЕЛЬНИЙ</item>
     </string-array>
     <string-array name="export_formats">
+        <item>CSV</item>
         <item>QIF</item>
         <item>OFX</item>
         <item>XML</item>
@@ -247,8 +245,6 @@
     <string name="title_dropbox_sync_preference">Під’єднати Dropbox</string>
     <string name="title_owncloud_sync_preference">Під’єднати до ownCloud </string>
     <string name="title_backup_preference_category">Резервне копіюванняе</string>
-    <string name="summary_dropbox_sync">Увімкнути експорт до Dropbox</string>
-    <string name="summary_owncloud_sync">Увімкнути експорт у ownCloud</string>
     <string name="title_backup_prefs">Резервне копіювання</string>
     <string name="title_create_backup_pref">Створити резервну копію</string>
     <string name="summary_create_backup_pref">Створити резервну копію активної книги</string>
@@ -265,14 +261,6 @@
     <string name="nav_menu_settings">Налаштування</string>
     <string name="username">Ім’я користувача</string>
     <string name="password">Пароль</string>
-    <string name="owncloud_pref">owncloud</string>
-    <string name="owncloud_server">https://</string>
-    <string name="owncloud_server_invalid">Сервер не знайдено</string>
-    <string name="owncloud_user_invalid">Невірне ім’я користувача або пароль</string>
-    <string name="owncloud_dir_invalid">Використовуйте лише букви, цифри, дефіси, символи підкреслення, апострофи й крапки</string>
-    <string name="owncloud_server_ok">Сервер знайдено</string>
-    <string name="owncloud_user_ok">Ім’я користувача та пароль вірні</string>
-    <string name="owncloud_dir_ok">Ім’я папки підходить</string>
     <plurals name="label_every_x_hours">
         <item quantity="one">Щогодини</item>
         <item quantity="few">Кожних %d годин</item>
@@ -360,7 +348,6 @@
     <string name="label_balance_sheet_total">Всього:</string>
     <string name="title_google_plus_community">Google+ спільнота</string>
     <string name="title_translate_gnucash">Перекласти GnuCash</string>
-    <string name="summary_google_plus">Поділитися ідеями, обговорити зміни або повідомити про проблеми</string>
     <string name="summary_translate_gnucash">Перекласти або вичитати на CrowdIn</string>
     <string name="toast_no_compatible_apps_to_receive_export">Нема сумісних застосунків для експортування!</string>
     <string name="menu_move_transaction">Перемістити&#8230;</string>

@@ -48,7 +48,6 @@
     <string name="label_account_balance">貸借バランス：</string>
     <string name="label_export_destination">エクスポート先：</string>
     <string name="title_export_dialog">取引のエクスポート</string>
-    <string name="hint_export_choice">デフォルトでは前回エクスポートされた取引より新しいものがエクスポートされます。すべての取引をエクスポートするにはチェックしてください</string>
     <string name="toast_export_error">エクスポートエラー（%1$s）</string>
     <string name="btn_export">エクスポート</string>
     <string name="option_delete_after_export">エクスポート後に取引を削除する</string>
@@ -56,8 +55,6 @@
     <string name="title_settings">設定</string>
     <string-array name="export_destinations">
         <item>名前を付けて保存&#8230;</item>
-        <item>Dropbox</item>
-        <item>ownCloud</item>
         <item>&#8230;に送信</item>
     </string-array>
     <string name="btn_move">移動</string>
@@ -169,6 +166,7 @@
         <item>売買取引</item>
     </string-array>
     <string-array name="export_formats">
+        <item>CSV</item>
         <item>QIF</item>
         <item>OFX</item>
         <item>XML</item>
@@ -243,8 +241,6 @@
     <string name="title_dropbox_sync_preference">DropBox を有効にする</string>
     <string name="title_owncloud_sync_preference">ownCloud を有効にする</string>
     <string name="title_backup_preference_category">バックアップ</string>
-    <string name="summary_dropbox_sync">DropBox へのエクスポートを有効にします</string>
-    <string name="summary_owncloud_sync">ownCloud へのエクスポートを有効にします</string>
     <string name="title_backup_prefs">バックアップ設定</string>
     <string name="title_create_backup_pref">バックアップを作成</string>
     <string name="summary_create_backup_pref">アクティブな帳簿のバックアップを作成します</string>
@@ -261,14 +257,6 @@
     <string name="nav_menu_settings">設定</string>
     <string name="username">ユーザー名</string>
     <string name="password">パスワード</string>
-    <string name="owncloud_pref">owncloud</string>
-    <string name="owncloud_server">https://</string>
-    <string name="owncloud_server_invalid">OC サーバーが見つかりません</string>
-    <string name="owncloud_user_invalid">OC のユーザー名/パスワードが正しくありません</string>
-    <string name="owncloud_dir_invalid">無効な文字: \\ &lt; &gt; : \&quot; | * ? </string>
-    <string name="owncloud_server_ok">OC サーバー OK</string>
-    <string name="owncloud_user_ok">OC ユーザー名/パスワード OK</string>
-    <string name="owncloud_dir_ok">ディレクトリ名 OK</string>
     <plurals name="label_every_x_hours">
         <item quantity="other">%d 時間ごと</item>
     </plurals>
@@ -346,7 +334,6 @@
     <string name="label_balance_sheet_total">合計:</string>
     <string name="title_google_plus_community">Google+ コミュニティ</string>
     <string name="title_translate_gnucash">GnuCash を翻訳</string>
-    <string name="summary_google_plus">アイデアを共有、変更を議論、または問題を報告</string>
     <string name="summary_translate_gnucash">CrowdIn で翻訳または検証します</string>
     <string name="toast_no_compatible_apps_to_receive_export">エクスポートされた取引を受け取る、互換性のあるアプリがありません!</string>
     <string name="menu_move_transaction">移動&#8230;</string>

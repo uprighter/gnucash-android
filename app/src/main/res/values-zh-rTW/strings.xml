@@ -48,7 +48,6 @@
     <string name="label_account_balance">合計：</string>
     <string name="label_export_destination">匯出至：</string>
     <string name="title_export_dialog">匯出交易資料</string>
-    <string name="hint_export_choice">預設情况下，自上次匯出後新增的交易才會被匯出。選擇此項後所有的交易都會被匯出。</string>
     <string name="toast_export_error">匯出%1$s發生錯誤</string>
     <string name="btn_export">匯出</string>
     <string name="option_delete_after_export">匯出後刪除交易記錄</string>
@@ -56,8 +55,6 @@
     <string name="title_settings">設置</string>
     <string-array name="export_destinations">
         <item>另存為&#8230;</item>
-        <item>Dropbox</item>
-        <item>ownCloud</item>
         <item>傳送到&#8230;</item>
     </string-array>
     <string name="btn_move">移動</string>
@@ -171,6 +168,7 @@
         <item>貿易</item>
     </string-array>
     <string-array name="export_formats">
+        <item>CSV</item>
         <item>QIF</item>
         <item>OFX</item>
         <item>XML</item>
@@ -245,8 +243,6 @@
     <string name="title_dropbox_sync_preference">啟用 DropBox</string>
     <string name="title_owncloud_sync_preference">啟用 ownCloud </string>
     <string name="title_backup_preference_category">備份</string>
-    <string name="summary_dropbox_sync">啟用匯出到 DropBox</string>
-    <string name="summary_owncloud_sync">啟用匯出到 ownCloud</string>
     <string name="title_backup_prefs">備份設置</string>
     <string name="title_create_backup_pref">建立備份</string>
     <string name="summary_create_backup_pref">Create a backup of the active book</string>
@@ -263,14 +259,6 @@
     <string name="nav_menu_settings">設置</string>
     <string name="username">帳號</string>
     <string name="password">密碼</string>
-    <string name="owncloud_pref">ownCloud</string>
-    <string name="owncloud_server">https://</string>
-    <string name="owncloud_server_invalid">沒有找到 ownCloud 伺服器</string>
-    <string name="owncloud_user_invalid">帳號/密碼無效</string>
-    <string name="owncloud_dir_invalid">無效字元: \\ &lt; &gt; : \&quot; | * ? </string>
-    <string name="owncloud_server_ok">OC server OK</string>
-    <string name="owncloud_user_ok">OC username/password OK</string>
-    <string name="owncloud_dir_ok">Dir name OK</string>
     <plurals name="label_every_x_hours">
         <item quantity="other">每 %d 個小時</item>
     </plurals>
@@ -350,7 +338,6 @@ No user-identifiable information will be collected as part of this process!
     <string name="label_balance_sheet_total">總計</string>
     <string name="title_google_plus_community">Google+ 社群</string>
     <string name="title_translate_gnucash">翻譯GnuCash</string>
-    <string name="summary_google_plus">在Google+上提交问题和建议</string>
     <string name="summary_translate_gnucash">在CrowdIn上協助翻譯或校對GnuCash</string>
     <string name="toast_no_compatible_apps_to_receive_export">没有合适的应用接收汇出的文档</string>
     <string name="menu_move_transaction">移動...</string>
