@@ -18,7 +18,6 @@ package org.gnucash.android.ui.settings;
 
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -29,12 +28,10 @@ import android.widget.ArrayAdapter;
 
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.preference.CheckBoxPreference;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.PreferenceManager;
 
-import com.dropbox.core.android.Auth;
 import com.google.android.material.snackbar.Snackbar;
 
 import org.gnucash.android.R;
@@ -59,30 +56,14 @@ public class BackupPreferenceFragment extends PreferenceFragmentCompat implement
         Preference.OnPreferenceClickListener, Preference.OnPreferenceChangeListener {
 
     /**
-     * Collects references to the UI elements and binds click listeners
+     * String for tagging log statements
      */
-    private static final int REQUEST_LINK_TO_DBX = 0x11;
-    public static final int REQUEST_RESOLVE_CONNECTION = 0x12;
+    public static final String LOG_TAG = "BackupPreferenceFragment";
 
     /**
      * Request code for the backup file where to save backups
      */
     private static final int REQUEST_BACKUP_FILE = 0x13;
-
-    /**
-     * Testing app key for DropBox API
-     */
-    final static public String DROPBOX_APP_KEY = "dhjh8ke9wf05948";
-
-    /**
-     * Testing app secret for DropBox API
-     */
-    final static public String DROPBOX_APP_SECRET = "h2t9fphj3nr4wkw";
-
-    /**
-     * String for tagging log statements
-     */
-    public static final String LOG_TAG = "BackupPrefFragment";
 
     @Override
     public void onCreatePreferences(Bundle bundle, String s) {
@@ -103,8 +84,6 @@ public class BackupPreferenceFragment extends PreferenceFragmentCompat implement
     public void onResume() {
         super.onResume();
         SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(getActivity());
-
-        //if we are returning from DropBox authentication, save the key which was generated
 
         String keyDefaultEmail = getString(R.string.key_default_export_email);
         Preference pref = findPreference(keyDefaultEmail);
@@ -134,10 +113,6 @@ public class BackupPreferenceFragment extends PreferenceFragmentCompat implement
         if (defaultBackupLocation != null) {
             pref.setSummary(Uri.parse(defaultBackupLocation).getAuthority());
         }
-
-        pref = findPreference(getString(R.string.key_dropbox_sync));
-        pref.setOnPreferenceClickListener(this);
-        toggleDropboxPreference(pref);
     }
 
     @Override
@@ -155,11 +130,6 @@ public class BackupPreferenceFragment extends PreferenceFragmentCompat implement
             String bookName = BooksDbAdapter.getInstance().getActiveBookDisplayName();
             createIntent.putExtra(Intent.EXTRA_TITLE, Exporter.sanitizeFilename(bookName) + "_" + getString(R.string.label_backup_filename));
             startActivityForResult(createIntent, REQUEST_BACKUP_FILE);
-        }
-
-        if (key.equals(getString(R.string.key_dropbox_sync))) {
-            toggleDropboxSync();
-            toggleDropboxPreference(preference);
         }
 
         if (key.equals(getString(R.string.key_create_backup))) {
@@ -199,32 +169,6 @@ public class BackupPreferenceFragment extends PreferenceFragmentCompat implement
             }
         }
         return true;
-    }
-
-
-    /**
-     * Toggles the checkbox of the DropBox Sync preference if a DropBox account is linked
-     *
-     * @param pref DropBox Sync preference
-     */
-    public void toggleDropboxPreference(Preference pref) {
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getActivity());
-        String accessToken = prefs.getString(getString(R.string.key_dropbox_access_token), null);
-        ((CheckBoxPreference) pref).setChecked(accessToken != null);
-    }
-
-    /**
-     * Toggles the authorization state of a DropBox account.
-     * If a link exists, it is removed else DropBox authorization is started
-     */
-    private void toggleDropboxSync() {
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getActivity());
-        String accessToken = prefs.getString(getString(R.string.key_dropbox_access_token), null);
-        if (accessToken == null) {
-            Auth.startOAuth2Authentication(getActivity(), getString(R.string.dropbox_app_key));
-        } else {
-            prefs.edit().remove(getString(R.string.key_dropbox_access_token)).apply();
-        }
     }
 
     /**
@@ -304,23 +248,6 @@ public class BackupPreferenceFragment extends PreferenceFragmentCompat implement
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         switch (requestCode) {
-
-            case REQUEST_LINK_TO_DBX:
-                Preference preference = findPreference(getString(R.string.key_dropbox_sync));
-                if (preference == null) //if we are in a preference header fragment, this may return null
-                    break;
-                toggleDropboxPreference(preference);
-                break;
-
-            case REQUEST_RESOLVE_CONNECTION:
-                if (resultCode == Activity.RESULT_OK) {
-                    Preference pref = findPreference(getString(R.string.key_dropbox_sync));
-                    if (pref == null) //if we are in a preference header fragment, this may return null
-                        break;
-                    toggleDropboxPreference(pref);
-                }
-                break;
-
             case REQUEST_BACKUP_FILE:
                 if (resultCode == Activity.RESULT_OK) {
                     Uri backupFileUri = null;

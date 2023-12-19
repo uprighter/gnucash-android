@@ -48,7 +48,6 @@
     <string name="label_account_balance">Saldo:</string>
     <string name="label_export_destination">Ekspor ke:</string>
     <string name="title_export_dialog">Ekspor Transaksi</string>
-    <string name="hint_export_choice">Secara default, hanya transaksi baru sejak ekspor terakhir yang akan diekspor. Beri centang pilihan ini untuk mengekspor semua transaksi</string>
     <string name="toast_export_error">Kesalahan mengekspor file %1$s</string>
     <string name="btn_export">Ekspor</string>
     <string name="option_delete_after_export">Hapus transaksi setelah mengekspor</string>
@@ -56,8 +55,6 @@
     <string name="title_settings">Pengaturan</string>
     <string-array name="export_destinations">
         <item>Simpan sbg&#8230;</item>
-        <item>Dropbox</item>
-        <item>ownCloud</item>
         <item>Kirim ke&#8230;</item>
     </string-array>
     <string name="btn_move">Pindahkan</string>
@@ -167,6 +164,7 @@
         <item>PERDAGANGAN</item>
     </string-array>
     <string-array name="export_formats">
+        <item>CSV</item>
         <item>QIF</item>
         <item>OFX</item>
         <item>XML</item>
@@ -244,8 +242,6 @@
     <string name="title_dropbox_sync_preference">Aktifkan DropBox</string>
     <string name="title_owncloud_sync_preference">Aktifkan ownCloud </string>
     <string name="title_backup_preference_category">Cadangan</string>
-    <string name="summary_dropbox_sync">Aktifkan mengekspor ke DropBox</string>
-    <string name="summary_owncloud_sync">Aktifkan mengekspor ke ownCloud</string>
     <string name="title_backup_prefs">Pengaturan Cadangan</string>
     <string name="title_create_backup_pref">Membuat Cadangan</string>
     <string name="summary_create_backup_pref">Buat cadangan dari pembukuan yang aktif</string>
@@ -263,16 +259,6 @@
     <string name="nav_menu_settings">Pengaturan</string>
     <string name="username">Nama Pengguna</string>
     <string name="password">Kata Sandi</string>
-    <string name="owncloud_pref">owncloud</string>
-    <string name="owncloud_server">https://</string>
-    <string name="owncloud_server_invalid">Server OC tidak ditemukan</string>
-    <string name="owncloud_user_invalid">Username / kata kunci OC tidak valid
- </string>
-    <string name="owncloud_dir_invalid">Karakter tidak valid: \\ &lt; &gt; : \&quot; | * ? </string>
-    <string name="owncloud_server_ok">Server OC OK</string>
-    <string name="owncloud_user_ok">OC username / password OK
- </string>
-    <string name="owncloud_dir_ok">Nama Dir OK</string>
     <plurals name="label_every_x_hours">
         <item quantity="other">Per jam</item>
     </plurals>
@@ -359,7 +345,6 @@
     <string name="label_balance_sheet_total">Jumlah:</string>
     <string name="title_google_plus_community">Komunitas Google+</string>
     <string name="title_translate_gnucash">Menerjemahkan GnuCash</string>
-    <string name="summary_google_plus">Berbagi ide-ide, mendiskusikan perubahan atau melaporkan masalah</string>
     <string name="summary_translate_gnucash">Menerjemahkan atau bukti dibaca pada CrowdIn</string>
     <string name="toast_no_compatible_apps_to_receive_export">Tidak ada aplikasi yang kompatibel untuk menerima transaksi diekspor!</string>
     <string name="menu_move_transaction">Bergerak&#8230;</string>

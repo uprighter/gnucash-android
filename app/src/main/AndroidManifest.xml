@@ -105,19 +105,7 @@
             android:theme="@style/Theme.GnucashTheme" />
         <activity android:name=".ui.settings.PreferenceActivity"
             android:theme="@style/Theme.GnucashTheme" />
-        <activity
-            android:name="com.dropbox.core.android.AuthActivity"
-            android:launchMode="singleTask"
-            android:configChanges="orientation|keyboard"
-            android:exported="true">
-            <intent-filter>
-                <!-- Change this to be db- followed by your app key -->
-                <data android:scheme="@string/manifest_dropbox_app_key" />
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.BROWSABLE"/>
-                <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
-        </activity>
+
         <service android:name=".service.ScheduledActionService"
             android:exported="false"
             android:permission="android.permission.BIND_JOB_SERVICE"

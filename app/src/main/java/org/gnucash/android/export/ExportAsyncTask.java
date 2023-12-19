@@ -32,8 +32,6 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.core.content.FileProvider;
 
-import com.dropbox.core.v2.DbxClientV2;
-import com.dropbox.core.v2.files.FileMetadata;
 import com.google.firebase.crashlytics.FirebaseCrashlytics;
 
 import org.gnucash.android.R;
@@ -54,7 +52,6 @@ import org.gnucash.android.ui.transaction.TransactionsActivity;
 import org.gnucash.android.util.BackupManager;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.text.SimpleDateFormat;
@@ -231,10 +228,6 @@ public class ExportAsyncTask extends AsyncTask<ExportParams, Void, Boolean> {
                 shareFiles(mExportedFiles);
                 break;
 
-            case DROPBOX:
-                moveExportToDropbox();
-                break;
-
             case URI:
                 moveExportToUri();
                 break;
@@ -264,33 +257,6 @@ public class ExportAsyncTask extends AsyncTask<ExportParams, Void, Boolean> {
                 org.gnucash.android.util.FileUtils.moveFile(mExportedFiles.get(0), outputStream);
             } catch (IOException ex) {
                 throw new Exporter.ExporterException(mExportParams, "Error when moving file to URI");
-            }
-        }
-    }
-
-    /**
-     * Move the exported files (in the cache directory) to Dropbox
-     */
-    private void moveExportToDropbox() {
-        Log.i(TAG, "Uploading exported files to DropBox");
-
-        DbxClientV2 dbxClient = DropboxHelper.getClient();
-
-        for (String exportedFilePath : mExportedFiles) {
-            File exportedFile = new File(exportedFilePath);
-            try {
-                FileInputStream inputStream = new FileInputStream(exportedFile);
-                FileMetadata metadata = dbxClient.files()
-                        .uploadBuilder("/" + exportedFile.getName())
-                        .uploadAndFinish(inputStream);
-                Log.i(TAG, "Successfully uploaded file " + metadata.getName() + " to DropBox");
-                inputStream.close();
-                exportedFile.delete(); //delete file to prevent cache accumulation
-            } catch (IOException e) {
-                FirebaseCrashlytics.getInstance().recordException(e);
-                Log.e(TAG, e.getMessage());
-            } catch (com.dropbox.core.DbxException e) {
-                e.printStackTrace();
             }
         }
     }
@@ -385,24 +351,8 @@ public class ExportAsyncTask extends AsyncTask<ExportParams, Void, Boolean> {
             case SD_CARD:
                 targetLocation = "SD card";
                 break;
-            case DROPBOX:
-                targetLocation = "DropBox -> Apps -> GnuCash";
-                break;
             case GOOGLE_DRIVE:
                 targetLocation = "Google Drive -> " + mContext.getString(R.string.app_name);
-                break;
-            case OWNCLOUD:
-                targetLocation = mContext.getSharedPreferences(
-                        mContext.getString(R.string.owncloud_pref),
-                        Context.MODE_PRIVATE).getBoolean(
-                        mContext.getString(R.string.owncloud_sync), false) ?
-
-                        "ownCloud -> " +
-                                mContext.getSharedPreferences(
-                                        mContext.getString(R.string.owncloud_pref),
-                                        Context.MODE_PRIVATE).getString(
-                                        mContext.getString(R.string.key_owncloud_dir), null) :
-                        "ownCloud sync not enabled";
                 break;
             default:
                 targetLocation = mContext.getString(R.string.label_export_target_external_service);

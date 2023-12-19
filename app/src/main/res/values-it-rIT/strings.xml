@@ -48,7 +48,6 @@
     <string name="label_account_balance">Bilancio:</string>
     <string name="label_export_destination">Esporta su:</string>
     <string name="title_export_dialog">Esporta transazioni</string>
-    <string name="hint_export_choice">Per impostazione predefinita, verranno esportate solo le transazioni dall\'ultima esportazione. Selezionare questa opzione per esportare tutte le transazioni</string>
     <string name="toast_export_error">Errore nell\'esportazione del file %1$s</string>
     <string name="btn_export">Esporta</string>
     <string name="option_delete_after_export">Elimina le transazioni dopo l\'esportazione</string>
@@ -56,8 +55,6 @@
     <string name="title_settings">Impostazioni</string>
     <string-array name="export_destinations">
         <item>Salva con nome&#8230;</item>
-        <item>Dropbox</item>
-        <item>ownCloud</item>
         <item>Invia a&#8230;</item>
     </string-array>
     <string name="btn_move">Sposta</string>
@@ -172,6 +169,7 @@
         <item>TRADING</item>
     </string-array>
     <string-array name="export_formats">
+        <item>CSV</item>
         <item>QIF</item>
         <item>OFX</item>
         <item>XML</item>
@@ -247,8 +245,6 @@
     <string name="title_dropbox_sync_preference">Abilita DropBox</string>
     <string name="title_owncloud_sync_preference">Abilita ownCloud </string>
     <string name="title_backup_preference_category">Backup</string>
-    <string name="summary_dropbox_sync">Attiva l\'esportazione su DropBox</string>
-    <string name="summary_owncloud_sync">Attiva l\'esportazione su ownCloud</string>
     <string name="title_backup_prefs">Preferenze di backup</string>
     <string name="title_create_backup_pref">Crea backup</string>
     <string name="summary_create_backup_pref">Crea un backup del libro attivo</string>
@@ -265,14 +261,6 @@
     <string name="nav_menu_settings">Impostazioni</string>
     <string name="username">Nome utente</string>
     <string name="password">Password</string>
-    <string name="owncloud_pref">owncloud</string>
-    <string name="owncloud_server">https://</string>
-    <string name="owncloud_server_invalid">Server OC non trovato</string>
-    <string name="owncloud_user_invalid">Nome utente/password OC non validi</string>
-    <string name="owncloud_dir_invalid">Caratteri non validi: \\ &lt; &gt; : \&quot; | * ? </string>
-    <string name="owncloud_server_ok">Server OC OK</string>
-    <string name="owncloud_user_ok">Nome utente/password OC OK</string>
-    <string name="owncloud_dir_ok">Nome directory OK</string>
     <plurals name="label_every_x_hours">
         <item quantity="one">Ogni ora</item>
         <item quantity="other">Ogni %d ore</item>
@@ -355,7 +343,6 @@
     <string name="label_balance_sheet_total">Totale:</string>
     <string name="title_google_plus_community">Community Google+</string>
     <string name="title_translate_gnucash">Traduzione di GnuCash</string>
-    <string name="summary_google_plus">Condivi idee, discuti dei cambiamenti o segnala dei problemi</string>
     <string name="summary_translate_gnucash">Traduci o revisiona su Crowdin</string>
     <string name="toast_no_compatible_apps_to_receive_export">Nessuna app compatibile con la ricezione delle transazioni esportate!</string>
     <string name="menu_move_transaction">Sposta&#8230;</string>

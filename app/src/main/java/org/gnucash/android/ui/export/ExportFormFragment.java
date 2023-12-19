@@ -57,7 +57,6 @@ import org.gnucash.android.app.GnuCashApplication;
 import org.gnucash.android.db.adapter.BooksDbAdapter;
 import org.gnucash.android.db.adapter.DatabaseAdapter;
 import org.gnucash.android.db.adapter.ScheduledActionDbAdapter;
-import org.gnucash.android.export.DropboxHelper;
 import org.gnucash.android.export.ExportAsyncTask;
 import org.gnucash.android.export.ExportFormat;
 import org.gnucash.android.export.ExportParams;
@@ -65,7 +64,6 @@ import org.gnucash.android.export.Exporter;
 import org.gnucash.android.model.BaseModel;
 import org.gnucash.android.model.ScheduledAction;
 import org.gnucash.android.ui.common.UxArgument;
-import org.gnucash.android.ui.settings.BackupPreferenceFragment;
 import org.gnucash.android.ui.transaction.TransactionFormFragment;
 import org.gnucash.android.ui.util.RecurrenceParser;
 import org.gnucash.android.ui.util.RecurrenceViewClickListener;
@@ -306,13 +304,12 @@ public class ExportFormFragment extends Fragment implements
     @Override
     public void onResume() {
         super.onResume();
-        DropboxHelper.retrieveAndSaveToken();
     }
 
     @Override
     public void onPause() {
         super.onPause();
-        // When the user try to export sharing to 3rd party service like DropBox
+        // When the user try to export sharing to 3rd party service
         // then pausing all activities. That cause passcode screen appearing happened.
         // We use a disposable flag to skip this unnecessary passcode screen.
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getActivity());
@@ -384,10 +381,7 @@ public class ExportFormFragment extends Fragment implements
                         if (mExportUri != null)
                             setExportUriText(mExportUri.toString());
                         break;
-                    case 1: //DROPBOX
-                        setExportUriText(getString(R.string.label_dropbox_export_destination));
-                        break;
-                    case 2: //Share File
+                    case 1: //Share File
                         setExportUriText(getString(R.string.label_select_destination_after_export));
                         mExportTarget = ExportParams.ExportTarget.SHARING;
                         mRecurrenceOptionsView.setVisibility(View.GONE);
@@ -476,7 +470,7 @@ public class ExportFormFragment extends Fragment implements
             }
         });
 
-        mExportAllSwitch.setChecked(sharedPrefs.getBoolean(getString(R.string.key_export_all_transactions), false));
+        mExportAllSwitch.setChecked(sharedPrefs.getBoolean(getString(R.string.key_export_all_transactions), true));
         mDeleteAllCheckBox.setChecked(sharedPrefs.getBoolean(getString(R.string.key_delete_transactions_after_export), false));
 
         mRecurrenceTextView.setOnClickListener(new RecurrenceViewClickListener((AppCompatActivity) getActivity(), mRecurrenceRule, this));
@@ -576,9 +570,6 @@ public class ExportFormFragment extends Fragment implements
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
 
         switch (requestCode) {
-            case BackupPreferenceFragment.REQUEST_RESOLVE_CONNECTION:
-                break;
-
             case REQUEST_EXPORT_FILE:
                 if (resultCode == Activity.RESULT_OK) {
                     if (data != null) {

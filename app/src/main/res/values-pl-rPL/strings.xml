@@ -48,7 +48,6 @@
     <string name="label_account_balance">Saldo:</string>
     <string name="label_export_destination">Wyeksportuj do:</string>
     <string name="title_export_dialog">Eksport transakcji</string>
-    <string name="hint_export_choice">Domyślnie tylko nowe transakcje od ostatniego eksportu, zostaną wyeksportowane. Zaznacz tą opcję, aby eksportować wszystkie transakcje</string>
     <string name="toast_export_error">Błąd eksportowania pliku %1$s</string>
     <string name="btn_export">Eksportuj</string>
     <string name="option_delete_after_export">Usuń transakcje po eksporcie</string>
@@ -56,8 +55,6 @@
     <string name="title_settings">Ustawienia</string>
     <string-array name="export_destinations">
         <item>Save As&#8230;</item>
-        <item>Dropbox</item>
-        <item>ownCloud</item>
         <item>Send to&#8230;</item>
     </string-array>
     <string name="btn_move">Przenieś</string>
@@ -173,6 +170,7 @@ Konto docelowe używa innej waluty niż konto wyjściowe</string>
         <item>Handlowy</item>
     </string-array>
     <string-array name="export_formats">
+        <item>CSV</item>
         <item>QIF</item>
         <item>OFX</item>
         <item>XML</item>
@@ -247,8 +245,6 @@ Konto docelowe używa innej waluty niż konto wyjściowe</string>
     <string name="title_dropbox_sync_preference">Enable DropBox</string>
     <string name="title_owncloud_sync_preference">Enable ownCloud </string>
     <string name="title_backup_preference_category">Kopia zapasowa</string>
-    <string name="summary_dropbox_sync">Enable exporting to DropBox</string>
-    <string name="summary_owncloud_sync">Enable exporting to ownCloud</string>
     <string name="title_backup_prefs">Ustawienia kopii zapasowej</string>
     <string name="title_create_backup_pref">Utwórz kopię zapasową</string>
     <string name="summary_create_backup_pref">Create a backup of the active book</string>
@@ -265,14 +261,6 @@ Konto docelowe używa innej waluty niż konto wyjściowe</string>
     <string name="nav_menu_settings">Ustawienia</string>
     <string name="username">User Name</string>
     <string name="password">Password</string>
-    <string name="owncloud_pref">owncloud</string>
-    <string name="owncloud_server">https://</string>
-    <string name="owncloud_server_invalid">OC server not found</string>
-    <string name="owncloud_user_invalid">OC username/password invalid</string>
-    <string name="owncloud_dir_invalid">Invalid chars: \\ &lt; &gt; : \&quot; | * ? </string>
-    <string name="owncloud_server_ok">OC server OK</string>
-    <string name="owncloud_user_ok">OC username/password OK</string>
-    <string name="owncloud_dir_ok">Dir name OK</string>
     <plurals name="label_every_x_hours">
         <item quantity="one">Hourly</item>
         <item quantity="few">Every %d hours</item>
@@ -361,7 +349,6 @@ Konto docelowe używa innej waluty niż konto wyjściowe</string>
     <string name="label_balance_sheet_total">Suma:</string>
     <string name="title_google_plus_community">Społeczność Google+</string>
     <string name="title_translate_gnucash">Tłumacz GnuCash</string>
-    <string name="summary_google_plus">Udostępnij pomysły, przedyskutuj zmiany lub zgłoś problem</string>
     <string name="summary_translate_gnucash">Tłumacz lub sprawdzaj na Crowdin</string>
     <string name="toast_no_compatible_apps_to_receive_export">Brak kompatybilnych aplikacji do otrzymania eksportowanych transakcji!</string>
     <string name="menu_move_transaction">Move&#8230;</string>
