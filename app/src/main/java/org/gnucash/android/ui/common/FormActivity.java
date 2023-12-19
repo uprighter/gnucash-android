@@ -18,10 +18,10 @@ package org.gnucash.android.ui.common;
 
 import android.content.Intent;
 import android.graphics.drawable.ColorDrawable;
-import android.os.Build;
 import android.os.Bundle;
 import android.view.MenuItem;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.widget.Toolbar;
 import androidx.fragment.app.Fragment;
@@ -68,7 +68,7 @@ public class FormActivity extends PasscodeLockActivity {
             BookUtils.activateBook(bookUID);
         }
 
-        Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+        Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
         ActionBar actionBar = getSupportActionBar();
@@ -88,48 +88,41 @@ public class FormActivity extends PasscodeLockActivity {
         if (mAccountUID != null) {
             int colorCode = AccountsDbAdapter.getActiveAccountColorResource(mAccountUID);
             actionBar.setBackgroundDrawable(new ColorDrawable(colorCode));
-            if (Build.VERSION.SDK_INT > 20)
-                getWindow().setStatusBarColor(GnuCashApplication.darken(colorCode));
+            getWindow().setStatusBarColor(GnuCashApplication.darken(colorCode));
         }
         switch (formType) {
-            case ACCOUNT:
-                showAccountFormFragment(intent.getExtras());
-                break;
-
-            case TRANSACTION:
-                showTransactionFormFragment(intent.getExtras());
-                break;
-
-            case EXPORT:
-                showExportFormFragment(null);
-                break;
-
-            case SPLIT_EDITOR:
-                showSplitEditorFragment(intent.getExtras());
-                break;
-
-            case BUDGET:
-                showBudgetFormFragment(intent.getExtras());
-                break;
-
-            case BUDGET_AMOUNT_EDITOR:
-                showBudgetAmountEditorFragment(intent.getExtras());
-                break;
-
-            default:
-                throw new IllegalArgumentException("No form display type specified");
+            case ACCOUNT -> showAccountFormFragment(intent.getExtras());
+            case TRANSACTION -> showTransactionFormFragment(intent.getExtras());
+            case EXPORT -> showExportFormFragment(intent.getExtras());
+            case SPLIT_EDITOR -> showSplitEditorFragment(intent.getExtras());
+            case BUDGET -> showBudgetFormFragment(intent.getExtras());
+            case BUDGET_AMOUNT_EDITOR -> showBudgetAmountEditorFragment(intent.getExtras());
+            default -> throw new IllegalArgumentException("No form display type specified");
         }
 
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                // Back is pressed... Finishing the activity
+                boolean eventProcessed = false;
 
+                if (mOnBackListener != null) {
+                    eventProcessed = mOnBackListener.onBackPressed();
+                }
+
+                if (!eventProcessed) {
+                    finish();
+                }
+            }
+        });
     }
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        switch (item.getItemId()) {
-            case android.R.id.home:
-                setResult(RESULT_CANCELED);
-                finish();
-                return true;
+        if (item.getItemId() == android.R.id.home) {
+            setResult(RESULT_CANCELED);
+            finish();
+            return true;
         }
 
         return super.onOptionsItemSelected(item);
@@ -229,16 +222,4 @@ public class FormActivity extends PasscodeLockActivity {
     public void setOnBackListener(CalculatorKeyboard keyboard) {
         mOnBackListener = keyboard;
     }
-
-    @Override
-    public void onBackPressed() {
-        boolean eventProcessed = false;
-
-        if (mOnBackListener != null)
-            eventProcessed = mOnBackListener.onBackPressed();
-
-        if (!eventProcessed)
-            super.onBackPressed();
-    }
-
 }

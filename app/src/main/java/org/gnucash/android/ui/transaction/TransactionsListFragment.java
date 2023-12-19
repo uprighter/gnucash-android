@@ -16,6 +16,7 @@
 
 package org.gnucash.android.ui.transaction;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
@@ -40,7 +41,6 @@ import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.PopupMenu;
 import androidx.fragment.app.Fragment;
-import androidx.fragment.app.FragmentResultListener;
 import androidx.loader.app.LoaderManager;
 import androidx.loader.content.Loader;
 import androidx.recyclerview.widget.GridLayoutManager;
@@ -73,6 +73,7 @@ import org.gnucash.android.ui.util.widget.EmptyRecyclerView;
 import org.gnucash.android.util.BackupManager;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * List Fragment for displaying list of transactions for an account
@@ -112,11 +113,11 @@ public class TransactionsListFragment extends Fragment implements
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setHasOptionsMenu(true);
-        Bundle args = getArguments();
+        Bundle args = requireArguments();
         mAccountUID = args.getString(UxArgument.SELECTED_ACCOUNT_UID);
 
         mUseCompactView = PreferenceActivity.getActiveBookSharedPreferences()
-                .getBoolean(getActivity().getString(R.string.key_use_compact_list), !GnuCashApplication.isDoubleEntryEnabled());
+                .getBoolean(requireActivity().getString(R.string.key_use_compact_list), !GnuCashApplication.isDoubleEntryEnabled());
         //if there was a local override of the global setting, respect it
         if (savedInstanceState != null) {
             mUseCompactView = savedInstanceState.getBoolean(getString(R.string.key_use_compact_list), mUseCompactView);
@@ -163,8 +164,8 @@ public class TransactionsListFragment extends Fragment implements
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        ActionBar aBar = ((AppCompatActivity) getActivity()).getSupportActionBar();
-        aBar.setDisplayShowTitleEnabled(false);
+        ActionBar aBar = ((AppCompatActivity) requireActivity()).getSupportActionBar();
+        Objects.requireNonNull(aBar).setDisplayShowTitleEnabled(false);
         aBar.setDisplayHomeAsUpEnabled(true);
 
         mTransactionRecyclerAdapter = new TransactionRecyclerAdapter(null);
@@ -195,7 +196,7 @@ public class TransactionsListFragment extends Fragment implements
     @Override
     public void onResume() {
         super.onResume();
-        ((TransactionsActivity) getActivity()).updateNavigationSelection();
+        ((TransactionsActivity) requireActivity()).updateNavigationSelection();
         refresh();
     }
 
@@ -238,6 +239,7 @@ public class TransactionsListFragment extends Fragment implements
         return new TransactionsCursorLoader(getActivity(), mAccountUID);
     }
 
+    @SuppressLint("NotifyDataSetChanged")
     @Override
     public void onLoadFinished(@NonNull Loader<Cursor> loader, Cursor cursor) {
         Log.d(LOG_TAG, "Transactions loader finished. Swapping in cursor");
@@ -315,12 +317,7 @@ public class TransactionsListFragment extends Fragment implements
             String dateText = TransactionsActivity.getPrettyDateFormat(getActivity(), dateMillis);
 
             final long id = holder.transactionId;
-            holder.itemView.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    onListItemClick(id);
-                }
-            });
+            holder.itemView.setOnClickListener(v -> onListItemClick(id));
 
             if (mUseCompactView) {
                 holder.secondaryText.setText(dateText);
@@ -342,18 +339,20 @@ public class TransactionsListFragment extends Fragment implements
                     text = splits.size() + " splits";
                 }
                 holder.secondaryText.setText(text);
-                holder.transactionDate.setText(dateText);
 
-                holder.editTransaction.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
+                if (holder.transactionDate != null) {
+                    holder.transactionDate.setText(dateText);
+                }
+
+                if (holder.editTransaction != null) {
+                    holder.editTransaction.setOnClickListener(v -> {
                         Intent formActivityIntent = new Intent(getActivity(), FormActivity.class);
                         formActivityIntent.putExtra(UxArgument.FORM_TYPE, FormActivity.FormType.TRANSACTION.name());
                         formActivityIntent.putExtra(UxArgument.SELECTED_TRANSACTION_UID, transactionUID);
                         formActivityIntent.putExtra(UxArgument.SELECTED_ACCOUNT_UID, mAccountUID);
                         launcher.launch(formActivityIntent);
-                    }
-                });
+                    });
+                }
             }
         }
 
@@ -396,15 +395,12 @@ public class TransactionsListFragment extends Fragment implements
                 }
 
                 primaryText.setTextSize(18);
-                optionsMenu.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        PopupMenu popup = new PopupMenu(getActivity(), v);
-                        popup.setOnMenuItemClickListener(ViewHolder.this);
-                        MenuInflater inflater = popup.getMenuInflater();
-                        inflater.inflate(R.menu.transactions_context_menu, popup.getMenu());
-                        popup.show();
-                    }
+                optionsMenu.setOnClickListener(v -> {
+                    PopupMenu popup = new PopupMenu(requireActivity(), v);
+                    popup.setOnMenuItemClickListener(ViewHolder.this);
+                    MenuInflater inflater = popup.getMenuInflater();
+                    inflater.inflate(R.menu.transactions_context_menu, popup.getMenu());
+                    popup.show();
                 });
             }
 
@@ -429,12 +425,9 @@ public class TransactionsListFragment extends Fragment implements
 
                     Log.d(LOG_TAG, "context_menu_move_transaction_" + mAccountUID);
                     getParentFragmentManager().setFragmentResultListener(
-                            "bulk_move_transactions_" + mAccountUID, TransactionsListFragment.this, new FragmentResultListener() {
-                                @Override
-                                public void onFragmentResult(@NonNull String requestKey, @NonNull Bundle bundle) {
-                                    Log.d(LOG_TAG, "onFragmentResult " + requestKey + ", " + bundle);
-                                    refresh();
-                                }
+                            "bulk_move_transactions_" + mAccountUID, TransactionsListFragment.this, (requestKey, bundle) -> {
+                                Log.d(LOG_TAG, "onFragmentResult " + requestKey + ", " + bundle);
+                                refresh();
                             });
                     fragment.show(getParentFragmentManager(), "bulk_move_transactions");
                     return true;

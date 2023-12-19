@@ -16,16 +16,17 @@
 package org.gnucash.android.ui.transaction;
 
 import android.os.Bundle;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
-import androidx.fragment.app.FragmentManager;
-import androidx.fragment.app.FragmentStatePagerAdapter;
+import androidx.fragment.app.FragmentActivity;
 import androidx.viewbinding.ViewBinding;
-import androidx.viewpager.widget.PagerAdapter;
-import androidx.viewpager.widget.ViewPager;
+import androidx.viewpager2.adapter.FragmentStateAdapter;
+import androidx.viewpager2.widget.ViewPager2;
 
 import com.google.android.material.tabs.TabLayout;
+import com.google.android.material.tabs.TabLayoutMediator;
 
 import org.gnucash.android.R;
 import org.gnucash.android.databinding.ActivityScheduledEventsBinding;
@@ -39,10 +40,14 @@ import org.gnucash.android.ui.common.BaseDrawerActivity;
  */
 public class ScheduledActionsActivity extends BaseDrawerActivity {
 
+    public static final String LOG_TAG = "ScheduledActionsActivity";
+
     public static final int INDEX_SCHEDULED_TRANSACTIONS = 0;
     public static final int INDEX_SCHEDULED_EXPORTS = 1;
+    public static final int MAX_SCHEDULED_ACTIONS = 2;
 
-    ViewPager mViewPager;
+    ViewPager2 mViewPager;
+    TabLayout mTabLayout;
 
     @Override
     public ViewBinding bindViews() {
@@ -53,6 +58,7 @@ public class ScheduledActionsActivity extends BaseDrawerActivity {
         mToolbarProgress = viewBinding.toolbarLayout.actionbarProgressIndicator.toolbarProgress;
 
         mViewPager = viewBinding.pager;
+        mTabLayout = viewBinding.tabLayout;
 
         return viewBinding;
     }
@@ -65,17 +71,26 @@ public class ScheduledActionsActivity extends BaseDrawerActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        TabLayout tabLayout = findViewById(R.id.tab_layout);
-        tabLayout.addTab(tabLayout.newTab().setText(R.string.title_scheduled_transactions));
-        tabLayout.addTab(tabLayout.newTab().setText(R.string.title_scheduled_exports));
-        tabLayout.setTabGravity(TabLayout.GRAVITY_FILL);
-
         //show the simple accounts list
-        PagerAdapter mPagerAdapter = new ScheduledActionsViewPager(getSupportFragmentManager());
+        FragmentStateAdapter mPagerAdapter = new ScheduledActionsViewPager(this);
         mViewPager.setAdapter(mPagerAdapter);
 
-        mViewPager.addOnPageChangeListener(new TabLayout.TabLayoutOnPageChangeListener(tabLayout));
-        tabLayout.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
+        mTabLayout.addTab(mTabLayout.newTab().setText(R.string.title_scheduled_transactions));
+        mTabLayout.addTab(mTabLayout.newTab().setText(R.string.title_scheduled_exports));
+        mTabLayout.setTabGravity(TabLayout.GRAVITY_FILL);
+        new TabLayoutMediator(mTabLayout, mViewPager,
+                (@NonNull TabLayout.Tab tab, int position) -> {
+                    Log.d(LOG_TAG, String.format("TabLayoutMediator, position %d, tab.getText()  %s.", position, tab.getText()));
+                        switch (position) {
+                            case INDEX_SCHEDULED_TRANSACTIONS ->
+                                    tab.setText(R.string.title_scheduled_transactions);
+                            case INDEX_SCHEDULED_EXPORTS ->
+                                    tab.setText(R.string.title_scheduled_exports);
+                        }
+                }
+        ).attach();
+
+        mTabLayout.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
             @Override
             public void onTabSelected(TabLayout.Tab tab) {
                 mViewPager.setCurrentItem(tab.getPosition());
@@ -91,43 +106,37 @@ public class ScheduledActionsActivity extends BaseDrawerActivity {
                 //nothing to see here, move along
             }
         });
-    }
 
+
+    }
 
     /**
      * View pager adapter for managing the scheduled action views
      */
-    private class ScheduledActionsViewPager extends FragmentStatePagerAdapter {
+    private static class ScheduledActionsViewPager extends FragmentStateAdapter {
 
-        public ScheduledActionsViewPager(FragmentManager fm) {
-            super(fm);
-        }
-
-        @Override
-        public CharSequence getPageTitle(int position) {
-            switch (position) {
-                case INDEX_SCHEDULED_TRANSACTIONS:
-                    return getString(R.string.title_scheduled_transactions);
-                case INDEX_SCHEDULED_EXPORTS:
-                    return getString(R.string.title_scheduled_exports);
-                default:
-                    return super.getPageTitle(position);
-            }
+        public ScheduledActionsViewPager(FragmentActivity fa) {
+            super(fa);
         }
 
         @Override
         @NonNull
-        public Fragment getItem(int position) {
-            if (position == INDEX_SCHEDULED_TRANSACTIONS ) {
-                return ScheduledActionsListFragment.getInstance(ScheduledAction.ActionType.TRANSACTION);
-            } else { // INDEX_SCHEDULED_EXPORTS
-                return ScheduledActionsListFragment.getInstance(ScheduledAction.ActionType.BACKUP);
+        public Fragment createFragment(int position) {
+            switch (position) {
+                case INDEX_SCHEDULED_TRANSACTIONS -> {
+                    return ScheduledActionsListFragment.getInstance(ScheduledAction.ActionType.TRANSACTION);
+                }
+                case INDEX_SCHEDULED_EXPORTS -> {
+                    return ScheduledActionsListFragment.getInstance(ScheduledAction.ActionType.BACKUP);
+                }
             }
+            Log.e(LOG_TAG, String.format("createFragment for position %d.", position));
+            return ScheduledActionsListFragment.getInstance(ScheduledAction.ActionType.BACKUP);
         }
 
         @Override
-        public int getCount() {
-            return 2;
+        public int getItemCount() {
+            return MAX_SCHEDULED_ACTIONS;
         }
     }
 }

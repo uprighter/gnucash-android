@@ -285,16 +285,16 @@ public class TransactionsActivity extends BaseDrawerActivity implements
 
         mIsPlaceholderAccount = mAccountsDbAdapter.isPlaceholderAccount(mAccountUID);
 
-        mTabLayout.addTab(mTabLayout.newTab().setText(R.string.section_header_subaccounts));
-        if (!mIsPlaceholderAccount) {
-            mTabLayout.addTab(mTabLayout.newTab().setText(R.string.section_header_transactions));
-        }
-
         setupActionBarNavigation();
 
         mPagerAdapter = new AccountViewPagerAdapter(this);
         mViewPager.setAdapter(mPagerAdapter);
         mViewPager.setUserInputEnabled(false); // Don't switch tab when user swipes left or right.
+
+        mTabLayout.addTab(mTabLayout.newTab().setText(R.string.section_header_subaccounts));
+        if (!mIsPlaceholderAccount) {
+            mTabLayout.addTab(mTabLayout.newTab().setText(R.string.section_header_transactions));
+        }
         new TabLayoutMediator(mTabLayout, mViewPager,
                 (@NonNull TabLayout.Tab tab, int position) -> {
                     Log.d(LOG_TAG, String.format("TabLayoutMediator, position %d, tab.getText()  %s.", position, tab.getText()));

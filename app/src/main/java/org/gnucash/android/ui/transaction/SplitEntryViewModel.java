@@ -18,6 +18,7 @@ import org.gnucash.android.ui.util.widget.TransactionTypeSwitch;
 
 import java.math.BigDecimal;
 import java.util.Locale;
+import java.util.Objects;
 
 public class SplitEntryViewModel extends BaseObservable {
     public static final String LOG_TAG = "SplitEntryViewModel";
@@ -56,7 +57,7 @@ public class SplitEntryViewModel extends BaseObservable {
         this.mSplitAmountEditText = splitAmountEditText;
         this.mSplitTypeSwitch = splitTypeSwitch;
         if (mSplit != null) {
-            setSplitCurrencySymbol(mSplit.getValue().getCommodity().getSymbol());
+            setSplitCurrencySymbol(Objects.requireNonNull(Objects.requireNonNull(mSplit.getValue()).getCommodity()).getSymbol());
             setSplitUid(mSplit.getUID());
 
             String splitAccountUID = mSplit.getAccountUID();

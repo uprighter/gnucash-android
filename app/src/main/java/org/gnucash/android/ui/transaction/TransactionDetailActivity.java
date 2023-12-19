@@ -38,6 +38,7 @@ import org.gnucash.android.ui.passcode.PasscodeLockActivity;
 import java.text.DateFormat;
 import java.util.Date;
 import java.util.MissingFormatArgumentException;
+import java.util.Objects;
 
 /**
  * Activity for displaying transaction information
@@ -64,9 +65,7 @@ public class TransactionDetailActivity extends PasscodeLockActivity {
     FloatingActionButton mFabEditTransaction;
     private final ActivityResultLauncher<Intent> launcher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
-            result -> {
-                Log.d(LOG_TAG, "launch createTransactionIntent: result = " + result);
-            }
+            result -> Log.d(LOG_TAG, "launch createTransactionIntent: result = " + result)
     );
 
     private String mTransactionUID;
@@ -169,8 +168,8 @@ public class TransactionDetailActivity extends PasscodeLockActivity {
         boolean useDoubleEntry = GnuCashApplication.isDoubleEntryEnabled();
         LayoutInflater inflater = LayoutInflater.from(this);
         for (Split split : transaction.getSplits()) {
-            if (!useDoubleEntry && split.getAccountUID().equals(
-                    accountsDbAdapter.getImbalanceAccountUID(split.getValue().getCommodity()))) {
+            if (!useDoubleEntry &&
+                    accountsDbAdapter.getImbalanceAccountUID(Objects.requireNonNull(split.getValue()).getCommodity()).equals(split.getAccountUID())) {
                 //do not show imbalance accounts for single entry use case
                 continue;
             }
