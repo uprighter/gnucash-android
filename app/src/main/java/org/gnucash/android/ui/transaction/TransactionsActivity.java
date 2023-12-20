@@ -527,12 +527,12 @@ public class TransactionsActivity extends BaseDrawerActivity implements
 
     @Override
     public void editTransaction(String transactionUID) {
-        Intent createTransactionIntent = new Intent(this.getApplicationContext(), FormActivity.class);
-        createTransactionIntent.setAction(Intent.ACTION_INSERT_OR_EDIT);
-        createTransactionIntent.putExtra(UxArgument.SELECTED_ACCOUNT_UID, mAccountUID);
-        createTransactionIntent.putExtra(UxArgument.SELECTED_TRANSACTION_UID, transactionUID);
-        createTransactionIntent.putExtra(UxArgument.FORM_TYPE, FormActivity.FormType.TRANSACTION.name());
-        launcher.launch(createTransactionIntent);
+        Intent editTransactionIntent = new Intent(this.getApplicationContext(), FormActivity.class);
+        editTransactionIntent.setAction(Intent.ACTION_INSERT_OR_EDIT);
+        editTransactionIntent.putExtra(UxArgument.SELECTED_ACCOUNT_UID, mAccountUID);
+        editTransactionIntent.putExtra(UxArgument.SELECTED_TRANSACTION_UID, transactionUID);
+        editTransactionIntent.putExtra(UxArgument.FORM_TYPE, FormActivity.FormType.TRANSACTION.name());
+        launcher.launch(editTransactionIntent);
     }
 
     @Override

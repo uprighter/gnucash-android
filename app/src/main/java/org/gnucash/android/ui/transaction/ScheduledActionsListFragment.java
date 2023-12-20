@@ -94,7 +94,7 @@ public class ScheduledActionsListFragment extends ListFragment implements
 
     private ScheduledAction.ActionType mActionType = ScheduledAction.ActionType.TRANSACTION;
 
-    private final ActivityResultLauncher<Intent> launcher = registerForActivityResult(
+    private final ActivityResultLauncher<Intent> addScheduledExportLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
             result -> {
                 Log.d(LOG_TAG, "launch intent: result = " + result);
@@ -103,7 +103,6 @@ public class ScheduledActionsListFragment extends ListFragment implements
                 }
             }
     );
-
 
     /**
      * Callbacks for the menu items in the Context ActionBar (CAB) in action mode
@@ -257,9 +256,9 @@ public class ScheduledActionsListFragment extends ListFragment implements
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         if (item.getItemId() == R.id.menu_add_scheduled_export) {
-            Intent intent = new Intent(getActivity(), FormActivity.class);
-            intent.putExtra(UxArgument.FORM_TYPE, FormActivity.FormType.EXPORT.name());
-            launcher.launch(intent);
+            Intent addScheduledExportIntent = new Intent(getActivity(), FormActivity.class);
+            addScheduledExportIntent.putExtra(UxArgument.FORM_TYPE, FormActivity.FormType.EXPORT.name());
+            addScheduledExportLauncher.launch(addScheduledExportIntent);
             return true;
         }
         return super.onOptionsItemSelected(item);
