@@ -251,7 +251,7 @@ public class TransactionFormFragment extends Fragment implements
      */
     private Money mSplitQuantity;
 
-    private final ActivityResultLauncher<Intent> launcher = registerForActivityResult(
+    private final ActivityResultLauncher<Intent> openSplitEditorLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
             result -> {
                 Log.d(LOG_TAG, "launch intent: result = " + result);
@@ -643,12 +643,12 @@ public class TransactionFormFragment extends Fragment implements
             baseAmountString = biggestAmount.toPlainString();
         }
 
-        Intent intent = new Intent(getActivity(), FormActivity.class);
-        intent.putExtra(UxArgument.FORM_TYPE, FormActivity.FormType.SPLIT_EDITOR.name());
-        intent.putExtra(UxArgument.SELECTED_ACCOUNT_UID, mAccountUID);
-        intent.putExtra(UxArgument.AMOUNT_STRING, baseAmountString);
-        intent.putParcelableArrayListExtra(UxArgument.SPLIT_LIST, (ArrayList<Split>) extractSplitsFromView());
-        launcher.launch(intent);
+        Intent openSplitEditorIntent = new Intent(getActivity(), FormActivity.class);
+        openSplitEditorIntent.putExtra(UxArgument.FORM_TYPE, FormActivity.FormType.SPLIT_EDITOR.name());
+        openSplitEditorIntent.putExtra(UxArgument.SELECTED_ACCOUNT_UID, mAccountUID);
+        openSplitEditorIntent.putExtra(UxArgument.AMOUNT_STRING, baseAmountString);
+        openSplitEditorIntent.putParcelableArrayListExtra(UxArgument.SPLIT_LIST, (ArrayList<Split>) extractSplitsFromView());
+        openSplitEditorLauncher.launch(openSplitEditorIntent);
     }
 
     /**

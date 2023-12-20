@@ -47,6 +47,7 @@ import java.io.OutputStreamWriter;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.zip.GZIPOutputStream;
 
 
@@ -108,6 +109,7 @@ public class BackupManager {
         OutputStream outputStream;
         try {
             String backupFile = getBookBackupFileUri(bookUID);
+            Log.d(LOG_TAG, String.format("backupBook file: %s.", backupFile));
             if (backupFile != null) {
                 outputStream = GnuCashApplication.getAppContext().getContentResolver().openOutputStream(Uri.parse(backupFile));
             } else { //no Uri set by user, use default location on SD card
@@ -152,13 +154,17 @@ public class BackupManager {
      * @return Absolute path to backup folder for the book
      */
     private static String getBackupFolderPath(String bookUID) {
-        String baseFolderPath = GnuCashApplication.getAppContext()
-                .getExternalFilesDir(null)
+        String baseFolderPath = Objects.requireNonNull(GnuCashApplication.getAppContext()
+                        .getExternalFilesDir(null))
                 .getAbsolutePath();
         String path = baseFolderPath + "/" + bookUID + "/backups/";
         File file = new File(path);
-        if (!file.exists())
-            file.mkdirs();
+        if (!file.exists()) {
+            boolean dirsMade = file.mkdirs();
+            if (!dirsMade) {
+                Log.e(LOG_TAG, String.format("Cannot mkdirs for %s.", file.getAbsolutePath()));
+            }
+        }
         return path;
     }
 
@@ -176,7 +182,7 @@ public class BackupManager {
 
     public static List<File> getBackupList(String bookUID) {
         File[] backupFiles = new File(getBackupFolderPath(bookUID)).listFiles();
-        Arrays.sort(backupFiles);
+        Arrays.sort(Objects.requireNonNull(backupFiles));
         List<File> backupFilesList = Arrays.asList(backupFiles);
         Collections.reverse(backupFilesList);
         return backupFilesList;

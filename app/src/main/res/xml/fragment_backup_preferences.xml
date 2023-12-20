@@ -37,6 +37,7 @@
             android:entryValues="@array/key_export_format_values"
             android:entries="@array/export_formats"
             android:key="@string/key_default_export_format"
+            android:defaultValue="XML"
             android:summary="@string/summary_default_export_format" />
         <androidx.preference.EditTextPreference
             android:title="@string/title_default_export_email"

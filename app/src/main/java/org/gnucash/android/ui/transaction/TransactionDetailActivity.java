@@ -63,7 +63,7 @@ public class TransactionDetailActivity extends PasscodeLockActivity {
     TextView mCreditBalance;
     TableLayout mDetailTableLayout;
     FloatingActionButton mFabEditTransaction;
-    private final ActivityResultLauncher<Intent> launcher = registerForActivityResult(
+    private final ActivityResultLauncher<Intent> createTransactionLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
             result -> Log.d(LOG_TAG, "launch createTransactionIntent: result = " + result)
     );
@@ -94,7 +94,7 @@ public class TransactionDetailActivity extends PasscodeLockActivity {
             createTransactionIntent.putExtra(UxArgument.SELECTED_TRANSACTION_UID, mTransactionUID);
             createTransactionIntent.putExtra(UxArgument.FORM_TYPE, FormActivity.FormType.TRANSACTION.name());
 
-            launcher.launch(createTransactionIntent);
+            createTransactionLauncher.launch(createTransactionIntent);
         });
 
         setSupportActionBar(mToolBar);

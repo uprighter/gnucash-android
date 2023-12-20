@@ -79,7 +79,7 @@ public class ExportAsyncTask extends AsyncTask<ExportParams, Void, Boolean> {
     /**
      * Log tag
      */
-    public static final String TAG = "ExportAsyncTask";
+    public static final String LOG_TAG = "ExportAsyncTask";
 
     /**
      * Export parameters
@@ -122,8 +122,10 @@ public class ExportAsyncTask extends AsyncTask<ExportParams, Void, Boolean> {
 
         try {
             mExportedFiles = mExporter.generateExport();
+            Log.d(LOG_TAG, String.format("mExportedFiles: %s.", mExportedFiles));
+
         } catch (final Exception e) {
-            Log.e(TAG, "Error exporting: " + e.getMessage());
+            Log.e(LOG_TAG, "Error exporting: " + e.getMessage());
             FirebaseCrashlytics.getInstance().recordException(e);
             e.printStackTrace();
             if (mContext instanceof Activity) {
@@ -140,8 +142,9 @@ public class ExportAsyncTask extends AsyncTask<ExportParams, Void, Boolean> {
             return false;
         }
 
-        if (mExportedFiles.isEmpty())
+        if (mExportedFiles.isEmpty()) {
             return false;
+        }
 
         try {
             moveToTarget();
@@ -245,8 +248,9 @@ public class ExportAsyncTask extends AsyncTask<ExportParams, Void, Boolean> {
      */
     private void moveExportToUri() throws Exporter.ExporterException {
         Uri exportUri = Uri.parse(mExportParams.getExportLocation());
+        Log.d(LOG_TAG, String.format("moveExportToUri: %s.", exportUri));
         if (exportUri == null) {
-            Log.w(TAG, "No URI found for export destination");
+            Log.w(LOG_TAG, "No URI found for export destination");
             return;
         }
 
@@ -271,7 +275,7 @@ public class ExportAsyncTask extends AsyncTask<ExportParams, Void, Boolean> {
      * and deletes all non-template transactions in the database.
      */
     private void backupAndDeleteTransactions() {
-        Log.i(TAG, "Backup and deleting transactions after export");
+        Log.i(LOG_TAG, "Backup and deleting transactions after export");
         BackupManager.backupActiveBook(); //create backup before deleting everything
         List<Transaction> openingBalances = new ArrayList<>();
         boolean preserveOpeningBalances = GnuCashApplication.shouldSaveOpeningBalances(false);
