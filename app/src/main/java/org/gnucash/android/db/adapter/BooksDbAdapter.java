@@ -42,6 +42,8 @@ import java.util.List;
  */
 public class BooksDbAdapter extends DatabaseAdapter<Book> {
 
+    public static final String DEFAULT_BOOK_NAME = "Book1";
+
     /**
      * Opens the database adapter with an existing database
      *
@@ -95,10 +97,11 @@ public class BooksDbAdapter extends DatabaseAdapter<Book> {
         stmt.bindString(1, displayName);
         stmt.bindString(2, book.getRootAccountUID());
         stmt.bindString(3, book.getRootTemplateUID());
-        if (book.getSourceUri() != null)
-            stmt.bindString(4, book.getSourceUri().toString());
+        assert book.getSourceUri() != null;
+        stmt.bindString(4, book.getSourceUri().toString());
         stmt.bindLong(5, book.isActive() ? 1L : 0L);
         stmt.bindString(6, book.getUID());
+        assert book.getLastSync() != null;
         stmt.bindString(7, TimestampHelper.getUtcStringFromTimestamp(book.getLastSync()));
         return stmt;
     }
@@ -114,8 +117,10 @@ public class BooksDbAdapter extends DatabaseAdapter<Book> {
     public boolean deleteBook(@NonNull String bookUID) {
         Context context = GnuCashApplication.getAppContext();
         boolean result = context.deleteDatabase(bookUID);
-        if (result) //delete the db entry only if the file deletion was successful
-            result &= deleteRecord(bookUID);
+        if (result) {
+            //delete the db entry only if the file deletion was successful
+            result = deleteRecord(bookUID);
+        }
 
         PreferenceActivity.getBookSharedPreferences(bookUID).edit().clear().apply();
 
@@ -129,9 +134,10 @@ public class BooksDbAdapter extends DatabaseAdapter<Book> {
      * @param bookUID Unique identifier of the book
      * @return GUID of the currently active book
      */
-    public String setActive(@NonNull String bookUID) {
-        if (bookUID == null)
+    public String setActive(String bookUID) {
+        if (bookUID == null) {
             return getActiveBookUID();
+        }
 
         ContentValues contentValues = new ContentValues();
         contentValues.put(BookEntry.COLUMN_ACTIVE, 0);
@@ -193,7 +199,7 @@ public class BooksDbAdapter extends DatabaseAdapter<Book> {
         return info.toString();
     }
 
-    public class NoActiveBookFoundException extends RuntimeException {
+    public static class NoActiveBookFoundException extends RuntimeException {
         public NoActiveBookFoundException(String message) {
             super(message);
         }
@@ -286,17 +292,14 @@ public class BooksDbAdapter extends DatabaseAdapter<Book> {
      * @return Display name of the book
      */
     public @NonNull String getActiveBookDisplayName() {
-        Cursor cursor = mDb.query(mTableName,
+        try (Cursor cursor = mDb.query(mTableName,
                 new String[]{BookEntry.COLUMN_DISPLAY_NAME}, BookEntry.COLUMN_ACTIVE + " = 1",
-                null, null, null, null);
-        try {
+                null, null, null, null)) {
             if (cursor.moveToFirst()) {
                 return cursor.getString(cursor.getColumnIndexOrThrow(BookEntry.COLUMN_DISPLAY_NAME));
             }
-        } finally {
-            cursor.close();
         }
-        return "Book1";
+        return DEFAULT_BOOK_NAME;
     }
 
     /**

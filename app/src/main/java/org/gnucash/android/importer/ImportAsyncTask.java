@@ -125,7 +125,8 @@ public class ImportAsyncTask {
             ContentValues contentValues = new ContentValues();
             contentValues.put(DatabaseSchema.BookEntry.COLUMN_DISPLAY_NAME, displayName);
             contentValues.put(DatabaseSchema.BookEntry.COLUMN_SOURCE_URI, uri.toString());
-            BooksDbAdapter.getInstance().updateRecord(mImportedBookUID, contentValues);
+            int updated = BooksDbAdapter.getInstance().updateRecord(mImportedBookUID, contentValues);
+            Log.d(LOG_TAG, String.format("%d records updated for book %s.", updated, mImportedBookUID));
 
             cursor.close();
         }

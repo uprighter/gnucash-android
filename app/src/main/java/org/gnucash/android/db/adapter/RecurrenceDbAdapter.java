@@ -108,29 +108,14 @@ public class RecurrenceDbAdapter extends DatabaseAdapter<Recurrence> {
         StringBuilder builder = new StringBuilder();
         for (int day : byDays) {
             switch (day) {
-                case Calendar.MONDAY:
-                    builder.append("MO");
-                    break;
-                case Calendar.TUESDAY:
-                    builder.append("TU");
-                    break;
-                case Calendar.WEDNESDAY:
-                    builder.append("WE");
-                    break;
-                case Calendar.THURSDAY:
-                    builder.append("TH");
-                    break;
-                case Calendar.FRIDAY:
-                    builder.append("FR");
-                    break;
-                case Calendar.SATURDAY:
-                    builder.append("SA");
-                    break;
-                case Calendar.SUNDAY:
-                    builder.append("SU");
-                    break;
-                default:
-                    throw new RuntimeException("bad day of week: " + day);
+                case Calendar.MONDAY -> builder.append("MO");
+                case Calendar.TUESDAY -> builder.append("TU");
+                case Calendar.WEDNESDAY -> builder.append("WE");
+                case Calendar.THURSDAY -> builder.append("TH");
+                case Calendar.FRIDAY -> builder.append("FR");
+                case Calendar.SATURDAY -> builder.append("SA");
+                case Calendar.SUNDAY -> builder.append("SU");
+                default -> throw new RuntimeException("bad day of week: " + day);
             }
             builder.append(",");
         }
@@ -152,29 +137,14 @@ public class RecurrenceDbAdapter extends DatabaseAdapter<Recurrence> {
         List<Integer> byDaysList = new ArrayList<>();
         for (String day : byDaysString.split(",")) {
             switch (day) {
-                case "MO":
-                    byDaysList.add(Calendar.MONDAY);
-                    break;
-                case "TU":
-                    byDaysList.add(Calendar.TUESDAY);
-                    break;
-                case "WE":
-                    byDaysList.add(Calendar.WEDNESDAY);
-                    break;
-                case "TH":
-                    byDaysList.add(Calendar.THURSDAY);
-                    break;
-                case "FR":
-                    byDaysList.add(Calendar.FRIDAY);
-                    break;
-                case "SA":
-                    byDaysList.add(Calendar.SATURDAY);
-                    break;
-                case "SU":
-                    byDaysList.add(Calendar.SUNDAY);
-                    break;
-                default:
-                    throw new RuntimeException("bad day of week: " + day);
+                case "MO" -> byDaysList.add(Calendar.MONDAY);
+                case "TU" -> byDaysList.add(Calendar.TUESDAY);
+                case "WE" -> byDaysList.add(Calendar.WEDNESDAY);
+                case "TH" -> byDaysList.add(Calendar.THURSDAY);
+                case "FR" -> byDaysList.add(Calendar.FRIDAY);
+                case "SA" -> byDaysList.add(Calendar.SATURDAY);
+                case "SU" -> byDaysList.add(Calendar.SUNDAY);
+                default -> throw new RuntimeException("bad day of week: " + day);
             }
         }
         return byDaysList;

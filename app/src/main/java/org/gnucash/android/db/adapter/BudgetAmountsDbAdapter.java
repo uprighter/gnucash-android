@@ -29,6 +29,7 @@ import org.gnucash.android.model.Money;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Database adapter for {@link BudgetAmount}s
@@ -76,8 +77,10 @@ public class BudgetAmountsDbAdapter extends DatabaseAdapter<BudgetAmount> {
         stmt.clearBindings();
         stmt.bindString(1, budgetAmount.getBudgetUID());
         stmt.bindString(2, budgetAmount.getAccountUID());
-        stmt.bindLong(3, budgetAmount.getAmount().getNumerator());
-        stmt.bindLong(4, budgetAmount.getAmount().getDenominator());
+        Money amount = budgetAmount.getAmount();
+        assert amount != null;
+        stmt.bindLong(3, amount.getNumerator());
+        stmt.bindLong(4, amount.getDenominator());
         stmt.bindLong(5, budgetAmount.getPeriodNum());
         stmt.bindString(6, budgetAmount.getUID());
 
@@ -139,7 +142,7 @@ public class BudgetAmountsDbAdapter extends DatabaseAdapter<BudgetAmount> {
         List<BudgetAmount> budgetAmounts = getBudgetAmounts(accountUID);
         Money sum = Money.createZeroInstance(getAccountCurrencyCode(accountUID));
         for (BudgetAmount budgetAmount : budgetAmounts) {
-            sum = sum.add(budgetAmount.getAmount());
+            sum = sum.add(Objects.requireNonNull(budgetAmount.getAmount()));
         }
         return sum;
     }

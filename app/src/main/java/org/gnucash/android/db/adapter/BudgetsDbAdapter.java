@@ -20,6 +20,7 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteQueryBuilder;
 import android.database.sqlite.SQLiteStatement;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 
@@ -28,11 +29,11 @@ import org.gnucash.android.db.DatabaseSchema.BudgetAmountEntry;
 import org.gnucash.android.db.DatabaseSchema.BudgetEntry;
 import org.gnucash.android.model.Budget;
 import org.gnucash.android.model.BudgetAmount;
-import org.gnucash.android.model.Money;
 import org.gnucash.android.model.Recurrence;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 
 /**
@@ -40,8 +41,8 @@ import java.util.List;
  */
 public class BudgetsDbAdapter extends DatabaseAdapter<Budget> {
 
-    private RecurrenceDbAdapter mRecurrenceDbAdapter;
-    private BudgetAmountsDbAdapter mBudgetAmountsDbAdapter;
+    private final RecurrenceDbAdapter mRecurrenceDbAdapter;
+    private final BudgetAmountsDbAdapter mBudgetAmountsDbAdapter;
 
     /**
      * Opens the database adapter with an existing database
@@ -71,12 +72,14 @@ public class BudgetsDbAdapter extends DatabaseAdapter<Budget> {
 
     @Override
     public void addRecord(@NonNull Budget budget, UpdateMethod updateMethod) {
-        if (budget.getBudgetAmounts().size() == 0)
+        if (budget.getBudgetAmounts().size() == 0) {
             throw new IllegalArgumentException("Budgets must have budget amounts");
+        }
 
-        mRecurrenceDbAdapter.addRecord(budget.getRecurrence(), updateMethod);
+        mRecurrenceDbAdapter.addRecord(Objects.requireNonNull(budget.getRecurrence()), updateMethod);
         super.addRecord(budget, updateMethod);
-        mBudgetAmountsDbAdapter.deleteBudgetAmountsForBudget(budget.getUID());
+        int deleted = mBudgetAmountsDbAdapter.deleteBudgetAmountsForBudget(budget.getUID());
+        Log.d(LOG_TAG, String.format("deleted %d records for budget %s.", deleted, budget));
         for (BudgetAmount budgetAmount : budget.getBudgetAmounts()) {
             mBudgetAmountsDbAdapter.addRecord(budgetAmount, updateMethod);
         }
@@ -129,8 +132,9 @@ public class BudgetsDbAdapter extends DatabaseAdapter<Budget> {
     protected @NonNull SQLiteStatement setBindings(@NonNull SQLiteStatement stmt, @NonNull final Budget budget) {
         stmt.clearBindings();
         stmt.bindString(1, budget.getName());
-        if (budget.getDescription() != null)
+        assert budget.getDescription() != null;
             stmt.bindString(2, budget.getDescription());
+            assert budget.getRecurrence() != null;
         stmt.bindString(3, budget.getRecurrence().getUID());
         stmt.bindLong(4, budget.getNumberOfPeriods());
         stmt.bindString(5, budget.getUID());
@@ -173,24 +177,5 @@ public class BudgetsDbAdapter extends DatabaseAdapter<Budget> {
         }
         cursor.close();
         return budgets;
-    }
-
-    /**
-     * Returns the sum of the account balances for all accounts in a budget for a specified time period
-     * <p>This represents the total amount spent within the account of this budget in a given period</p>
-     *
-     * @param budgetUID   GUID of budget
-     * @param periodStart Start of the budgeting period in millis
-     * @param periodEnd   End of the budgeting period in millis
-     * @return Balance of all the accounts
-     */
-    public Money getAccountSum(String budgetUID, long periodStart, long periodEnd) {
-        List<BudgetAmount> budgetAmounts = mBudgetAmountsDbAdapter.getBudgetAmountsForBudget(budgetUID);
-        List<String> accountUIDs = new ArrayList<>();
-        for (BudgetAmount budgetAmount : budgetAmounts) {
-            accountUIDs.add(budgetAmount.getAccountUID());
-        }
-
-        return new AccountsDbAdapter(mDb).getAccountsBalance(accountUIDs, periodStart, periodEnd);
     }
 }

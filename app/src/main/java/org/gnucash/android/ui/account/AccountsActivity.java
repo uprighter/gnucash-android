@@ -438,7 +438,8 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
             delegate = new TaskDelegate() {
                 @Override
                 public void onTaskComplete() {
-                    AccountsDbAdapter.getInstance().updateAllAccounts(DatabaseSchema.AccountEntry.COLUMN_CURRENCY, currencyCode);
+                    int updated = AccountsDbAdapter.getInstance().updateAllAccounts(DatabaseSchema.AccountEntry.COLUMN_CURRENCY, currencyCode);
+                    Log.d(LOG_TAG, String.format("createDefaultAccounts created %d accounts.", updated));
                     GnuCashApplication.setDefaultCurrencyCode(currencyCode);
                 }
             };

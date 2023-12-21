@@ -122,8 +122,8 @@ public class OfxExporter extends Exporter {
             account.toOfx(doc, statementTransactionResponse, mExportParams.getExportStartTime());
 
             //mark as exported
-            accountsDbAdapter.markAsExported(account.getUID());
-
+            int marked = accountsDbAdapter.markAsExported(account.getUID());
+            Log.d(LOG_TAG, String.format("%d transactions for account %s are marked as exported.", marked, account));
         }
     }
 

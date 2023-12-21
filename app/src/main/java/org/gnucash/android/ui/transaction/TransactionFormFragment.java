@@ -921,7 +921,8 @@ public class TransactionFormFragment extends Fragment implements
 
         if (scheduledActionUID != null) { //if we are editing an existing schedule
             scheduledAction.setUID(scheduledActionUID);
-            scheduledActionDbAdapter.updateRecurrenceAttributes(scheduledAction);
+            long updated = scheduledActionDbAdapter.updateRecurrenceAttributes(scheduledAction);
+            Log.d(LOG_TAG, String.format("%s actions updated for %s.", updated, scheduledAction));
             Toast.makeText(getActivity(), R.string.toast_updated_transaction_recurring_schedule, Toast.LENGTH_SHORT).show();
         } else {
                 scheduledAction.setActionUID(transactionUID);

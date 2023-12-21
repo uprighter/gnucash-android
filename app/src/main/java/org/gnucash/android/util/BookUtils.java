@@ -1,5 +1,7 @@
 package org.gnucash.android.util;
 
+import android.util.Log;
+
 import androidx.annotation.NonNull;
 
 import org.gnucash.android.app.GnuCashApplication;
@@ -10,14 +12,16 @@ import org.gnucash.android.ui.account.AccountsActivity;
  */
 
 public class BookUtils {
+    private static final String LOG_TAG = BookUtils.class.getName();
 
     /**
-     * Activates the book with unique identifer {@code bookUID}, and refreshes the database adapters
+     * Activates the book with unique identifier {@code bookUID}, and refreshes the database adapters
      *
      * @param bookUID GUID of the book to be activated
      */
     public static void activateBook(@NonNull String bookUID) {
-        GnuCashApplication.getBooksDbAdapter().setActive(bookUID);
+        String activeBook = GnuCashApplication.getBooksDbAdapter().setActive(bookUID);
+        Log.d(LOG_TAG, String.format("Book %s is set active.", activeBook));
         GnuCashApplication.initializeDatabaseAdapters();
     }
 

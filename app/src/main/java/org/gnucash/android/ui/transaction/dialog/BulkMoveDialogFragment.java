@@ -18,6 +18,7 @@ package org.gnucash.android.ui.transaction.dialog;
 
 import android.database.Cursor;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -46,6 +47,7 @@ import org.gnucash.android.util.QualifiedAccountNameCursorAdapter;
  * @author Ngewi Fet <ngewif@gmail.com>
  */
 public class BulkMoveDialogFragment extends DialogFragment {
+    private static final String LOG_TAG = BulkMoveDialogFragment.class.getName();
 
     /**
      * Spinner for selecting the account to move the transactions to
@@ -167,7 +169,8 @@ public class BulkMoveDialogFragment extends DialogFragment {
                 String srcAccountUID = ((TransactionsActivity) getActivity()).getCurrentAccountUID();
 
                 for (long trxnId : mTransactionIds) {
-                    trxnAdapter.moveTransaction(trxnAdapter.getUID(trxnId), srcAccountUID, dstAccountUID);
+                    int moved = trxnAdapter.moveTransaction(trxnAdapter.getUID(trxnId), srcAccountUID, dstAccountUID);
+                    Log.d(LOG_TAG, String.format("%d splits moved for transaction %s.", moved, trxnAdapter.getUID(trxnId)));
                 }
 
                 WidgetConfigurationActivity.updateAllWidgets(getActivity());

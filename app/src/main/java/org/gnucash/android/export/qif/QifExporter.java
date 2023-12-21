@@ -23,6 +23,7 @@ import static org.gnucash.android.db.DatabaseSchema.TransactionEntry;
 import android.content.ContentValues;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 
@@ -250,7 +251,8 @@ public class QifExporter extends Exporter {
 
             ContentValues contentValues = new ContentValues();
             contentValues.put(TransactionEntry.COLUMN_EXPORTED, 1);
-            transactionsDbAdapter.updateTransaction(contentValues, null, null);
+            int updated = transactionsDbAdapter.updateTransaction(contentValues, null, null);
+            Log.d(LOG_TAG, String.format("%d records updated for %s.", updated, contentValues));
 
             /// export successful
             PreferencesHelper.setLastExportTime(TimestampHelper.getTimestampFromNow());

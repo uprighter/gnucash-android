@@ -19,6 +19,7 @@ package org.gnucash.android.ui.settings.dialog;
 import android.app.Dialog;
 import android.content.DialogInterface;
 import android.os.Bundle;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 
@@ -33,6 +34,7 @@ import org.gnucash.android.util.BackupManager;
  * @author Àlex Magaz <alexandre.magaz@gmail.com>
  */
 public class DeleteBookConfirmationDialog extends DoubleConfirmationDialog {
+    private static final String LOG_TAG = DeleteBookConfirmationDialog.class.getName();
     @NonNull
     public static DeleteBookConfirmationDialog newInstance(String bookUID) {
         DeleteBookConfirmationDialog frag = new DeleteBookConfirmationDialog();
@@ -55,7 +57,8 @@ public class DeleteBookConfirmationDialog extends DoubleConfirmationDialog {
                     public void onClick(DialogInterface dialogInterface, int which) {
                         final String bookUID = getArguments().getString("bookUID");
                         BackupManager.backupBook(bookUID);
-                        BooksDbAdapter.getInstance().deleteBook(bookUID);
+                        boolean deleted = BooksDbAdapter.getInstance().deleteBook(bookUID);
+                        Log.d(LOG_TAG, String.format("delete book %s result %b.", bookUID, deleted));
                         ((Refreshable) getTargetFragment()).refresh();
                     }
                 })

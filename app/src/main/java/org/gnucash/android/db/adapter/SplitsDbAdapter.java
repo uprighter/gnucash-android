@@ -39,8 +39,10 @@ import org.gnucash.android.model.TransactionType;
 import org.gnucash.android.util.TimestampHelper;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Database adapter for managing transaction splits in the database
@@ -102,9 +104,11 @@ public class SplitsDbAdapter extends DatabaseAdapter<Split> {
         if (split.getMemo() != null) {
             stmt.bindString(1, split.getMemo());
         }
-        stmt.bindString(2, split.getType().name());
+        stmt.bindString(2, Objects.requireNonNull(split.getType()).name());
+        assert split.getValue() != null;
         stmt.bindLong(3, split.getValue().getNumerator());
         stmt.bindLong(4, split.getValue().getDenominator());
+        assert split.getQuantity() != null;
         stmt.bindLong(5, split.getQuantity().getNumerator());
         stmt.bindLong(6, split.getQuantity().getDenominator());
         stmt.bindString(7, split.getCreatedTimestamp().toString());
@@ -255,7 +259,7 @@ public class SplitsDbAdapter extends DatabaseAdapter<Split> {
                     }
                     BigDecimal amount = Money.getBigDecimal(amount_num, amount_denom);
                     BigDecimal amountConverted = amount.multiply(new BigDecimal(price.first))
-                            .divide(new BigDecimal(price.second), commodity.getSmallestFractionDigits(), BigDecimal.ROUND_HALF_EVEN);
+                            .divide(new BigDecimal(price.second), commodity.getSmallestFractionDigits(), RoundingMode.HALF_EVEN);
                     total = total.add(new Money(amountConverted, commodity));
                     //Log.d(getClass().getName(), "currency " + commodity + " sub - total " + total);
                 }
@@ -274,7 +278,7 @@ public class SplitsDbAdapter extends DatabaseAdapter<Split> {
      */
     public List<Split> getSplitsForTransaction(String transactionUID) {
         Cursor cursor = fetchSplitsForTransaction(transactionUID);
-        List<Split> splitList = new ArrayList<Split>();
+        List<Split> splitList = new ArrayList<>();
         try {
             while (cursor.moveToNext()) {
                 splitList.add(buildModelInstance(cursor));
@@ -306,7 +310,7 @@ public class SplitsDbAdapter extends DatabaseAdapter<Split> {
      */
     public List<Split> getSplitsForTransactionInAccount(String transactionUID, String accountUID) {
         Cursor cursor = fetchSplitsForTransactionAndAccount(transactionUID, accountUID);
-        List<Split> splitList = new ArrayList<Split>();
+        List<Split> splitList = new ArrayList<>();
         if (cursor != null) {
             while (cursor.moveToNext()) {
                 splitList.add(buildModelInstance(cursor));
@@ -397,19 +401,16 @@ public class SplitsDbAdapter extends DatabaseAdapter<Split> {
      * @return String unique ID of the transaction or null if transaction with the ID cannot be found.
      */
     public String getTransactionUID(long transactionId) {
-        Cursor cursor = mDb.query(TransactionEntry.TABLE_NAME,
+
+        try (Cursor cursor = mDb.query(TransactionEntry.TABLE_NAME,
                 new String[]{TransactionEntry.COLUMN_UID},
                 TransactionEntry._ID + " = " + transactionId,
-                null, null, null, null);
-
-        try {
+                null, null, null, null)) {
             if (cursor.moveToFirst()) {
                 return cursor.getString(cursor.getColumnIndexOrThrow(TransactionEntry.COLUMN_UID));
             } else {
                 throw new IllegalArgumentException("transaction " + transactionId + " does not exist");
             }
-        } finally {
-            cursor.close();
         }
     }
 
@@ -423,15 +424,12 @@ public class SplitsDbAdapter extends DatabaseAdapter<Split> {
             return false;
 
         //if we just deleted the last split, then remove the transaction from db
-        Cursor cursor = fetchSplitsForTransaction(transactionUID);
-        try {
+        try (Cursor cursor = fetchSplitsForTransaction(transactionUID)) {
             if (cursor.getCount() > 0) {
                 long transactionID = getTransactionID(transactionUID);
                 result = mDb.delete(TransactionEntry.TABLE_NAME,
                         TransactionEntry._ID + "=" + transactionID, null) > 0;
             }
-        } finally {
-            cursor.close();
         }
         return result;
     }
@@ -443,18 +441,15 @@ public class SplitsDbAdapter extends DatabaseAdapter<Split> {
      * @return Database record ID for the transaction
      */
     public long getTransactionID(String transactionUID) {
-        Cursor c = mDb.query(TransactionEntry.TABLE_NAME,
+        try (Cursor c = mDb.query(TransactionEntry.TABLE_NAME,
                 new String[]{TransactionEntry._ID},
                 TransactionEntry.COLUMN_UID + "=?",
-                new String[]{transactionUID}, null, null, null);
-        try {
+                new String[]{transactionUID}, null, null, null)) {
             if (c.moveToFirst()) {
                 return c.getLong(0);
             } else {
                 throw new IllegalArgumentException("transaction " + transactionUID + " does not exist");
             }
-        } finally {
-            c.close();
         }
     }
 

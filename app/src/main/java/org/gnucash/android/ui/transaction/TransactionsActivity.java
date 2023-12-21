@@ -433,7 +433,8 @@ public class TransactionsActivity extends BaseDrawerActivity implements
                 long accountId = accountsDbAdapter.getID(mAccountUID);
                 boolean isFavorite = accountsDbAdapter.isFavoriteAccount(mAccountUID);
                 //toggle favorite preference
-                accountsDbAdapter.updateAccount(accountId, DatabaseSchema.AccountEntry.COLUMN_FAVORITE, isFavorite ? "0" : "1");
+                int updated = accountsDbAdapter.updateAccount(accountId, DatabaseSchema.AccountEntry.COLUMN_FAVORITE, isFavorite ? "0" : "1");
+                Log.d(LOG_TAG, String.format("toggle favorite preference for %d accounts under %s.", updated, mAccountUID));
                 supportInvalidateOptionsMenu();
                 return true;
         } else if (item.getItemId() ==  R.id.menu_edit_account) {
