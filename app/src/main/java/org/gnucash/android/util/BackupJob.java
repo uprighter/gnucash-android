@@ -31,10 +31,11 @@ import androidx.core.app.JobIntentService;
  * (through {@link org.gnucash.android.receivers.PeriodicJobReceiver}).</p>
  */
 public class BackupJob extends JobIntentService {
-    private static final String LOG_TAG = "BackupJob";
+    private static final String LOG_TAG = BackupJob.class.getName();
     private static final int JOB_ID = 1000;
 
     public static void enqueueWork(Context context) {
+        Log.i(LOG_TAG, "enqueueWork..");
         Intent intent = new Intent(context, BackupJob.class);
         enqueueWork(context, BackupJob.class, JOB_ID, intent);
     }

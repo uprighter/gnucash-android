@@ -47,6 +47,7 @@ import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 
 /**
@@ -63,7 +64,7 @@ import java.util.concurrent.ExecutionException;
  */
 public class ScheduledActionService extends JobIntentService {
 
-    private static final String LOG_TAG = "ScheduledActionService";
+    private static final String LOG_TAG = ScheduledActionService.class.getName();
     private static final int JOB_ID = 1001;
 
 
@@ -116,7 +117,7 @@ public class ScheduledActionService extends JobIntentService {
             if (scheduledAction.getStartTime() > now    //if schedule begins in the future
                     || !scheduledAction.isEnabled()     // of if schedule is disabled
                     || (totalPlannedExecutions > 0 && executionCount >= totalPlannedExecutions)) { //limit was set and we reached or exceeded it
-                Log.i(LOG_TAG, "Skipping scheduled action: " + scheduledAction.toString());
+                Log.i(LOG_TAG, "Skipping scheduled action: " + scheduledAction);
                 continue;
             }
 
@@ -134,13 +135,8 @@ public class ScheduledActionService extends JobIntentService {
         int executionCount = 0;
 
         switch (scheduledAction.getActionType()) {
-            case TRANSACTION:
-                executionCount += executeTransactions(scheduledAction, db);
-                break;
-
-            case BACKUP:
-                executionCount += executeBackup(scheduledAction, db);
-                break;
+            case TRANSACTION -> executionCount += executeTransactions(scheduledAction, db);
+            case BACKUP -> executionCount += executeBackup(scheduledAction, db);
         }
 
         if (executionCount > 0) {
@@ -172,7 +168,7 @@ public class ScheduledActionService extends JobIntentService {
         if (!shouldExecuteScheduledBackup(scheduledAction))
             return 0;
 
-        ExportParams params = ExportParams.parseCsv(scheduledAction.getTag());
+        ExportParams params = ExportParams.parseCsv(Objects.requireNonNull(scheduledAction.getTag()));
         // HACK: the tag isn't updated with the new date, so set the correct by hand
         params.setExportStartTime(new Timestamp(scheduledAction.getLastRunTime()));
         Boolean result = false;
@@ -181,7 +177,7 @@ public class ScheduledActionService extends JobIntentService {
             result = new ExportAsyncTask(GnuCashApplication.getAppContext(), db, params).asyncExecute().get();
         } catch (InterruptedException | ExecutionException e) {
             FirebaseCrashlytics.getInstance().recordException(e);
-            Log.e(LOG_TAG, e.getMessage());
+            Log.e(LOG_TAG, String.format("Exception: %s", e.getMessage()));
         }
         if (!result) {
             Log.i(LOG_TAG, "Backup/export did not occur. There might have been no"
@@ -229,12 +225,11 @@ public class ScheduledActionService extends JobIntentService {
         TransactionsDbAdapter transactionsDbAdapter = new TransactionsDbAdapter(db, new SplitsDbAdapter(db));
         Transaction trxnTemplate;
         try {
-            trxnTemplate = transactionsDbAdapter.getRecord(actionUID);
+            trxnTemplate = transactionsDbAdapter.getRecord(Objects.requireNonNull(actionUID));
         } catch (IllegalArgumentException ex) { //if the record could not be found, abort
             Log.e(LOG_TAG, "Scheduled transaction with UID " + actionUID + " could not be found in the db with path " + db.getPath());
             return executionCount;
         }
-
 
         long now = System.currentTimeMillis();
         //if there is an end time in the past, we execute all schedules up to the end time.

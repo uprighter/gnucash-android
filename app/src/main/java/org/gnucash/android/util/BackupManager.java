@@ -55,7 +55,7 @@ import java.util.zip.GZIPOutputStream;
  * Deals with all backup-related tasks.
  */
 public class BackupManager {
-    private static final String LOG_TAG = "BackupManager";
+    private static final String LOG_TAG = BackupManager.class.getName();
     public static final String KEY_BACKUP_FILE = "book_backup_file_key";
 
     /**
@@ -127,7 +127,7 @@ public class BackupManager {
             return true;
         } catch (IOException | Exporter.ExporterException e) {
             FirebaseCrashlytics.getInstance().recordException(e);
-            Log.e("GncXmlExporter", "Error creating XML  backup", e);
+            Log.e(LOG_TAG, "Error creating XML backup", e);
             return false;
         }
     }
@@ -197,6 +197,6 @@ public class BackupManager {
         AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
         alarmManager.setInexactRepeating(AlarmManager.ELAPSED_REALTIME_WAKEUP,
                 SystemClock.elapsedRealtime() + AlarmManager.INTERVAL_FIFTEEN_MINUTES,
-                AlarmManager.INTERVAL_DAY, alarmIntent);
+                AlarmManager.INTERVAL_HOUR, alarmIntent);
     }
 }

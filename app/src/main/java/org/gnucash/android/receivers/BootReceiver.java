@@ -19,6 +19,7 @@ package org.gnucash.android.receivers;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.util.Log;
 
 import org.gnucash.android.app.GnuCashApplication;
 import org.gnucash.android.util.BackupManager;
@@ -30,9 +31,11 @@ import org.gnucash.android.util.BackupManager;
  * @author Ngewi Fet <ngewif@gmail.com>
  */
 public class BootReceiver extends BroadcastReceiver {
+    public static final String LOG_TAG = BootReceiver.class.getName();
 
     @Override
     public void onReceive(Context context, Intent intent) {
+        Log.d(LOG_TAG, String.format("onReceive intent.action: %s.", intent.getAction()));
         GnuCashApplication.startScheduledActionExecutionService(context);
         BackupManager.schedulePeriodicBackups(context);
     }

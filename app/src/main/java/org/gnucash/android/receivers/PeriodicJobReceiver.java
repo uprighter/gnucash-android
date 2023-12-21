@@ -31,7 +31,7 @@ import org.gnucash.android.util.BackupJob;
  * @author Àlex Magaz Graça <alexandre.magaz@gmail.com>
  */
 public class PeriodicJobReceiver extends BroadcastReceiver {
-    private static final String LOG_TAG = "PeriodicJobReceiver";
+    private static final String LOG_TAG = PeriodicJobReceiver.class.getName();
 
     public static final String ACTION_BACKUP = "org.gnucash.android.action_backup";
     public static final String ACTION_SCHEDULED_ACTIONS = "org.gnucash.android.action_scheduled_actions";

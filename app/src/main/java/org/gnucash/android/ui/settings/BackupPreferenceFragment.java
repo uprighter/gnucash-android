@@ -60,7 +60,7 @@ public class BackupPreferenceFragment extends PreferenceFragmentCompat implement
     /**
      * String for tagging log statements
      */
-    public static final String LOG_TAG = "BackupPreferenceFragment";
+    public static final String LOG_TAG = BackupPreferenceFragment.class.getName();
 
     private final ActivityResultLauncher<Intent> createBackupFileLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),

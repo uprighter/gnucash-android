@@ -353,7 +353,6 @@ public class ExportAsyncTask {
     private void reportSuccess() {
         String targetLocation = switch (mExportParams.getExportTarget()) {
             case SD_CARD -> "SD card";
-            case GOOGLE_DRIVE -> "Google Drive -> " + mContext.getString(R.string.app_name);
             default -> mContext.getString(R.string.label_export_target_external_service);
         };
         Toast.makeText(mContext,
