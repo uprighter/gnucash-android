@@ -230,7 +230,9 @@ public class BackupPreferenceFragment extends PreferenceFragmentCompat implement
                     .setTitle(R.string.title_confirm_restore_backup)
                     .setMessage(R.string.msg_confirm_restore_backup_into_new_book)
                     .setNegativeButton(R.string.btn_cancel, (dialog, which) -> dialog.dismiss())
-                    .setPositiveButton(R.string.btn_restore, (dialogInterface, i) -> new ImportAsyncTask(getActivity()).execute(Uri.parse(defaultBackupFile)));
+                    .setPositiveButton(R.string.btn_restore,
+                            (dialogInterface, i) -> new ImportAsyncTask(getActivity(),
+                                    Uri.parse(defaultBackupFile)).asyncExecute());
             builder.create().show();
             return; //stop here if the default backup file exists
         }
@@ -262,7 +264,7 @@ public class BackupPreferenceFragment extends PreferenceFragmentCompat implement
                 (dialog, which) -> dialog.dismiss());
         restoreDialogBuilder.setAdapter(arrayAdapter, (dialog, which) -> {
             File backupFile = BackupManager.getBackupList(bookUID).get(which);
-            new ImportAsyncTask(getActivity()).execute(Uri.fromFile(backupFile));
+            new ImportAsyncTask(getActivity(), Uri.fromFile(backupFile)).asyncExecute();
         });
 
         restoreDialogBuilder.create().show();

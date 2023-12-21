@@ -119,17 +119,17 @@ public class ExportAsyncTask {
         onPreExecute();
 
         Callable<Boolean> callable = () -> {
-            Boolean exportSuccessfulBoolean = false;
+            Boolean successfulBoolean = false;
             try {
-                final Boolean exportSuccessful = doInBackground();
-                exportSuccessfulBoolean = exportSuccessful;
+                final Boolean successful = doInBackground();
+                successfulBoolean = successful;
 
-                handler.post(() -> onPostExecute(exportSuccessful));
+                handler.post(() -> onPostExecute(successful));
             } catch (Exception ex) {
-                Log.e(LOG_TAG, "Error computing account balance ", ex);
+                Log.e(LOG_TAG, "asyncExecute error: ", ex);
                 FirebaseCrashlytics.getInstance().recordException(ex);
             }
-            return exportSuccessfulBoolean;
+            return successfulBoolean;
         };
         return executor.submit(callable);
     }
@@ -191,7 +191,7 @@ public class ExportAsyncTask {
             }
         } else {
             if (mContext instanceof Activity) {
-                dismissProgressDialog();
+                dismissProgressBar();
                 if (mExportedFiles.isEmpty()) {
                     Toast.makeText(mContext,
                             R.string.toast_no_transactions_to_export,
@@ -204,10 +204,10 @@ public class ExportAsyncTask {
             }
         }
 
-        dismissProgressDialog();
+        dismissProgressBar();
     }
 
-    private void dismissProgressDialog() {
+    private void dismissProgressBar() {
         if (mContext instanceof Activity) {
             if (mProgressBar != null && mProgressBar.getVisibility() == View.VISIBLE) {
                 mProgressBar.setProgress(100);

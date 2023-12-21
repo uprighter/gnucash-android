@@ -287,7 +287,7 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
         if (data != null) {
             BackupManager.backupActiveBook();
             intent.setData(null);
-            new ImportAsyncTask(this).execute(data);
+            new ImportAsyncTask(this, data).asyncExecute();
             removeFirstRunFlag();
         }
     }
@@ -445,7 +445,7 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
         }
 
         Uri uri = Uri.parse("android.resource://" + BuildConfig.APPLICATION_ID + "/" + R.raw.default_accounts);
-        new ImportAsyncTask(activity, delegate).execute(uri);
+        new ImportAsyncTask(activity, delegate, uri).asyncExecute();
     }
 
     /**
@@ -503,7 +503,7 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
      */
     public static void importXmlFileFromIntent(Activity context, Intent data, TaskDelegate onFinishTask) {
         BackupManager.backupActiveBook();
-        new ImportAsyncTask(context, onFinishTask).execute(data.getData());
+        new ImportAsyncTask(context, onFinishTask, data.getData()).asyncExecute();
     }
 
     /**
