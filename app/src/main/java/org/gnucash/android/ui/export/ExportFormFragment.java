@@ -358,7 +358,7 @@ public class ExportFormFragment extends Fragment implements
         exportParameters.setCsvSeparator(mExportCsvSeparator);
 
         Log.i(LOG_TAG, "Commencing async export of transactions");
-        new ExportAsyncTask(getActivity(), GnuCashApplication.getActiveDb()).execute(exportParameters);
+        new ExportAsyncTask(getActivity(), GnuCashApplication.getActiveDb(), exportParameters).asyncExecute();
 
         if (mRecurrenceRule != null) {
             ScheduledAction scheduledAction = new ScheduledAction(ScheduledAction.ActionType.BACKUP);

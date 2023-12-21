@@ -178,7 +178,7 @@ public class ScheduledActionService extends JobIntentService {
         Boolean result = false;
         try {
             //wait for async task to finish before we proceed (we are holding a wake lock)
-            result = new ExportAsyncTask(GnuCashApplication.getAppContext(), db).execute(params).get();
+            result = new ExportAsyncTask(GnuCashApplication.getAppContext(), db, params).asyncExecute().get();
         } catch (InterruptedException | ExecutionException e) {
             FirebaseCrashlytics.getInstance().recordException(e);
             Log.e(LOG_TAG, e.getMessage());
