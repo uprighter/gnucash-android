@@ -47,7 +47,7 @@ import java.util.concurrent.Future;
  * The AccountsActivity is opened when importing is done.
  */
 public class ImportAsyncTask {
-    public static final String LOG_TAG = "ImportAsyncTask";
+    public static final String LOG_TAG = ImportAsyncTask.class.getName();
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Handler handler = new Handler(Looper.getMainLooper());

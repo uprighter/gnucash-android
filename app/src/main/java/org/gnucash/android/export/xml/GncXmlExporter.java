@@ -200,7 +200,7 @@ public class GncXmlExporter extends Exporter {
                 xmlSerializer.text(parentUID);
                 xmlSerializer.endTag(null, GncXmlHelper.TAG_PARENT_UID);
             } else {
-                Log.d("export", "root account : " + cursor.getString(cursor.getColumnIndexOrThrow(DatabaseSchema.AccountEntry.COLUMN_UID)));
+                Log.d(LOG_TAG, "root account : " + cursor.getString(cursor.getColumnIndexOrThrow(DatabaseSchema.AccountEntry.COLUMN_UID)));
             }
             xmlSerializer.endTag(null, GncXmlHelper.TAG_ACCOUNT);
         }

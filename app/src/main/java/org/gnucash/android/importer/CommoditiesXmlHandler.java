@@ -22,7 +22,6 @@ import org.gnucash.android.db.adapter.CommoditiesDbAdapter;
 import org.gnucash.android.db.adapter.DatabaseAdapter;
 import org.gnucash.android.model.Commodity;
 import org.xml.sax.Attributes;
-import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
 import java.util.ArrayList;
@@ -44,9 +43,9 @@ public class CommoditiesXmlHandler extends DefaultHandler {
      * List of commodities parsed from the XML file.
      * They will be all added to db at once at the end of the document
      */
-    private List<Commodity> mCommodities;
+    private final List<Commodity> mCommodities;
 
-    private CommoditiesDbAdapter mCommoditiesDbAdapter;
+    private final CommoditiesDbAdapter mCommoditiesDbAdapter;
 
     public CommoditiesXmlHandler(SQLiteDatabase db) {
         if (db == null) {
@@ -58,7 +57,7 @@ public class CommoditiesXmlHandler extends DefaultHandler {
     }
 
     @Override
-    public void startElement(String uri, String localName, String qName, Attributes attributes) throws SAXException {
+    public void startElement(String uri, String localName, String qName, Attributes attributes) {
         if (qName.equals(TAG_CURRENCY)) {
             String isoCode = attributes.getValue(ATTR_ISO_CODE);
             String fullname = attributes.getValue(ATTR_FULL_NAME);
@@ -81,7 +80,7 @@ public class CommoditiesXmlHandler extends DefaultHandler {
     }
 
     @Override
-    public void endDocument() throws SAXException {
+    public void endDocument() {
         mCommoditiesDbAdapter.bulkAddRecords(mCommodities, DatabaseAdapter.UpdateMethod.insert);
     }
 }

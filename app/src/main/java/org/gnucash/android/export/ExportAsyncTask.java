@@ -76,7 +76,7 @@ public class ExportAsyncTask {
     /**
      * Log tag
      */
-    public static final String LOG_TAG = "ExportAsyncTask";
+    public static final String LOG_TAG = ExportAsyncTask.class.getName();
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Handler handler = new Handler(Looper.getMainLooper());

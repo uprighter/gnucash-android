@@ -67,6 +67,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Stack;
 import java.util.regex.Pattern;
 
@@ -87,7 +88,7 @@ public class GncXmlHandler extends DefaultHandler {
     /**
      * Tag for logging
      */
-    private static final String LOG_TAG = "GnuCashAccountImporter";
+    private static final String LOG_TAG = GncXmlHandler.class.getName();
 
     /*
         ^             anchor for start of string
@@ -282,8 +283,9 @@ public class GncXmlHandler extends DefaultHandler {
 
     private Map<String, Integer> mCurrencyCount;
 
-    private BudgetsDbAdapter mBudgetsDbAdapter;
     private Book mBook;
+    private DatabaseHelper mDatabaseHelper;
+    private BudgetsDbAdapter mBudgetsDbAdapter;
     private SQLiteDatabase mainDb;
 
     /**
@@ -299,8 +301,8 @@ public class GncXmlHandler extends DefaultHandler {
     private void init() {
         mBook = new Book();
 
-        DatabaseHelper databaseHelper = new DatabaseHelper(GnuCashApplication.getAppContext(), mBook.getUID());
-        mainDb = databaseHelper.getWritableDatabase();
+        mDatabaseHelper = new DatabaseHelper(GnuCashApplication.getAppContext(), mBook.getUID());
+        mainDb = mDatabaseHelper.getWritableDatabase();
         mTransactionsDbAdapter = new TransactionsDbAdapter(mainDb, new SplitsDbAdapter(mainDb));
         mAccountsDbAdapter = new AccountsDbAdapter(mainDb, mTransactionsDbAdapter);
         RecurrenceDbAdapter recurrenceDbAdapter = new RecurrenceDbAdapter(mainDb);
@@ -328,81 +330,59 @@ public class GncXmlHandler extends DefaultHandler {
         mCurrencyCount = new HashMap<>();
     }
 
+    public void close() {
+        mDatabaseHelper.close();
+    }
+
     @Override
     public void startElement(String uri, String localName,
-                             String qualifiedName, Attributes attributes) throws SAXException {
+                             String qualifiedName, Attributes attributes) {
         switch (qualifiedName) {
-            case GncXmlHelper.TAG_ACCOUNT:
+            case GncXmlHelper.TAG_ACCOUNT -> {
                 mAccount = new Account(""); // dummy name, will be replaced when we find name tag
                 mISO4217Currency = false;
-                break;
-            case GncXmlHelper.TAG_TRANSACTION:
+            }
+            case GncXmlHelper.TAG_TRANSACTION -> {
                 mTransaction = new Transaction(""); // dummy name will be replaced
                 mTransaction.setExported(true);     // default to exported when import transactions
                 mISO4217Currency = false;
-                break;
-            case GncXmlHelper.TAG_TRN_SPLIT:
-                mSplit = new Split(Money.getZeroInstance(), "");
-                break;
-            case GncXmlHelper.TAG_DATE_POSTED:
-                mIsDatePosted = true;
-                break;
-            case GncXmlHelper.TAG_DATE_ENTERED:
-                mIsDateEntered = true;
-                break;
-            case GncXmlHelper.TAG_TEMPLATE_TRANSACTIONS:
-                mInTemplates = true;
-                break;
-            case GncXmlHelper.TAG_SCHEDULED_ACTION:
+            }
+            case GncXmlHelper.TAG_TRN_SPLIT ->
+                    mSplit = new Split(Objects.requireNonNull(Money.getZeroInstance()), "");
+            case GncXmlHelper.TAG_DATE_POSTED -> mIsDatePosted = true;
+            case GncXmlHelper.TAG_DATE_ENTERED -> mIsDateEntered = true;
+            case GncXmlHelper.TAG_TEMPLATE_TRANSACTIONS -> mInTemplates = true;
+            case GncXmlHelper.TAG_SCHEDULED_ACTION ->
                 //default to transaction type, will be changed during parsing
-                mScheduledAction = new ScheduledAction(ScheduledAction.ActionType.TRANSACTION);
-                break;
-            case GncXmlHelper.TAG_SX_START:
-                mIsScheduledStart = true;
-                break;
-            case GncXmlHelper.TAG_SX_END:
-                mIsScheduledEnd = true;
-                break;
-            case GncXmlHelper.TAG_SX_LAST:
-                mIsLastRun = true;
-                break;
-            case GncXmlHelper.TAG_RX_START:
-                mIsRecurrenceStart = true;
-                break;
-            case GncXmlHelper.TAG_PRICE:
-                mPrice = new Price();
-                break;
-            case GncXmlHelper.TAG_PRICE_CURRENCY:
+                    mScheduledAction = new ScheduledAction(ScheduledAction.ActionType.TRANSACTION);
+            case GncXmlHelper.TAG_SX_START -> mIsScheduledStart = true;
+            case GncXmlHelper.TAG_SX_END -> mIsScheduledEnd = true;
+            case GncXmlHelper.TAG_SX_LAST -> mIsLastRun = true;
+            case GncXmlHelper.TAG_RX_START -> mIsRecurrenceStart = true;
+            case GncXmlHelper.TAG_PRICE -> mPrice = new Price();
+            case GncXmlHelper.TAG_PRICE_CURRENCY -> {
                 mPriceCurrency = true;
                 mPriceCommodity = false;
                 mISO4217Currency = false;
-                break;
-            case GncXmlHelper.TAG_PRICE_COMMODITY:
+            }
+            case GncXmlHelper.TAG_PRICE_COMMODITY -> {
                 mPriceCurrency = false;
                 mPriceCommodity = true;
                 mISO4217Currency = false;
-                break;
-
-            case GncXmlHelper.TAG_BUDGET:
-                mBudget = new Budget();
-                break;
-
-            case GncXmlHelper.TAG_GNC_RECURRENCE:
-            case GncXmlHelper.TAG_BUDGET_RECURRENCE:
+            }
+            case GncXmlHelper.TAG_BUDGET -> mBudget = new Budget();
+            case GncXmlHelper.TAG_GNC_RECURRENCE, GncXmlHelper.TAG_BUDGET_RECURRENCE -> {
                 mRecurrenceMultiplier = 1;
                 mRecurrence = new Recurrence(PeriodType.MONTH);
-                break;
-            case GncXmlHelper.TAG_BUDGET_SLOTS:
-                mInBudgetSlot = true;
-                break;
-            case GncXmlHelper.TAG_SLOT:
+            }
+            case GncXmlHelper.TAG_BUDGET_SLOTS -> mInBudgetSlot = true;
+            case GncXmlHelper.TAG_SLOT -> {
                 if (mInBudgetSlot) {
                     mBudgetAmount = new BudgetAmount(mBudget.getUID(), mBudgetAmountAccountUID);
                 }
-                break;
-            case GncXmlHelper.TAG_SLOT_VALUE:
-                mSlotTagAttribute = attributes.getValue(GncXmlHelper.ATTR_KEY_TYPE);
-                break;
+            }
+            case GncXmlHelper.TAG_SLOT_VALUE ->
+                    mSlotTagAttribute = attributes.getValue(GncXmlHelper.ATTR_KEY_TYPE);
         }
     }
 
@@ -499,33 +479,16 @@ public class GncXmlHandler extends DefaultHandler {
                 break;
             case GncXmlHelper.TAG_SLOT_KEY:
                 switch (characterString) {
-                    case GncXmlHelper.KEY_PLACEHOLDER:
-                        mInPlaceHolderSlot = true;
-                        break;
-                    case GncXmlHelper.KEY_COLOR:
-                        mInColorSlot = true;
-                        break;
-                    case GncXmlHelper.KEY_FAVORITE:
-                        mInFavoriteSlot = true;
-                        break;
-                    case GncXmlHelper.KEY_NOTES:
-                        mIsNote = true;
-                        break;
-                    case GncXmlHelper.KEY_DEFAULT_TRANSFER_ACCOUNT:
-                        mInDefaultTransferAccount = true;
-                        break;
-                    case GncXmlHelper.KEY_EXPORTED:
-                        mInExported = true;
-                        break;
-                    case GncXmlHelper.KEY_SPLIT_ACCOUNT_SLOT:
-                        mInSplitAccountSlot = true;
-                        break;
-                    case GncXmlHelper.KEY_CREDIT_NUMERIC:
-                        mInCreditNumericSlot = true;
-                        break;
-                    case GncXmlHelper.KEY_DEBIT_NUMERIC:
-                        mInDebitNumericSlot = true;
-                        break;
+                    case GncXmlHelper.KEY_PLACEHOLDER -> mInPlaceHolderSlot = true;
+                    case GncXmlHelper.KEY_COLOR -> mInColorSlot = true;
+                    case GncXmlHelper.KEY_FAVORITE -> mInFavoriteSlot = true;
+                    case GncXmlHelper.KEY_NOTES -> mIsNote = true;
+                    case GncXmlHelper.KEY_DEFAULT_TRANSFER_ACCOUNT ->
+                            mInDefaultTransferAccount = true;
+                    case GncXmlHelper.KEY_EXPORTED -> mInExported = true;
+                    case GncXmlHelper.KEY_SPLIT_ACCOUNT_SLOT -> mInSplitAccountSlot = true;
+                    case GncXmlHelper.KEY_CREDIT_NUMERIC -> mInCreditNumericSlot = true;
+                    case GncXmlHelper.KEY_DEBIT_NUMERIC -> mInDebitNumericSlot = true;
                 }
                 if (mInBudgetSlot && mBudgetAmountAccountUID == null) {
                     mBudgetAmountAccountUID = characterString;
@@ -588,7 +551,7 @@ public class GncXmlHandler extends DefaultHandler {
                             //currency doesn't matter since we don't persist it in the budgets table
                             mBudgetAmount.setAmount(new Money(bigDecimal, Commodity.DEFAULT_COMMODITY));
                         } catch (ParseException e) {
-                            mBudgetAmount.setAmount(Money.getZeroInstance()); //just put zero, in case it was a formula we couldnt parse
+                            mBudgetAmount.setAmount(Objects.requireNonNull(Money.getZeroInstance())); //just put zero, in case it was a formula we couldnt parse
                             e.printStackTrace();
                         } finally {
                             mBudget.addBudgetAmount(mBudgetAmount);
@@ -647,13 +610,7 @@ public class GncXmlHandler extends DefaultHandler {
                 try {
                     // The value and quantity can have different sign for custom currency(stock).
                     // Use the sign of value for split, as it would not be custom currency
-                    String q = characterString;
-                    if (q.charAt(0) == '-') {
-                        mNegativeQuantity = true;
-                        q = q.substring(1);
-                    } else {
-                        mNegativeQuantity = false;
-                    }
+                    mNegativeQuantity = (characterString.charAt(0) == '-');
                     mValue = GncXmlHelper.parseSplitAmount(characterString).abs(); // use sign from quantity
                 } catch (ParseException e) {
                     String msg = "Error parsing split quantity - " + characterString;
@@ -753,7 +710,7 @@ public class GncXmlHandler extends DefaultHandler {
                 break;
             case GncXmlHelper.TAG_GDATE:
                 try {
-                    long date = GncXmlHelper.DATE_FORMATTER.parse(characterString).getTime();
+                    long date = Objects.requireNonNull(GncXmlHelper.DATE_FORMATTER.parse(characterString)).getTime();
                     if (mIsScheduledStart && mScheduledAction != null) {
                         mScheduledAction.setCreatedTimestamp(new Timestamp(date));
                         mIsScheduledStart = false;
@@ -796,7 +753,7 @@ public class GncXmlHandler extends DefaultHandler {
 
             case GncXmlHelper.TAG_SCHEDULED_ACTION:
                 if (mScheduledAction.getActionUID() != null && !mIgnoreScheduledAction) {
-                    if (mScheduledAction.getRecurrence().getPeriodType() == PeriodType.WEEK) {
+                    if (Objects.requireNonNull(mScheduledAction.getRecurrence()).getPeriodType() == PeriodType.WEEK) {
                         // TODO: implement parsing of by days for scheduled actions
                         setMinimalScheduledActionByDays();
                     }
@@ -824,9 +781,9 @@ public class GncXmlHandler extends DefaultHandler {
                         FirebaseCrashlytics.getInstance().log(message);
                         throw new SAXException(message);
                     } else {
-                        mPrice.setValueNum(Long.valueOf(parts[0]));
-                        mPrice.setValueDenom(Long.valueOf(parts[1]));
-                        Log.d(getClass().getName(), "price " + characterString +
+                        mPrice.setValueNum(Long.parseLong(parts[0]));
+                        mPrice.setValueDenom(Long.parseLong(parts[1]));
+                        Log.d(LOG_TAG, "price " + characterString +
                                 " .. " + mPrice.getValueNum() + "/" + mPrice.getValueDenom());
                     }
                 }
@@ -899,8 +856,8 @@ public class GncXmlHandler extends DefaultHandler {
                 account.setParentUID(mRootAccount.getUID());
                 topLevel = true;
             }
-            if (topLevel || (mRootAccount.getUID().equals(account.getParentUID()))) {
-                if (account.getName().startsWith(imbalancePrefix)) {
+            if (topLevel || (Objects.equals(mRootAccount.getUID(), account.getParentUID()))) {
+                if (Objects.requireNonNull(account.getName()).startsWith(imbalancePrefix)) {
                     mapImbalanceAccount.put(account.getName().substring(imbalancePrefix.length()), account);
                 }
             }
@@ -940,7 +897,7 @@ public class GncXmlHandler extends DefaultHandler {
                 Account parentAccount = mAccountMap.get(parentUID);
                 // ROOT account will be added if not exist, so now anly ROOT
                 // has an empty parent
-                if (parentAccount.getAccountType() == AccountType.ROOT) {
+                if (Objects.requireNonNull(parentAccount).getAccountType() == AccountType.ROOT) {
                     // top level account, full name is the same as its name
                     mapFullName.put(acc.getUID(), acc.getName());
                     stack.pop();
@@ -978,8 +935,6 @@ public class GncXmlHandler extends DefaultHandler {
 
     /**
      * Saves the imported data to the database
-     *
-     * @return GUID of the newly created book, or null if not successful
      */
     private void saveToDatabase() {
         BooksDbAdapter booksDbAdapter = BooksDbAdapter.getInstance();
@@ -989,36 +944,35 @@ public class GncXmlHandler extends DefaultHandler {
 
         long startTime = System.nanoTime();
         mAccountsDbAdapter.beginTransaction();
-        Log.d(getClass().getSimpleName(), "bulk insert starts");
+        Log.d(LOG_TAG, "bulk insert starts");
         try {
             // disable foreign key. The database structure should be ensured by the data inserted.
             // it will make insertion much faster.
             mAccountsDbAdapter.enableForeignKey(false);
-            Log.d(getClass().getSimpleName(), "before clean up db");
+            Log.d(LOG_TAG, "before clean up db");
             mAccountsDbAdapter.deleteAllRecords();
-            Log.d(getClass().getSimpleName(), String.format("deb clean up done %d ns", System.nanoTime() - startTime));
+            Log.d(LOG_TAG, String.format("deb clean up done %d ns", System.nanoTime() - startTime));
             long nAccounts = mAccountsDbAdapter.bulkAddRecords(mAccountList, DatabaseAdapter.UpdateMethod.insert);
-            Log.d("Handler:", String.format("%d accounts inserted", nAccounts));
+            Log.d(LOG_TAG, String.format("%d accounts inserted", nAccounts));
             //We need to add scheduled actions first because there is a foreign key constraint on transactions
             //which are generated from scheduled actions (we do auto-create some transactions during import)
             long nSchedActions = mScheduledActionsDbAdapter.bulkAddRecords(mScheduledActionsList, DatabaseAdapter.UpdateMethod.insert);
-            Log.d("Handler:", String.format("%d scheduled actions inserted", nSchedActions));
+            Log.d(LOG_TAG, String.format("%d scheduled actions inserted", nSchedActions));
 
             long nTempTransactions = mTransactionsDbAdapter.bulkAddRecords(mTemplateTransactions, DatabaseAdapter.UpdateMethod.insert);
-            Log.d("Handler:", String.format("%d template transactions inserted", nTempTransactions));
+            Log.d(LOG_TAG, String.format("%d template transactions inserted", nTempTransactions));
 
             long nTransactions = mTransactionsDbAdapter.bulkAddRecords(mTransactionList, DatabaseAdapter.UpdateMethod.insert);
-            Log.d("Handler:", String.format("%d transactions inserted", nTransactions));
+            Log.d(LOG_TAG, String.format("%d transactions inserted", nTransactions));
 
             long nPrices = mPricesDbAdapter.bulkAddRecords(mPriceList, DatabaseAdapter.UpdateMethod.insert);
-            Log.d(getClass().getSimpleName(), String.format("%d prices inserted", nPrices));
+            Log.d(LOG_TAG, String.format("%d prices inserted", nPrices));
 
-            //// TODO: 01.06.2016 Re-enable import of Budget stuff when the UI is complete
-//            long nBudgets = mBudgetsDbAdapter.bulkAddRecords(mBudgetList, DatabaseAdapter.UpdateMethod.insert);
-//            Log.d(getClass().getSimpleName(), String.format("%d budgets inserted", nBudgets));
+            long nBudgets = mBudgetsDbAdapter.bulkAddRecords(mBudgetList, DatabaseAdapter.UpdateMethod.insert);
+            Log.d(LOG_TAG, String.format("%d budgets inserted", nBudgets));
 
             long endTime = System.nanoTime();
-            Log.d(getClass().getSimpleName(), String.format("bulk insert time: %d", endTime - startTime));
+            Log.d(LOG_TAG, String.format("bulk insert time: %d", endTime - startTime));
 
             //if all of the import went smoothly, then add the book to the book db
             booksDbAdapter.addRecord(mBook, DatabaseAdapter.UpdateMethod.insert);
@@ -1036,7 +990,7 @@ public class GncXmlHandler extends DefaultHandler {
      * @return GUID of the newly imported book
      */
     public @NonNull String getBookUID() {
-        return mBook.getUID();
+        return Objects.requireNonNull(mBook.getUID());
     }
 
     /**
@@ -1048,7 +1002,7 @@ public class GncXmlHandler extends DefaultHandler {
      */
     private Commodity getCommodityForAccount(String accountUID) {
         try {
-            return mAccountMap.get(accountUID).getCommodity();
+            return Objects.requireNonNull(mAccountMap.get(accountUID)).getCommodity();
         } catch (Exception e) {
             FirebaseCrashlytics.getInstance().recordException(e);
             return Commodity.DEFAULT_COMMODITY;
@@ -1064,8 +1018,7 @@ public class GncXmlHandler extends DefaultHandler {
     private void handleEndOfTemplateNumericSlot(String characterString, TransactionType splitType) {
         try {
             // HACK: Check for bug #562. If a value has already been set, ignore the one just read
-            if (mSplit.getValue().equals(
-                    new Money(BigDecimal.ZERO, mSplit.getValue().getCommodity()))) {
+            if (Objects.equals(mSplit.getValue(), new Money(BigDecimal.ZERO, Objects.requireNonNull(mSplit.getValue()).getCommodity()))) {
                 BigDecimal amountBigD = GncXmlHelper.parseSplitAmount(characterString);
                 Money amount = new Money(amountBigD, getCommodityForAccount(mSplit.getAccountUID()));
 
@@ -1109,9 +1062,10 @@ public class GncXmlHandler extends DefaultHandler {
         int generatedTransactionCount = 0;
         long period = scheduledAction.getPeriod();
         final String actionUID = scheduledAction.getActionUID();
+        assert actionUID != null;
         while ((lastRuntime = lastRuntime + period) <= System.currentTimeMillis()) {
             for (Transaction templateTransaction : mTemplateTransactions) {
-                if (templateTransaction.getUID().equals(actionUID)) {
+                if (actionUID.equals(templateTransaction.getUID())) {
                     Transaction transaction = new Transaction(templateTransaction, true);
                     transaction.setTime(lastRuntime);
                     transaction.setScheduledActionUID(scheduledAction.getUID());
@@ -1139,7 +1093,7 @@ public class GncXmlHandler extends DefaultHandler {
     private void setMinimalScheduledActionByDays() {
         Calendar calendar = Calendar.getInstance();
         calendar.setTime(new Date(mScheduledAction.getStartTime()));
-        mScheduledAction.getRecurrence().setByDays(
+        Objects.requireNonNull(mScheduledAction.getRecurrence()).setByDays(
                 Collections.singletonList(calendar.get(Calendar.DAY_OF_WEEK)));
     }
 }

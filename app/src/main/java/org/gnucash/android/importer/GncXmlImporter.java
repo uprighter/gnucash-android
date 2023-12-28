@@ -41,6 +41,8 @@ import javax.xml.parsers.SAXParserFactory;
  */
 public class GncXmlImporter {
 
+    public static final String LOG_TAG = GncXmlImporter.class.getName();
+
     /**
      * Parse GnuCash XML input and populates the database
      *
@@ -63,19 +65,20 @@ public class GncXmlImporter {
             bos = new BufferedInputStream(pb);
 
         //TODO: Set an error handler which can log errors
-        Log.d(GncXmlImporter.class.getSimpleName(), "Start import");
+        Log.d(LOG_TAG, "Start import");
         GncXmlHandler handler = new GncXmlHandler();
         xr.setContentHandler(handler);
         long startTime = System.nanoTime();
         xr.parse(new InputSource(bos));
         long endTime = System.nanoTime();
-        Log.d(GncXmlImporter.class.getSimpleName(), String.format("%d ns spent on importing the file", endTime - startTime));
+        Log.d(LOG_TAG, String.format("%d ns spent on importing the file", endTime - startTime));
 
         String bookUID = handler.getBookUID();
         PreferencesHelper.setLastExportTime(
                 TransactionsDbAdapter.getInstance().getTimestampOfLastModification(),
                 bookUID
         );
+        handler.close();
 
         return bookUID;
     }
