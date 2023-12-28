@@ -42,6 +42,8 @@ import org.xml.sax.SAXException;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.Locale;
+import java.util.Objects;
 
 import javax.xml.parsers.ParserConfigurationException;
 
@@ -282,16 +284,16 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             try {
                 Method method = MigrationHelper.class.getDeclaredMethod("upgradeDbToVersion" + (oldVersion + 1), SQLiteDatabase.class);
                 Object result = method.invoke(null, db);
-                oldVersion = Integer.parseInt(result.toString());
+                oldVersion = Integer.parseInt(Objects.requireNonNull(result).toString());
 
             } catch (NoSuchMethodException e) {
-                String msg = String.format("Database upgrade method upgradeToVersion%d(SQLiteDatabase) definition not found ", newVersion);
+                String msg = String.format(Locale.getDefault(), "Database upgrade method upgradeToVersion%d(SQLiteDatabase) definition not found ", newVersion);
                 Log.e(LOG_TAG, msg, e);
                 FirebaseCrashlytics.getInstance().log(msg);
                 FirebaseCrashlytics.getInstance().recordException(e);
                 throw new RuntimeException(e);
             } catch (IllegalAccessException e) {
-                String msg = String.format("Database upgrade to version %d failed. The upgrade method is inaccessible ", newVersion);
+                String msg = String.format(Locale.getDefault(), "Database upgrade to version %d failed. The upgrade method is inaccessible ", newVersion);
                 Log.e(LOG_TAG, msg, e);
                 FirebaseCrashlytics.getInstance().log(msg);
                 FirebaseCrashlytics.getInstance().recordException(e);

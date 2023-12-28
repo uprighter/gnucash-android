@@ -48,7 +48,7 @@ public abstract class DatabaseAdapter<Model extends BaseModel> {
     /**
      * Tag for logging
      */
-    protected String LOG_TAG = DatabaseAdapter.class.getName();
+    protected String LOG_TAG = this.getClass().getName();
 
     /**
      * SQLite database

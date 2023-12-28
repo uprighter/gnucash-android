@@ -44,14 +44,14 @@ public abstract class DatabaseCursorLoader extends AsyncTaskLoader<Cursor> {
     /**
      * {@link DatabaseAdapter} which will be used to load the records from the database
      */
-    protected DatabaseAdapter mDatabaseAdapter = null;
+    protected DatabaseAdapter<?> mDatabaseAdapter = null;
 
     /**
      * A content observer which monitors the cursor and provides notifications when
      * the dataset backing the cursor changes. You need to register the oberserver on
      * your cursor using {@link #registerContentObserver(Cursor)}
      */
-    protected final Loader.ForceLoadContentObserver mObserver;
+    protected final Loader<?>.ForceLoadContentObserver mObserver;
 
     /**
      * Constructor
@@ -147,7 +147,8 @@ public abstract class DatabaseCursorLoader extends AsyncTaskLoader<Cursor> {
      * @param c {@link Cursor} to be released
      */
     protected void onReleaseResources(Cursor c) {
-        if (c != null)
+        if (c != null) {
             c.close();
+        }
     }
 }

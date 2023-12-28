@@ -79,6 +79,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.TimeZone;
 
 import javax.xml.parsers.ParserConfigurationException;
@@ -92,7 +93,7 @@ import javax.xml.parsers.SAXParserFactory;
  */
 @SuppressWarnings("unused")
 public class MigrationHelper {
-    public static final String LOG_TAG = "MigrationHelper";
+    public static final String LOG_TAG = MigrationHelper.class.getName();
 
     /**
      * Performs same function as {@link AccountsDbAdapter#getFullyQualifiedAccountName(String)}
@@ -175,19 +176,13 @@ public class MigrationHelper {
     static void moveFile(File src, File dst) throws IOException {
         Log.d(LOG_TAG, String.format(Locale.US, "Moving %s from %s to %s",
                 src.getName(), src.getParent(), dst.getParent()));
-        FileChannel inChannel = new FileInputStream(src).getChannel();
-        FileChannel outChannel = new FileOutputStream(dst).getChannel();
-        try {
+        try (FileChannel inChannel = new FileInputStream(src).getChannel(); FileChannel outChannel = new FileOutputStream(dst).getChannel()) {
             long bytesCopied = inChannel.transferTo(0, inChannel.size(), outChannel);
             if (bytesCopied >= src.length()) {
                 boolean result = src.delete();
                 String msg = result ? "Deleted src file: " : "Could not delete src: ";
                 Log.d(LOG_TAG, msg + src.getPath());
             }
-        } finally {
-            if (inChannel != null)
-                inChannel.close();
-            outChannel.close();
         }
     }
 
@@ -197,42 +192,40 @@ public class MigrationHelper {
      * <p>The new folder structure also futher enables parallel installation of multiple flavours of
      * the program (like development and production) on the same device.</p>
      */
-    static final Runnable moveExportedFilesToNewDefaultLocation = new Runnable() {
-        @Override
-        public void run() {
-            File oldExportFolder = new File(Environment.getExternalStorageDirectory() + "/gnucash");
-            if (oldExportFolder.exists()) {
-                for (File src : oldExportFolder.listFiles()) {
-                    if (src.isDirectory())
-                        continue;
-                    File dst = new File(Exporter.LEGACY_BASE_FOLDER_PATH + "/exports/" + src.getName());
-                    try {
-                        MigrationHelper.moveFile(src, dst);
-                    } catch (IOException e) {
-                        Log.e(LOG_TAG, "Error migrating " + src.getName());
-                        FirebaseCrashlytics.getInstance().recordException(e);
-                    }
-                }
-            } else {
-                //if the base folder does not exist, no point going one level deeper
-                return;
-            }
-
-            File oldBackupFolder = new File(oldExportFolder, "backup");
-            if (oldBackupFolder.exists()) {
-                for (File src : new File(oldExportFolder, "backup").listFiles()) {
-                    File dst = new File(Exporter.LEGACY_BASE_FOLDER_PATH + "/backups/" + src.getName());
-                    try {
-                        MigrationHelper.moveFile(src, dst);
-                    } catch (IOException e) {
-                        Log.e(LOG_TAG, "Error migrating backup: " + src.getName());
-                        FirebaseCrashlytics.getInstance().recordException(e);
-                    }
+    static final Runnable moveExportedFilesToNewDefaultLocation = () -> {
+        File oldExportFolder = new File(Environment.getExternalStorageDirectory() + "/gnucash");
+        if (oldExportFolder.exists()) {
+            for (File src : Objects.requireNonNull(oldExportFolder.listFiles())) {
+                if (src.isDirectory())
+                    continue;
+                File dst = new File(Exporter.LEGACY_BASE_FOLDER_PATH + "/exports/" + src.getName());
+                try {
+                    MigrationHelper.moveFile(src, dst);
+                } catch (IOException e) {
+                    Log.e(LOG_TAG, "Error migrating " + src.getName());
+                    FirebaseCrashlytics.getInstance().recordException(e);
                 }
             }
+        } else {
+            //if the base folder does not exist, no point going one level deeper
+            return;
+        }
 
-            if (oldBackupFolder.delete())
-                oldExportFolder.delete();
+        File oldBackupFolder = new File(oldExportFolder, "backup");
+        if (oldBackupFolder.exists()) {
+            for (File src : Objects.requireNonNull(new File(oldExportFolder, "backup").listFiles())) {
+                File dst = new File(Exporter.LEGACY_BASE_FOLDER_PATH + "/backups/" + src.getName());
+                try {
+                    MigrationHelper.moveFile(src, dst);
+                } catch (IOException e) {
+                    Log.e(LOG_TAG, "Error migrating backup: " + src.getName());
+                    FirebaseCrashlytics.getInstance().recordException(e);
+                }
+            }
+        }
+
+        if (oldBackupFolder.delete() && oldExportFolder.delete()) {
+            Log.d(LOG_TAG, String.format("old backup/export folder %s and %s deleted.", oldBackupFolder, oldExportFolder));
         }
     };
 
@@ -248,8 +241,7 @@ public class MigrationHelper {
                 .openRawResource(R.raw.iso_4217_currencies);
         BufferedInputStream bos = new BufferedInputStream(commoditiesInputStream);
 
-        /** Create handler to handle XML Tags ( extends DefaultHandler ) */
-
+        /* Create handler to handle XML Tags ( extends DefaultHandler ) */
         CommoditiesXmlHandler handler = new CommoditiesXmlHandler(db);
 
         xr.setContentHandler(handler);
@@ -366,8 +358,9 @@ public class MigrationHelper {
             String uid = cursor.getString(cursor.getColumnIndexOrThrow(AccountEntry.COLUMN_UID));
             String fullName = getFullyQualifiedAccountName(db, uid);
 
-            if (fullName == null)
+            if (fullName == null) {
                 continue;
+            }
 
             ContentValues contentValues = new ContentValues();
             contentValues.put(AccountEntry.COLUMN_FULL_NAME, fullName);
@@ -1493,7 +1486,7 @@ public class MigrationHelper {
 
         //cancel the existing pending intent so that the alarm can be rescheduled
         Intent alarmIntent = new Intent(context, ScheduledActionService.class);
-        PendingIntent pendingIntent = PendingIntent.getService(context, 0, alarmIntent, PendingIntent.FLAG_NO_CREATE);
+        PendingIntent pendingIntent = PendingIntent.getService(context, 0, alarmIntent, PendingIntent.FLAG_NO_CREATE | PendingIntent.FLAG_IMMUTABLE);
         if (pendingIntent != null) {
             AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
             alarmManager.cancel(pendingIntent);

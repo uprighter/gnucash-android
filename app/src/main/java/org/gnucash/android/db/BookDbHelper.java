@@ -37,6 +37,7 @@ import org.gnucash.android.util.RecursiveMoveFiles;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Objects;
 
 /**
  * Database helper for managing database which stores information about the books in the application
@@ -46,7 +47,7 @@ import java.io.IOException;
  */
 public class BookDbHelper extends SQLiteOpenHelper {
 
-    public static final String LOG_TAG = "BookDbHelper";
+    public static final String LOG_TAG = BookDbHelper.class.getName();
 
     private final Context mContext;
 
@@ -93,7 +94,7 @@ public class BookDbHelper extends SQLiteOpenHelper {
             helper.close();
 
             File src = new File(mainDbPath);
-            File dst = new File(src.getParent(), book.getUID());
+            File dst = new File(src.getParent(), Objects.requireNonNull(book.getUID()));
             try {
                 MigrationHelper.moveFile(src, dst);
             } catch (IOException e) {
@@ -111,15 +112,16 @@ public class BookDbHelper extends SQLiteOpenHelper {
         if (count == 0) { //no book in the database, create a default one
             Log.i(LOG_TAG, "No books found in database, creating default book");
             Book book = new Book();
-            DatabaseHelper helper = new DatabaseHelper(GnuCashApplication.getAppContext(), book.getUID());
-            SQLiteDatabase mainDb = helper.getWritableDatabase(); //actually create the db
-            AccountsDbAdapter accountsDbAdapter = new AccountsDbAdapter(mainDb,
-                    new TransactionsDbAdapter(mainDb, new SplitsDbAdapter(mainDb)));
+            try(DatabaseHelper helper = new DatabaseHelper(GnuCashApplication.getAppContext(), book.getUID())) {
+                SQLiteDatabase mainDb = helper.getWritableDatabase(); //actually create the db
+                AccountsDbAdapter accountsDbAdapter = new AccountsDbAdapter(mainDb,
+                        new TransactionsDbAdapter(mainDb, new SplitsDbAdapter(mainDb)));
 
-            String rootAccountUID = accountsDbAdapter.getOrCreateGnuCashRootAccountUID();
-            book.setRootAccountUID(rootAccountUID);
-            book.setActive(true);
-            insertBook(db, book);
+                String rootAccountUID = accountsDbAdapter.getOrCreateGnuCashRootAccountUID();
+                book.setRootAccountUID(rootAccountUID);
+                book.setActive(true);
+                insertBook(db, book);
+            }
         }
 
     }
@@ -131,8 +133,9 @@ public class BookDbHelper extends SQLiteOpenHelper {
      * @return SQLiteDatabase of the book
      */
     public static SQLiteDatabase getDatabase(String bookUID) {
-        DatabaseHelper dbHelper = new DatabaseHelper(GnuCashApplication.getAppContext(), bookUID);
-        return dbHelper.getWritableDatabase();
+        try(DatabaseHelper dbHelper = new DatabaseHelper(GnuCashApplication.getAppContext(), bookUID)) {
+            return dbHelper.getWritableDatabase();
+        }
     }
 
     /**
@@ -166,11 +169,11 @@ public class BookDbHelper extends SQLiteOpenHelper {
         newBasePath.mkdirs();
 
         File src = new File(Exporter.LEGACY_BASE_FOLDER_PATH + "/backups/");
-        File dst = new File(Exporter.LEGACY_BASE_FOLDER_PATH + "/" + activeBookUID + "/backups/");
+        File dst = new File(Exporter.BASE_FOLDER_PATH + "/" + activeBookUID + "/backups/");
         new Thread(new RecursiveMoveFiles(src, dst)).start();
 
         src = new File(Exporter.LEGACY_BASE_FOLDER_PATH + "/exports/");
-        dst = new File(Exporter.LEGACY_BASE_FOLDER_PATH + "/" + activeBookUID + "/exports/");
+        dst = new File(Exporter.BASE_FOLDER_PATH + "/" + activeBookUID + "/exports/");
         new Thread(new RecursiveMoveFiles(src, dst)).start();
 
         File nameFile = new File(newBasePath, "Book 1");
