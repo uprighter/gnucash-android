@@ -21,7 +21,6 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.Editor;
@@ -35,22 +34,23 @@ import android.util.SparseArray;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
-import android.view.View;
-import android.view.ViewGroup;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.coordinatorlayout.widget.CoordinatorLayout;
 import androidx.fragment.app.Fragment;
-import androidx.fragment.app.FragmentManager;
-import androidx.fragment.app.FragmentPagerAdapter;
+import androidx.fragment.app.FragmentActivity;
 import androidx.preference.PreferenceManager;
 import androidx.viewbinding.ViewBinding;
-import androidx.viewpager.widget.ViewPager;
+import androidx.viewpager2.adapter.FragmentStateAdapter;
+import androidx.viewpager2.widget.ViewPager2;
 
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.material.tabs.TabLayout;
+import com.google.android.material.tabs.TabLayoutMediator;
 import com.google.firebase.crashlytics.FirebaseCrashlytics;
 
 import org.gnucash.android.BuildConfig;
@@ -85,14 +85,9 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
     public static final int REQUEST_PICK_ACCOUNTS_FILE = 0x1;
 
     /**
-     * Request code for opening the account to edit
-     */
-    public static final int REQUEST_EDIT_ACCOUNT = 0x10;
-
-    /**
      * Logging tag
      */
-    protected static final String LOG_TAG = "AccountsActivity";
+    protected static final String LOG_TAG = AccountsActivity.class.getName();
 
     /**
      * Number of pages to show
@@ -132,68 +127,52 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
     /**
      * ViewPager which manages the different tabs
      */
-    ViewPager mViewPager;
+    ViewPager2 mViewPager;
     FloatingActionButton mFloatingActionButton;
     CoordinatorLayout mCoordinatorLayout;
+    TabLayout mTabLayout;
 
     private AccountViewPagerAdapter mPagerAdapter;
+
+    private final ActivityResultLauncher<Intent> addAccountLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                Log.d(LOG_TAG, "launch intent: result = " + result);
+                if (result.getResultCode() == Activity.RESULT_CANCELED) {
+                    Log.d(LOG_TAG, "intent cancelled.");
+                }
+            }
+    );
 
     /**
      * Adapter for managing the sub-account and transaction fragment pages in the accounts view
      */
-    private class AccountViewPagerAdapter extends FragmentPagerAdapter {
+    private class AccountViewPagerAdapter extends FragmentStateAdapter {
 
-        public AccountViewPagerAdapter(FragmentManager fm) {
-            super(fm);
+        public AccountViewPagerAdapter(FragmentActivity fa) {
+            super(fa);
         }
 
         @Override
         @NonNull
-        public Fragment getItem(int i) {
-            AccountsListFragment currentFragment = (AccountsListFragment) mFragmentPageReferenceMap.get(i);
+        public Fragment createFragment(int position) {
+            AccountsListFragment currentFragment = (AccountsListFragment) mFragmentPageReferenceMap.get(position);
             if (currentFragment == null) {
-                switch (i) {
-                    case INDEX_RECENT_ACCOUNTS_FRAGMENT:
-                        currentFragment = AccountsListFragment.newInstance(AccountsListFragment.DisplayMode.RECENT);
-                        break;
-
-                    case INDEX_FAVORITE_ACCOUNTS_FRAGMENT:
-                        currentFragment = AccountsListFragment.newInstance(AccountsListFragment.DisplayMode.FAVORITES);
-                        break;
-
-                    case INDEX_TOP_LEVEL_ACCOUNTS_FRAGMENT:
-                    default:
-                        currentFragment = AccountsListFragment.newInstance(AccountsListFragment.DisplayMode.TOP_LEVEL);
-                        break;
-                }
-                mFragmentPageReferenceMap.put(i, currentFragment);
+                currentFragment = switch (position) {
+                    case INDEX_RECENT_ACCOUNTS_FRAGMENT ->
+                            AccountsListFragment.newInstance(AccountsListFragment.DisplayMode.RECENT);
+                    case INDEX_FAVORITE_ACCOUNTS_FRAGMENT ->
+                            AccountsListFragment.newInstance(AccountsListFragment.DisplayMode.FAVORITES);
+                    default ->
+                            AccountsListFragment.newInstance(AccountsListFragment.DisplayMode.TOP_LEVEL);
+                };
+                mFragmentPageReferenceMap.put(position, currentFragment);
             }
             return currentFragment;
         }
 
         @Override
-        public void destroyItem(@NonNull ViewGroup container, int position, @NonNull Object object) {
-            super.destroyItem(container, position, object);
-            mFragmentPageReferenceMap.remove(position);
-        }
-
-        @Override
-        public CharSequence getPageTitle(int position) {
-            switch (position) {
-                case INDEX_RECENT_ACCOUNTS_FRAGMENT:
-                    return getString(R.string.title_recent_accounts);
-
-                case INDEX_FAVORITE_ACCOUNTS_FRAGMENT:
-                    return getString(R.string.title_favorite_accounts);
-
-                case INDEX_TOP_LEVEL_ACCOUNTS_FRAGMENT:
-                default:
-                    return getString(R.string.title_all_accounts);
-            }
-        }
-
-        @Override
-        public int getCount() {
+        public int getItemCount() {
             return DEFAULT_NUM_PAGES;
         }
     }
@@ -201,8 +180,9 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
     public AccountsListFragment getCurrentAccountListFragment() {
         int index = mViewPager.getCurrentItem();
         Fragment fragment = (Fragment) mFragmentPageReferenceMap.get(index);
-        if (fragment == null)
-            fragment = mPagerAdapter.getItem(index);
+        if (fragment == null) {
+            fragment = mPagerAdapter.createFragment(index);
+        }
         return (AccountsListFragment) fragment;
     }
 
@@ -217,6 +197,7 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
         mViewPager = viewBinding.pager;
         mFloatingActionButton = viewBinding.fabCreateAccount;
         mCoordinatorLayout = viewBinding.coordinatorLayout;
+        mTabLayout = viewBinding.tabLayout;
 
         return viewBinding;
     }
@@ -235,18 +216,29 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
 
         init();
 
-        TabLayout tabLayout = findViewById(R.id.tab_layout);
-        tabLayout.addTab(tabLayout.newTab().setText(R.string.title_recent_accounts));
-        tabLayout.addTab(tabLayout.newTab().setText(R.string.title_all_accounts));
-        tabLayout.addTab(tabLayout.newTab().setText(R.string.title_favorite_accounts));
-        tabLayout.setTabGravity(TabLayout.GRAVITY_FILL);
+        mTabLayout.addTab(mTabLayout.newTab().setText(R.string.title_recent_accounts));
+        mTabLayout.addTab(mTabLayout.newTab().setText(R.string.title_all_accounts));
+        mTabLayout.addTab(mTabLayout.newTab().setText(R.string.title_favorite_accounts));
+        mTabLayout.setTabGravity(TabLayout.GRAVITY_FILL);
 
         //show the simple accounts list
-        mPagerAdapter = new AccountViewPagerAdapter(getSupportFragmentManager());
+        mPagerAdapter = new AccountViewPagerAdapter(this);
         mViewPager.setAdapter(mPagerAdapter);
 
-        mViewPager.addOnPageChangeListener(new TabLayout.TabLayoutOnPageChangeListener(tabLayout));
-        tabLayout.setOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
+        new TabLayoutMediator(mTabLayout, mViewPager,
+                (@NonNull TabLayout.Tab tab, int position) -> {
+                    Log.d(LOG_TAG, String.format("TabLayoutMediator, position=%d, tab.getText()=%s.", position, tab.getText()));
+                    switch (position) {
+                        case INDEX_RECENT_ACCOUNTS_FRAGMENT ->
+                                tab.setText(getString(R.string.title_recent_accounts));
+                        case INDEX_FAVORITE_ACCOUNTS_FRAGMENT ->
+                                tab.setText(getString(R.string.title_favorite_accounts));
+                        default -> tab.setText(getString(R.string.title_all_accounts));
+                    }
+                }
+        ).attach();
+
+        mTabLayout.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
             @Override
             public void onTabSelected(TabLayout.Tab tab) {
                 mViewPager.setCurrentItem(tab.getPosition());
@@ -265,14 +257,11 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
 
         setCurrentTab();
 
-        mFloatingActionButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Intent addAccountIntent = new Intent(AccountsActivity.this, FormActivity.class);
-                addAccountIntent.setAction(Intent.ACTION_INSERT_OR_EDIT);
-                addAccountIntent.putExtra(UxArgument.FORM_TYPE, FormActivity.FormType.ACCOUNT.name());
-                startActivityForResult(addAccountIntent, AccountsActivity.REQUEST_EDIT_ACCOUNT);
-            }
+        mFloatingActionButton.setOnClickListener(v -> {
+            Intent addAccountIntent = new Intent(AccountsActivity.this, FormActivity.class);
+            addAccountIntent.setAction(Intent.ACTION_INSERT_OR_EDIT);
+            addAccountIntent.putExtra(UxArgument.FORM_TYPE, FormActivity.FormType.ACCOUNT.name());
+            addAccountLauncher.launch(addAccountIntent);
         });
     }
 
@@ -300,8 +289,9 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
 
         int index = mViewPager.getCurrentItem();
         Fragment fragment = (Fragment) mFragmentPageReferenceMap.get(index);
-        if (fragment != null)
+        if (fragment != null) {
             ((Refreshable) fragment).refresh();
+        }
 
         handleOpenFileIntent(intent);
     }
@@ -389,13 +379,7 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
         return new AlertDialog.Builder(context)
                 .setTitle(releaseTitle.toString())
                 .setMessage(R.string.whats_new)
-                .setPositiveButton(R.string.label_dismiss, new DialogInterface.OnClickListener() {
-
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        dialog.dismiss();
-                    }
-                }).show();
+                .setPositiveButton(R.string.label_dismiss, (dialog, which) -> dialog.dismiss()).show();
     }
 
     /**
@@ -416,13 +400,10 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        switch (item.getItemId()) {
-            case android.R.id.home:
-                return super.onOptionsItemSelected(item);
-
-            default:
-                return false;
+        if (item.getItemId() == android.R.id.home) {
+            return super.onOptionsItemSelected(item);
         }
+        return false;
     }
 
     /**
@@ -435,13 +416,10 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
     public static void createDefaultAccounts(final String currencyCode, final Activity activity) {
         TaskDelegate delegate = null;
         if (currencyCode != null) {
-            delegate = new TaskDelegate() {
-                @Override
-                public void onTaskComplete() {
-                    int updated = AccountsDbAdapter.getInstance().updateAllAccounts(DatabaseSchema.AccountEntry.COLUMN_CURRENCY, currencyCode);
-                    Log.d(LOG_TAG, String.format("createDefaultAccounts created %d accounts.", updated));
-                    GnuCashApplication.setDefaultCurrencyCode(currencyCode);
-                }
+            delegate = () -> {
+                int updated = AccountsDbAdapter.getInstance().updateAllAccounts(DatabaseSchema.AccountEntry.COLUMN_CURRENCY, currencyCode);
+                Log.d(LOG_TAG, String.format("createDefaultAccounts created %d accounts.", updated));
+                GnuCashApplication.setDefaultCurrencyCode(currencyCode);
             };
         }
 
@@ -480,18 +458,7 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
      * @see #startXmlFileChooser(Activity)
      */
     public static void startXmlFileChooser(Fragment fragment) {
-        Intent pickIntent = new Intent(Intent.ACTION_GET_CONTENT);
-        pickIntent.addCategory(Intent.CATEGORY_OPENABLE);
-        pickIntent.setType("*/*");
-        Intent chooser = Intent.createChooser(pickIntent, "Select GnuCash account file"); //todo internationalize string
-
-        try {
-            fragment.startActivityForResult(chooser, REQUEST_PICK_ACCOUNTS_FILE);
-        } catch (ActivityNotFoundException ex) {
-            FirebaseCrashlytics.getInstance().log("No file manager for selecting files available");
-            FirebaseCrashlytics.getInstance().recordException(ex);
-            Toast.makeText(fragment.getActivity(), R.string.toast_install_file_manager, Toast.LENGTH_LONG).show();
-        }
+        startXmlFileChooser(fragment.requireActivity());
     }
 
     /**
@@ -536,7 +503,7 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
         Context context = GnuCashApplication.getAppContext();
         Editor editor = PreferenceManager.getDefaultSharedPreferences(context).edit();
         editor.putBoolean(context.getString(R.string.key_first_run), false);
-        editor.commit();
+        editor.apply();
     }
 
 }

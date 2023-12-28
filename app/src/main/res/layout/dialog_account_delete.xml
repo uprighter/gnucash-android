@@ -28,6 +28,7 @@
         layout="@layout/radio_group_delete_or_move" />
 
     <include
+        android:id="@+id/default_buttons"
         layout="@layout/default_buttons"
         android:layout_width="match_parent"
         android:layout_height="wrap_content" />

@@ -82,7 +82,7 @@ public class TransactionsActivity extends BaseDrawerActivity implements
     /**
      * Logging tag
      */
-    protected static final String LOG_TAG = "TransactionsActivity";
+    protected static final String LOG_TAG = TransactionsActivity.class.getName();
 
     /**
      * ViewPager index for sub-accounts fragment
@@ -127,7 +127,6 @@ public class TransactionsActivity extends BaseDrawerActivity implements
                 if (result.getResultCode() == Activity.RESULT_CANCELED) {
                     Log.d(LOG_TAG, "intent cancelled.");
                 }
-//                refresh();
             }
     );
 
@@ -238,7 +237,6 @@ public class TransactionsActivity extends BaseDrawerActivity implements
     @SuppressLint("NotifyDataSetChanged")
     @Override
     public void refresh(String accountUID) {
-
         if (mPagerAdapter != null) {
             mPagerAdapter.notifyDataSetChanged();
         }
@@ -297,7 +295,7 @@ public class TransactionsActivity extends BaseDrawerActivity implements
         }
         new TabLayoutMediator(mTabLayout, mViewPager,
                 (@NonNull TabLayout.Tab tab, int position) -> {
-                    Log.d(LOG_TAG, String.format("TabLayoutMediator, position %d, tab.getText()  %s.", position, tab.getText()));
+                    Log.d(LOG_TAG, String.format("TabLayoutMediator, position=%d, tab.getText()=%s.", position, tab.getText()));
                     if (mIsPlaceholderAccount) {
                         tab.setText(R.string.section_header_subaccounts);
                     } else {

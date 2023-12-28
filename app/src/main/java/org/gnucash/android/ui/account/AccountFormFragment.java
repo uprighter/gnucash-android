@@ -41,11 +41,10 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.CheckBox;
-import android.widget.CompoundButton;
-import android.widget.CompoundButton.OnCheckedChangeListener;
 import android.widget.EditText;
 import android.widget.Spinner;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
@@ -56,6 +55,7 @@ import androidx.fragment.app.FragmentManager;
 import com.google.android.material.textfield.TextInputLayout;
 
 import org.gnucash.android.R;
+import org.gnucash.android.databinding.FragmentAccountFormBinding;
 import org.gnucash.android.db.DatabaseSchema;
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.db.adapter.CommoditiesDbAdapter;
@@ -76,9 +76,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
-
-import butterknife.BindView;
-import butterknife.ButterKnife;
+import java.util.Objects;
 
 /**
  * Fragment used for creating and editing accounts
@@ -88,26 +86,68 @@ import butterknife.ButterKnife;
  */
 public class AccountFormFragment extends Fragment {
 
-    /**
-     * Tag for the color picker dialog fragment
-     */
-    private static final String COLOR_PICKER_DIALOG_TAG = "color_picker_dialog";
-
+    private FragmentAccountFormBinding mBinding;
     /**
      * EditText for the name of the account to be created/edited
      */
-    @BindView(R.id.input_account_name)
-    EditText mNameEditText;
+    private EditText mNameEditText;
 
-    @BindView(R.id.name_text_input_layout)
-    TextInputLayout mTextInputLayout;
+    private TextInputLayout mTextInputLayout;
 
     /**
      * Spinner for selecting the currency of the account
      * Currencies listed are those specified by ISO 4217
      */
-    @BindView(R.id.input_currency_spinner)
-    Spinner mCurrencySpinner;
+    private Spinner mCurrencySpinner;
+
+    /**
+     * Spinner for parent account list
+     */
+    private Spinner mParentAccountSpinner;
+
+    /**
+     * Checkbox which activates the parent account spinner when selected
+     * Leaving this unchecked means it is a top-level root account
+     */
+    private CheckBox mParentCheckBox;
+
+    /**
+     * Spinner for the account type
+     *
+     * @see org.gnucash.android.model.AccountType
+     */
+    private Spinner mAccountTypeSpinner;
+
+    /**
+     * Checkbox for activating the default transfer account spinner
+     */
+    private CheckBox mDefaultTransferAccountCheckBox;
+
+    /**
+     * Spinner for selecting the default transfer account
+     */
+    private Spinner mDefaultTransferAccountSpinner;
+
+    /**
+     * Account description input text view
+     */
+    private EditText mDescriptionEditText;
+
+    /**
+     * Checkbox indicating if account is a placeholder account
+     */
+    private CheckBox mPlaceholderCheckBox;
+
+    /**
+     * Trigger for color picker dialog
+     */
+    private ColorSquare mColorSquare;
+
+
+    /**
+     * Tag for the color picker dialog fragment
+     */
+    private static final String COLOR_PICKER_DIALOG_TAG = "color_picker_dialog";
 
     /**
      * Accounts database adapter
@@ -160,51 +200,6 @@ public class AccountFormFragment extends Fragment {
     private SimpleCursorAdapter mParentAccountCursorAdapter;
 
     /**
-     * Spinner for parent account list
-     */
-    @BindView(R.id.input_parent_account)
-    Spinner mParentAccountSpinner;
-
-    /**
-     * Checkbox which activates the parent account spinner when selected
-     * Leaving this unchecked means it is a top-level root account
-     */
-    @BindView(R.id.checkbox_parent_account)
-    CheckBox mParentCheckBox;
-
-    /**
-     * Spinner for the account type
-     *
-     * @see org.gnucash.android.model.AccountType
-     */
-    @BindView(R.id.input_account_type_spinner)
-    Spinner mAccountTypeSpinner;
-
-    /**
-     * Checkbox for activating the default transfer account spinner
-     */
-    @BindView(R.id.checkbox_default_transfer_account)
-    CheckBox mDefaultTransferAccountCheckBox;
-
-    /**
-     * Spinner for selecting the default transfer account
-     */
-    @BindView(R.id.input_default_transfer_account)
-    Spinner mDefaultTransferAccountSpinner;
-
-    /**
-     * Account description input text view
-     */
-    @BindView(R.id.input_account_description)
-    EditText mDescriptionEditText;
-
-    /**
-     * Checkbox indicating if account is a placeholder account
-     */
-    @BindView(R.id.checkbox_placeholder_account)
-    CheckBox mPlaceholderCheckBox;
-
-    /**
      * Cursor adapter which binds to the spinner for default transfer account
      */
     private SimpleCursorAdapter mDefaultTransferAccountCursorAdapter;
@@ -215,12 +210,6 @@ public class AccountFormFragment extends Fragment {
     private boolean mUseDoubleEntry;
 
     private int mSelectedColor = Account.DEFAULT_COLOR;
-
-    /**
-     * Trigger for color picker dialog
-     */
-    @BindView(R.id.input_color_picker)
-    ColorSquare mColorSquare;
 
     private final ColorPickerSwatch.OnColorSelectedListener mColorSelectedListener =
             new ColorPickerSwatch.OnColorSelectedListener() {
@@ -265,10 +254,21 @@ public class AccountFormFragment extends Fragment {
      * Inflates the dialog view and retrieves references to the dialog elements
      */
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container,
+    public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
-        View view = inflater.inflate(R.layout.fragment_account_form, container, false);
-        ButterKnife.bind(this, view);
+        mBinding = FragmentAccountFormBinding.inflate(inflater, container, false);
+
+        mNameEditText = mBinding.inputAccountName;
+        mTextInputLayout = mBinding.nameTextInputLayout;
+        mCurrencySpinner = mBinding.inputCurrencySpinner;
+         mParentAccountSpinner = mBinding.inputParentAccount;
+         mParentCheckBox = mBinding.checkboxParentAccount;
+         mAccountTypeSpinner = mBinding.inputAccountTypeSpinner;
+         mDefaultTransferAccountCheckBox = mBinding.checkboxDefaultTransferAccount;
+         mDefaultTransferAccountSpinner = mBinding.inputDefaultTransferAccount;
+         mDescriptionEditText = mBinding.inputAccountDescription;
+         mPlaceholderCheckBox = mBinding.checkboxPlaceholderAccount;
+         mColorSquare = mBinding.inputColorPicker;
 
         mNameEditText.addTextChangedListener(new TextWatcher() {
             @Override
@@ -306,30 +306,14 @@ public class AccountFormFragment extends Fragment {
 
         mParentAccountSpinner.setEnabled(false);
 
-        mParentCheckBox.setOnCheckedChangeListener(new OnCheckedChangeListener() {
-
-            @Override
-            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                mParentAccountSpinner.setEnabled(isChecked);
-            }
-        });
+        mParentCheckBox.setOnCheckedChangeListener((buttonView, isChecked) -> mParentAccountSpinner.setEnabled(isChecked));
 
         mDefaultTransferAccountSpinner.setEnabled(false);
-        mDefaultTransferAccountCheckBox.setOnCheckedChangeListener(new OnCheckedChangeListener() {
-            @Override
-            public void onCheckedChanged(CompoundButton compoundButton, boolean isChecked) {
-                mDefaultTransferAccountSpinner.setEnabled(isChecked);
-            }
-        });
+        mDefaultTransferAccountCheckBox.setOnCheckedChangeListener((compoundButton, isChecked) -> mDefaultTransferAccountSpinner.setEnabled(isChecked));
 
-        mColorSquare.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                showColorPickerDialog();
-            }
-        });
+        mColorSquare.setOnClickListener(view -> showColorPickerDialog());
 
-        return view;
+        return mBinding.getRoot();
     }
 
 
@@ -337,8 +321,8 @@ public class AccountFormFragment extends Fragment {
      * Initializes the values of the views in the dialog
      */
     @Override
-    public void onActivityCreated(Bundle savedInstanceState) {
-        super.onActivityCreated(savedInstanceState);
+    public void onViewCreated(@NonNull View view, Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
 
         CommoditiesCursorAdapter commoditiesAdapter = new CommoditiesCursorAdapter(
                 getActivity(), android.R.layout.simple_spinner_item);
@@ -347,9 +331,10 @@ public class AccountFormFragment extends Fragment {
         mCurrencySpinner.setAdapter(commoditiesAdapter);
 
 
-        mAccountUID = getArguments().getString(UxArgument.SELECTED_ACCOUNT_UID);
+        mAccountUID = requireArguments().getString(UxArgument.SELECTED_ACCOUNT_UID);
 
-        ActionBar supportActionBar = ((AppCompatActivity) getActivity()).getSupportActionBar();
+        ActionBar supportActionBar = ((AppCompatActivity) requireActivity()).getSupportActionBar();
+        assert supportActionBar != null;
         if (mAccountUID != null) {
             mAccount = mAccountsDbAdapter.getRecord(mAccountUID);
             supportActionBar.setTitle(R.string.title_edit_account);
@@ -369,11 +354,10 @@ public class AccountFormFragment extends Fragment {
         if (mAccount != null) {
             initializeViewsWithAccount(mAccount);
             //do not immediately open the keyboard when editing an account
-            getActivity().getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
+            requireActivity().getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
         } else {
             initializeViews();
         }
-
     }
 
     /**
@@ -400,7 +384,7 @@ public class AccountFormFragment extends Fragment {
         String currencyCode = account.getCommodity().getCurrencyCode();
         setSelectedCurrency(currencyCode);
 
-        if (mAccountsDbAdapter.getTransactionMaxSplitNum(mAccount.getUID()) > 1) {
+        if (mAccountsDbAdapter.getTransactionMaxSplitNum(Objects.requireNonNull(mAccount.getUID())) > 1) {
             //TODO: Allow changing the currency and effecting the change for all transactions without any currency exchange (purely cosmetic change)
             mCurrencySpinner.setEnabled(false);
         }
@@ -440,7 +424,7 @@ public class AccountFormFragment extends Fragment {
     private void initializeViews() {
         setSelectedCurrency(Money.DEFAULT_CURRENCY_CODE);
         mColorSquare.setBackgroundColor(Color.LTGRAY);
-        mParentAccountUID = getArguments().getString(UxArgument.PARENT_ACCOUNT_UID);
+        mParentAccountUID = requireArguments().getString(UxArgument.PARENT_ACCOUNT_UID);
 
 
         if (mParentAccountUID != null) {
@@ -543,7 +527,7 @@ public class AccountFormFragment extends Fragment {
         TypedArray colorTypedArray = res.obtainTypedArray(R.array.account_colors);
         int[] colorOptions = new int[colorTypedArray.length()];
         for (int i = 0; i < colorTypedArray.length(); i++) {
-            int color = colorTypedArray.getColor(i, ContextCompat.getColor(getContext(),
+            int color = colorTypedArray.getColor(i, ContextCompat.getColor(requireContext(),
                     R.color.title_green));
             colorOptions[i] = color;
         }
@@ -555,7 +539,7 @@ public class AccountFormFragment extends Fragment {
      * Shows the color picker dialog
      */
     private void showColorPickerDialog() {
-        FragmentManager fragmentManager = getActivity().getSupportFragmentManager();
+        FragmentManager fragmentManager = requireActivity().getSupportFragmentManager();
         int currentColor = Color.LTGRAY;
         if (mAccount != null) {
             currentColor = mAccount.getColor();
@@ -570,22 +554,20 @@ public class AccountFormFragment extends Fragment {
     }
 
     @Override
-    public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
+    public void onCreateOptionsMenu(@NonNull Menu menu, @NonNull MenuInflater inflater) {
         super.onCreateOptionsMenu(menu, inflater);
         inflater.inflate(R.menu.default_save_actions, menu);
     }
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        switch (item.getItemId()) {
-            case R.id.menu_save:
+        if (item.getItemId() == R.id.menu_save) {
                 saveAccount();
                 return true;
-
-            case android.R.id.home:
+            } else if (item.getItemId() == android.R.id.home) {
                 finishFragment();
                 return true;
-        }
+            }
 
         return super.onOptionsItemSelected(item);
     }
@@ -663,23 +645,13 @@ public class AccountFormFragment extends Fragment {
     private String getAllowedParentAccountTypes(AccountType type) {
 
         switch (type) {
-            case EQUITY:
+            case EQUITY -> {
                 return "'" + AccountType.EQUITY.name() + "'";
-
-            case INCOME:
-            case EXPENSE:
+            }
+            case INCOME, EXPENSE -> {
                 return "'" + AccountType.EXPENSE.name() + "', '" + AccountType.INCOME.name() + "'";
-
-            case CASH:
-            case BANK:
-            case CREDIT:
-            case ASSET:
-            case LIABILITY:
-            case PAYABLE:
-            case RECEIVABLE:
-            case CURRENCY:
-            case STOCK:
-            case MUTUAL: {
+            }
+            case CASH, BANK, CREDIT, ASSET, LIABILITY, PAYABLE, RECEIVABLE, CURRENCY, STOCK, MUTUAL -> {
                 List<String> accountTypeStrings = getAccountTypeStringList();
                 accountTypeStrings.remove(AccountType.EQUITY.name());
                 accountTypeStrings.remove(AccountType.EXPENSE.name());
@@ -687,13 +659,12 @@ public class AccountFormFragment extends Fragment {
                 accountTypeStrings.remove(AccountType.ROOT.name());
                 return "'" + TextUtils.join("','", accountTypeStrings) + "'";
             }
-
-            case TRADING:
+            case TRADING -> {
                 return "'" + AccountType.TRADING.name() + "'";
-
-            case ROOT:
-            default:
-                return Arrays.toString(AccountType.values()).replaceAll("\\[|]", "");
+            }
+            default -> {
+                return Arrays.toString(AccountType.getEntries().toArray()).replaceAll("[\\[\\]]", "");
+            }
         }
     }
 
@@ -703,7 +674,7 @@ public class AccountFormFragment extends Fragment {
      * @return String list of all account types
      */
     private List<String> getAccountTypeStringList() {
-        String[] accountTypes = Arrays.toString(AccountType.values()).replaceAll("\\[|]", "").split(",");
+        String[] accountTypes = Arrays.toString(AccountType.getEntries().toArray()).replaceAll("[\\[\\]]", "").split(",");
         List<String> accountTypesList = new ArrayList<>();
         for (String accountType : accountTypes) {
             accountTypesList.add(accountType.trim());
@@ -718,7 +689,7 @@ public class AccountFormFragment extends Fragment {
     private void loadAccountTypesList() {
         String[] accountTypes = getResources().getStringArray(R.array.account_type_entry_values);
         ArrayAdapter<String> accountTypesAdapter = new ArrayAdapter<>(
-                getActivity(), android.R.layout.simple_list_item_1, accountTypes);
+                requireActivity(), android.R.layout.simple_list_item_1, accountTypes);
 
         accountTypesAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         mAccountTypeSpinner.setAdapter(accountTypesAdapter);
@@ -730,22 +701,24 @@ public class AccountFormFragment extends Fragment {
      * Depends on how the fragment was loaded, it might have a backstack or not
      */
     private void finishFragment() {
-        InputMethodManager imm = (InputMethodManager) getActivity().getSystemService(
+        InputMethodManager imm = (InputMethodManager) requireActivity().getSystemService(
                 Context.INPUT_METHOD_SERVICE);
         imm.hideSoftInputFromWindow(mNameEditText.getWindowToken(), 0);
 
-        final String action = getActivity().getIntent().getAction();
+        final String action = requireActivity().getIntent().getAction();
         if (action != null && action.equals(Intent.ACTION_INSERT_OR_EDIT)) {
-            getActivity().setResult(Activity.RESULT_OK);
-            getActivity().finish();
+            requireActivity().setResult(Activity.RESULT_OK);
+            requireActivity().finish();
         } else {
-            getActivity().getSupportFragmentManager().popBackStack();
+            requireActivity().getSupportFragmentManager().popBackStack();
         }
     }
 
     @Override
     public void onDestroy() {
         super.onDestroy();
+        mBinding = null;
+
         if (mParentAccountCursor != null)
             mParentAccountCursor.close();
         if (mDefaultTransferAccountCursorAdapter != null) {
@@ -773,7 +746,7 @@ public class AccountFormFragment extends Fragment {
             mAccount = new Account(getEnteredName());
             mAccountsDbAdapter.addRecord(mAccount, DatabaseAdapter.UpdateMethod.insert); //new account, insert it
         } else {
-            nameChanged = !mAccount.getName().equals(getEnteredName());
+            nameChanged = !Objects.equals(mAccount.getName(), getEnteredName());
             mAccount.setName(getEnteredName());
         }
 
@@ -837,11 +810,11 @@ public class AccountFormFragment extends Fragment {
                     // mAccountsDbAdapter.getDescendantAccountUIDs() will ensure a parent-child order
                     Account acct = mapAccount.get(uid);
                     // mAccount cannot be root, so acct here cannot be top level account.
-                    if (mAccount.getUID().equals(acct.getParentUID())) {
+                    if (Objects.equals(mAccount.getUID(), Objects.requireNonNull(acct).getParentUID())) {
                         acct.setFullName(mAccount.getFullName() + AccountsDbAdapter.ACCOUNT_NAME_SEPARATOR + acct.getName());
                     } else {
                         acct.setFullName(
-                                mapAccount.get(acct.getParentUID()).getFullName() +
+                                Objects.requireNonNull(mapAccount.get(acct.getParentUID())).getFullName() +
                                         AccountsDbAdapter.ACCOUNT_NAME_SEPARATOR +
                                         acct.getName()
                         );

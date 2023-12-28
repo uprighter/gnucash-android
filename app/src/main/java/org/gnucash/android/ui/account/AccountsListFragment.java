@@ -503,7 +503,7 @@ public class AccountsListFragment extends Fragment implements
         public void onBindViewHolderCursor(final AccountViewHolder holder, final Cursor cursor) {
             final String accountUID = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseSchema.AccountEntry.COLUMN_UID));
             mAccountsDbAdapter = AccountsDbAdapter.getInstance();
-            holder.accoundId = mAccountsDbAdapter.getID(accountUID);
+            holder.accountId = mAccountsDbAdapter.getID(accountUID);
 
             holder.accountName.setText(cursor.getString(cursor.getColumnIndexOrThrow(DatabaseSchema.AccountEntry.COLUMN_NAME)));
             int subAccountCount = mAccountsDbAdapter.getSubAccountCount(accountUID);
@@ -585,7 +585,7 @@ public class AccountsListFragment extends Fragment implements
             View colorStripView;
             ProgressBar budgetIndicator;
 
-            long accoundId;
+            long accountId;
 
             public AccountViewHolder(CardviewAccountBinding cardviewBinding) {
                 super(cardviewBinding.getRoot());
@@ -614,11 +614,11 @@ public class AccountsListFragment extends Fragment implements
             public boolean onMenuItemClick(MenuItem item) {
                 Log.d(LOG_TAG, "onMenuItemClick, item: " + item);
                 if (item.getItemId() == R.id.context_menu_edit_accounts) {
-                    openCreateOrEditActivity(accoundId);
+                    openCreateOrEditActivity(accountId);
                     return true;
 
                 } else if (item.getItemId() == R.id.context_menu_delete) {
-                    tryDeleteAccount(accoundId);
+                    tryDeleteAccount(accountId);
                     return true;
                 } else {
                     return false;

@@ -22,10 +22,8 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
-import android.widget.CompoundButton;
 import android.widget.RadioButton;
 import android.widget.Spinner;
-import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -34,6 +32,8 @@ import androidx.fragment.app.DialogFragment;
 
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
+import org.gnucash.android.databinding.DialogAccountDeleteBinding;
+import org.gnucash.android.databinding.RadioGroupDeleteOrMoveBinding;
 import org.gnucash.android.db.DatabaseSchema;
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.db.adapter.SplitsDbAdapter;
@@ -106,38 +106,38 @@ public class DeleteAccountDialogFragment extends DialogFragment {
     }
 
     @Override
-    public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        View view = inflater.inflate(R.layout.dialog_account_delete, container, false);
-        View transactionOptionsView = view.findViewById(R.id.transactions_options);
-        ((TextView) transactionOptionsView.findViewById(R.id.title_content)).setText(R.string.section_header_transactions);
-        ((TextView) transactionOptionsView.findViewById(R.id.description)).setText(R.string.label_delete_account_transactions_description);
-        mDeleteTransactionsRadioButton = (RadioButton) transactionOptionsView.findViewById(R.id.radio_delete);
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        DialogAccountDeleteBinding binding = DialogAccountDeleteBinding.inflate(inflater, container, false);
+        RadioGroupDeleteOrMoveBinding transactionOptionsBinding = binding.transactionsOptions;
+        transactionOptionsBinding.titleContent.setText(R.string.section_header_transactions);
+        transactionOptionsBinding.description.setText(R.string.label_delete_account_transactions_description);
+        mDeleteTransactionsRadioButton = transactionOptionsBinding.radioDelete;
         mDeleteTransactionsRadioButton.setText(R.string.label_delete_transactions);
-        mMoveTransactionsRadioButton = (RadioButton) transactionOptionsView.findViewById(R.id.radio_move);
-        mTransactionsDestinationAccountSpinner = (Spinner) transactionOptionsView.findViewById(R.id.target_accounts_spinner);
+        mMoveTransactionsRadioButton = transactionOptionsBinding.radioMove;
+        mTransactionsDestinationAccountSpinner = transactionOptionsBinding.targetAccountsSpinner;
 
-        View accountOptionsView = view.findViewById(R.id.accounts_options);
-        ((TextView) accountOptionsView.findViewById(R.id.title_content)).setText(R.string.section_header_subaccounts);
-        ((TextView) accountOptionsView.findViewById(R.id.description)).setText(R.string.label_delete_account_subaccounts_description);
-        mDeleteAccountsRadioButton = (RadioButton) accountOptionsView.findViewById(R.id.radio_delete);
+        RadioGroupDeleteOrMoveBinding accountOptionsBinding = binding.accountsOptions;
+        accountOptionsBinding.titleContent.setText(R.string.section_header_subaccounts);
+        accountOptionsBinding.description.setText(R.string.label_delete_account_subaccounts_description);
+        mDeleteAccountsRadioButton = accountOptionsBinding.radioDelete;
         mDeleteAccountsRadioButton.setText(R.string.label_delete_sub_accounts);
-        mMoveAccountsRadioButton = (RadioButton) accountOptionsView.findViewById(R.id.radio_move);
-        mAccountsDestinationAccountSpinner = (Spinner) accountOptionsView.findViewById(R.id.target_accounts_spinner);
+        mMoveAccountsRadioButton = accountOptionsBinding.radioMove;
+        mAccountsDestinationAccountSpinner = accountOptionsBinding.targetAccountsSpinner;
 
-        transactionOptionsView.setVisibility(mTransactionCount > 0 ? View.VISIBLE : View.GONE);
-        accountOptionsView.setVisibility(mSubAccountCount > 0 ? View.VISIBLE : View.GONE);
+        transactionOptionsBinding.getRoot().setVisibility(mTransactionCount > 0 ? View.VISIBLE : View.GONE);
+        accountOptionsBinding.getRoot().setVisibility(mSubAccountCount > 0 ? View.VISIBLE : View.GONE);
 
-        mCancelButton = (Button) view.findViewById(R.id.btn_cancel);
-        mOkButton = (Button) view.findViewById(R.id.btn_save);
+        mCancelButton = binding.defaultButtons.btnCancel;
+        mOkButton = binding.defaultButtons.btnSave;
         mOkButton.setText(R.string.alert_dialog_ok_delete);
-        return view;
+        return binding.getRoot();
     }
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         String accountName = AccountsDbAdapter.getInstance().getAccountName(mOriginAccountUID);
-        getDialog().setTitle(getString(R.string.alert_dialog_ok_delete) + ": " + accountName);
+        requireDialog().setTitle(getString(R.string.alert_dialog_ok_delete) + ": " + accountName);
         AccountsDbAdapter accountsDbAdapter = AccountsDbAdapter.getInstance();
         List<String> descendantAccountUIDs = accountsDbAdapter.getDescendantAccountUIDs(mOriginAccountUID, null, null);
 
@@ -186,62 +186,41 @@ public class DeleteAccountDialogFragment extends DialogFragment {
      * Binds click listeners for the dialog buttons
      */
     protected void setListeners() {
-        mMoveAccountsRadioButton.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-            @Override
-            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                mAccountsDestinationAccountSpinner.setEnabled(isChecked);
+        mMoveAccountsRadioButton.setOnCheckedChangeListener((buttonView, isChecked) -> mAccountsDestinationAccountSpinner.setEnabled(isChecked));
+
+        mMoveTransactionsRadioButton.setOnCheckedChangeListener((buttonView, isChecked) -> mTransactionsDestinationAccountSpinner.setEnabled(isChecked));
+
+        mCancelButton.setOnClickListener(v -> dismiss());
+
+        mOkButton.setOnClickListener(v -> {
+            BackupManager.backupActiveBook();
+
+            AccountsDbAdapter accountsDbAdapter = AccountsDbAdapter.getInstance();
+
+            if ((mTransactionCount > 0) && mMoveTransactionsRadioButton.isChecked()) {
+                long targetAccountId = mTransactionsDestinationAccountSpinner.getSelectedItemId();
+                //move all the splits
+                SplitsDbAdapter.getInstance().updateRecords(DatabaseSchema.SplitEntry.COLUMN_ACCOUNT_UID + " = ?",
+                        new String[]{mOriginAccountUID}, DatabaseSchema.SplitEntry.COLUMN_ACCOUNT_UID, accountsDbAdapter.getUID(targetAccountId));
             }
-        });
 
-        mMoveTransactionsRadioButton.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-            @Override
-            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                mTransactionsDestinationAccountSpinner.setEnabled(isChecked);
+            if ((mSubAccountCount > 0) && mMoveAccountsRadioButton.isChecked()) {
+                long targetAccountId = mAccountsDestinationAccountSpinner.getSelectedItemId();
+                AccountsDbAdapter.getInstance().reassignDescendantAccounts(mOriginAccountUID, accountsDbAdapter.getUID(targetAccountId));
             }
-        });
 
-        mCancelButton.setOnClickListener(new View.OnClickListener() {
-
-            @Override
-            public void onClick(View v) {
-                dismiss();
+            if (GnuCashApplication.isDoubleEntryEnabled()) { //reassign splits to imbalance
+                TransactionsDbAdapter.getInstance().deleteTransactionsForAccount(mOriginAccountUID);
             }
-        });
 
-        mOkButton.setOnClickListener(new View.OnClickListener() {
+            //now kill them all!!
+            accountsDbAdapter.recursiveDeleteAccount(accountsDbAdapter.getID(mOriginAccountUID));
 
-            @Override
-            public void onClick(View v) {
-                BackupManager.backupActiveBook();
+            WidgetConfigurationActivity.updateAllWidgets(getActivity());
 
-                AccountsDbAdapter accountsDbAdapter = AccountsDbAdapter.getInstance();
+            getParentFragmentManager().setFragmentResult("delete_account_" + mOriginAccountUID, new Bundle());
 
-                if ((mTransactionCount > 0) && mMoveTransactionsRadioButton.isChecked()) {
-                    long targetAccountId = mTransactionsDestinationAccountSpinner.getSelectedItemId();
-                    //move all the splits
-                    SplitsDbAdapter.getInstance().updateRecords(DatabaseSchema.SplitEntry.COLUMN_ACCOUNT_UID + " = ?",
-                            new String[]{mOriginAccountUID}, DatabaseSchema.SplitEntry.COLUMN_ACCOUNT_UID, accountsDbAdapter.getUID(targetAccountId));
-                }
-
-                if ((mSubAccountCount > 0) && mMoveAccountsRadioButton.isChecked()) {
-                    long targetAccountId = mAccountsDestinationAccountSpinner.getSelectedItemId();
-                    AccountsDbAdapter.getInstance().reassignDescendantAccounts(mOriginAccountUID, accountsDbAdapter.getUID(targetAccountId));
-                }
-
-                if (GnuCashApplication.isDoubleEntryEnabled()) { //reassign splits to imbalance
-                    TransactionsDbAdapter.getInstance().deleteTransactionsForAccount(mOriginAccountUID);
-                }
-
-                //now kill them all!!
-                accountsDbAdapter.recursiveDeleteAccount(accountsDbAdapter.getID(mOriginAccountUID));
-
-                WidgetConfigurationActivity.updateAllWidgets(getActivity());
-
-                getParentFragmentManager().setFragmentResult("delete_account_" + mOriginAccountUID, new Bundle());
-
-                dismiss();
-            }
+            dismiss();
         });
     }
-
 }
