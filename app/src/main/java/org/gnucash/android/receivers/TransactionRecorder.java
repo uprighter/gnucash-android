@@ -40,6 +40,7 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.math.BigDecimal;
 import java.math.MathContext;
+import java.math.RoundingMode;
 
 /**
  * Broadcast receiver responsible for creating transactions received through {@link Intent}s
@@ -59,6 +60,7 @@ public class TransactionRecorder extends BroadcastReceiver {
     public void onReceive(Context context, Intent intent) {
         Log.i(this.getClass().getName(), "Received transaction recording intent");
         Bundle args = intent.getExtras();
+        assert args != null;
         String name = args.getString(Intent.EXTRA_TITLE);
         String note = args.getString(Intent.EXTRA_TEXT);
 
@@ -75,9 +77,10 @@ public class TransactionRecorder extends BroadcastReceiver {
         String accountUID = args.getString(Transaction.EXTRA_ACCOUNT_UID);
         if (accountUID != null) {
             TransactionType type = TransactionType.valueOf(args.getString(Transaction.EXTRA_TRANSACTION_TYPE));
-            BigDecimal amountBigDecimal = (BigDecimal) args.getSerializable(Transaction.EXTRA_AMOUNT);
             Commodity commodity = CommoditiesDbAdapter.getInstance().getCommodity(currencyCode);
-            amountBigDecimal = amountBigDecimal.setScale(commodity.getSmallestFractionDigits(), BigDecimal.ROUND_HALF_EVEN).round(MathContext.DECIMAL128);
+            BigDecimal amountBigDecimal = args.getSerializable(Transaction.EXTRA_AMOUNT, BigDecimal.class);
+            assert amountBigDecimal != null;
+            amountBigDecimal = amountBigDecimal.setScale(commodity.getSmallestFractionDigits(), RoundingMode.HALF_EVEN).round(MathContext.DECIMAL128);
             Money amount = new Money(amountBigDecimal, Commodity.getInstance(currencyCode));
             Split split = new Split(amount, accountUID);
             split.setType(type);
@@ -93,7 +96,7 @@ public class TransactionRecorder extends BroadcastReceiver {
         if (splits != null) {
             StringReader stringReader = new StringReader(splits);
             BufferedReader bufferedReader = new BufferedReader(stringReader);
-            String line = null;
+            String line;
             try {
                 while ((line = bufferedReader.readLine()) != null) {
                     Split split = Split.parseSplit(line);

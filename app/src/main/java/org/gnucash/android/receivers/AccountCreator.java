@@ -27,6 +27,8 @@ import org.gnucash.android.db.adapter.DatabaseAdapter;
 import org.gnucash.android.model.Account;
 import org.gnucash.android.model.Commodity;
 
+import java.util.Objects;
+
 /**
  * Broadcast receiver responsible for creating {@link Account}s received through intents.
  * In order to create an <code>Account</code>, you need to broadcast an {@link Intent} with arguments
@@ -36,16 +38,19 @@ import org.gnucash.android.model.Commodity;
  * in order to be able to use Intents to create accounts. So remember to declare it in your manifest
  *
  * @author Ngewi Fet <ngewif@gmail.com>
- * @see {@link Account#EXTRA_CURRENCY_CODE}, {@link Account#MIME_TYPE} {@link Intent#EXTRA_TITLE}, {@link Intent#EXTRA_UID}
+ * @see {@link Account#EXTRA_CURRENCY_CODE}, {@link Account#MIME_TYPE}, {@link Intent#EXTRA_TITLE}, {@link Intent#EXTRA_UID}
  */
 public class AccountCreator extends BroadcastReceiver {
 
+    public static final String LOG_TAG = AccountCreator.class.getName();
+
     @Override
     public void onReceive(Context context, Intent intent) {
-        Log.i("Gnucash", "Received account creation intent");
+        Log.i(LOG_TAG, "Received account creation intent");
         Bundle args = intent.getExtras();
+        assert args != null;
 
-        Account account = new Account(args.getString(Intent.EXTRA_TITLE));
+        Account account = new Account(Objects.requireNonNull(args.getString(Intent.EXTRA_TITLE)));
         account.setParentUID(args.getString(Account.EXTRA_PARENT_UID));
 
         String currencyCode = args.getString(Account.EXTRA_CURRENCY_CODE);
