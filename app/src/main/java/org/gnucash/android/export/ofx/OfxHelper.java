@@ -28,9 +28,9 @@ import java.util.TimeZone;
  */
 public class OfxHelper {
     /**
-     * A date formatter used when creating file names for the exported data
+     * A date format string used when creating file names for the exported data
      */
-    public final static SimpleDateFormat OFX_DATE_FORMATTER = new SimpleDateFormat("yyyyMMddHHmmss", Locale.US);
+    public final static String OFX_DATE_FORMAT = "yyyyMMddHHmmss";
 
     /**
      * The Transaction ID is usually the client ID sent in a request.
@@ -92,6 +92,10 @@ public class OfxHelper {
         return getOfxFormattedTime(System.currentTimeMillis());
     }
 
+    private static SimpleDateFormat getOfxDateFormatter() {
+        return new SimpleDateFormat(OFX_DATE_FORMAT, Locale.getDefault());
+    }
+
     /**
      * Returns a formatted string representation of time in <code>milliseconds</code>
      *
@@ -100,10 +104,10 @@ public class OfxHelper {
      */
     public static String getOfxFormattedTime(long milliseconds) {
         Date date = new Date(milliseconds);
-        String dateString = OFX_DATE_FORMATTER.format(date);
+        String dateString = getOfxDateFormatter().format(date);
         TimeZone tz = Calendar.getInstance().getTimeZone();
         int offset = tz.getRawOffset();
-        int hours = (int) ((offset / (1000 * 60 * 60)) % 24);
+        int hours = (offset / (1000 * 60 * 60)) % 24;
         String sign = offset > 0 ? "+" : "";
         return dateString + "[" + sign + hours + ":" + tz.getDisplayName(false, TimeZone.SHORT, Locale.getDefault()) + "]";
     }

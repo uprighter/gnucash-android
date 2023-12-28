@@ -17,7 +17,6 @@
 
 package org.gnucash.android.export.xml;
 
-import org.gnucash.android.model.Commodity;
 import org.gnucash.android.ui.transaction.TransactionFormFragment;
 
 import java.math.BigDecimal;
@@ -27,6 +26,7 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
+import java.util.Objects;
 
 /**
  * Collection of helper tags and methods for Gnc XML export
@@ -181,7 +181,7 @@ public abstract class GncXmlHelper {
      */
     public static long parseDate(String dateString) throws ParseException {
         Date date = TIME_FORMATTER.parse(dateString);
-        return date.getTime();
+        return Objects.requireNonNull(date).getTime();
     }
 
     /**
@@ -209,19 +209,37 @@ public abstract class GncXmlHelper {
     /**
      * Formats money amounts for splits in the format 2550/100
      *
-     * @param amount    Split amount as BigDecimal
-     * @param commodity Commodity of the transaction
+     * @param prefix prefix
+     * @param num    numerator
+     * @param denom  denominator
      * @return Formatted split amount
-     * @deprecated Just use the values for numerator and denominator which are saved in the database
      */
-    @Deprecated
-    public static String formatSplitAmount(BigDecimal amount, Commodity commodity) {
-        int denomInt = commodity.getSmallestFraction();
-        BigDecimal denom = new BigDecimal(denomInt);
-        String denomString = Integer.toString(denomInt);
+    public static String formatSplitAmount(String prefix, int num, int denom) {
+        return String.format(Locale.US, "%s%d/%d", prefix, num, denom);
+    }
 
-        String numerator = TransactionFormFragment.stripCurrencyFormatting(amount.multiply(denom).stripTrailingZeros().toPlainString());
-        return numerator + "/" + denomString;
+    /**
+     * Formats money amounts for splits in the format 2550/100
+     *
+     * @param prefix prefix
+     * @param num    numerator
+     * @param denom  denominator
+     * @return Formatted split amount
+     */
+    public static String formatSplitAmount(String prefix, long num, long denom) {
+        return String.format(Locale.US, "%s%d/%d", prefix, num, denom);
+    }
+
+    /**
+     * Formats money amounts for splits in the format 2550/100
+     *
+     * @param prefix prefix
+     * @param num    numerator
+     * @param denom  denominator
+     * @return Formatted split amount
+     */
+    public static String formatSplitAmount(String prefix, String num, String denom) {
+        return String.format(Locale.US, "%s%s/%s", prefix, num, denom);
     }
 
     /**

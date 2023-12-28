@@ -27,6 +27,7 @@ import org.gnucash.android.model.Account;
 
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -36,7 +37,7 @@ import java.util.List;
  * @author Semyannikov Gleb <nightdevgame@gmail.com>
  */
 public class CsvAccountExporter extends Exporter {
-    private char mCsvSeparator;
+    private final char mCsvSeparator;
 
     /**
      * Construct a new exporter with export parameters
@@ -46,7 +47,6 @@ public class CsvAccountExporter extends Exporter {
     public CsvAccountExporter(ExportParams params) {
         super(params, null);
         mCsvSeparator = params.getCsvSeparator();
-        LOG_TAG = "GncXmlExporter";
     }
 
     /**
@@ -59,13 +59,12 @@ public class CsvAccountExporter extends Exporter {
     public CsvAccountExporter(ExportParams params, SQLiteDatabase db) {
         super(params, db);
         mCsvSeparator = params.getCsvSeparator();
-        LOG_TAG = "GncXmlExporter";
     }
 
     @Override
     public List<String> generateExport() throws ExporterException {
         String outputFile = getExportCacheFilePath();
-        try (CsvWriter writer = new CsvWriter(new FileWriter(outputFile), mCsvSeparator + "")) {
+        try (CsvWriter writer = new CsvWriter(new FileWriter(outputFile), String.valueOf(mCsvSeparator))) {
             generateExport(writer);
         } catch (IOException ex) {
             FirebaseCrashlytics.getInstance().log("Error exporting CSV");
@@ -73,7 +72,9 @@ public class CsvAccountExporter extends Exporter {
             throw new ExporterException(mExportParams, ex);
         }
 
-        return Arrays.asList(outputFile);
+        ArrayList<String> exportedFiles = new ArrayList<>();
+        exportedFiles.add(outputFile);
+        return exportedFiles;
     }
 
     /**

@@ -19,7 +19,6 @@ package org.gnucash.android.test.unit.export;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.gnucash.android.export.xml.GncXmlHelper;
-import org.gnucash.android.model.Commodity;
 import org.junit.Test;
 
 import java.math.BigDecimal;
@@ -46,20 +45,5 @@ public class GncXmlHelperTest {
     @Test(expected = ParseException.class)
     public void shouldFailToParseWronglyFormattedInput() throws ParseException {
         GncXmlHelper.parseSplitAmount("123.45");
-    }
-
-    @Test
-    public void testFormatSplitAmount() {
-        Commodity usdCommodity = new Commodity("US Dollars", "USD", 100);
-        Commodity euroCommodity = new Commodity("Euro", "EUR", 100);
-
-        BigDecimal bigDecimal = new BigDecimal("45.90");
-        String amount = GncXmlHelper.formatSplitAmount(bigDecimal, usdCommodity);
-        assertThat(amount).isEqualTo("4590/100");
-
-
-        bigDecimal = new BigDecimal("350");
-        amount = GncXmlHelper.formatSplitAmount(bigDecimal, euroCommodity);
-        assertThat(amount).isEqualTo("35000/100");
     }
 }

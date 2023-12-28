@@ -15,6 +15,8 @@
  */
 package org.gnucash.android.export;
 
+import androidx.annotation.NonNull;
+
 /**
  * Enumeration of the different export formats supported by the application
  *
@@ -30,7 +32,7 @@ public enum ExportFormat {
     /**
      * Full name of the export format acronym
      */
-    private String mDescription;
+    private final String mDescription;
 
     ExportFormat(String description) {
         this.mDescription = description;
@@ -42,21 +44,15 @@ public enum ExportFormat {
      * @return String file extension for the export format
      */
     public String getExtension() {
-        switch (this) {
-            case QIF:
-                return ".qif";
-            case OFX:
-                return ".ofx";
-            case XML:
-                return ".gnca";
-            case CSVA:
-            case CSVT:
-                return ".csv";
-            default:
-                return ".txt";
-        }
+        return switch (this) {
+            case QIF -> ".qif";
+            case OFX -> ".ofx";
+            case XML -> ".gnca";
+            case CSVA, CSVT -> ".csv";
+        };
     }
 
+    @NonNull
     @Override
     public String toString() {
         return mDescription;

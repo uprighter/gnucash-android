@@ -18,6 +18,8 @@ package org.gnucash.android.export;
 
 import android.net.Uri;
 
+import androidx.annotation.NonNull;
+
 import org.gnucash.android.ui.export.ExportFormFragment;
 import org.gnucash.android.util.TimestampHelper;
 
@@ -41,7 +43,7 @@ public class ExportParams {
         SD_CARD("SD Card"),
         SHARING("External Service"),
         URI("Sync Service");
-        private String mDescription;
+        private final String mDescription;
 
         ExportTarget(String description) {
             mDescription = description;
@@ -205,6 +207,7 @@ public class ExportParams {
         mCsvSeparator = separator;
     }
 
+    @NonNull
     @Override
     public String toString() {
         return "Export all transactions created since " + TimestampHelper.getUtcStringFromTimestamp(mExportStartTime) + " UTC"
@@ -223,7 +226,7 @@ public class ExportParams {
         return mExportFormat.name() + separator
                 + mExportTarget.name() + separator
                 + TimestampHelper.getUtcStringFromTimestamp(mExportStartTime) + separator
-                + Boolean.toString(mDeleteTransactionsAfterExport) + separator
+                + mDeleteTransactionsAfterExport + separator
                 + (mExportLocation != null ? mExportLocation : "");
     }
 

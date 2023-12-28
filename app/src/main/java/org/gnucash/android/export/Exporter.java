@@ -46,6 +46,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 
 /**
  * Base class for the different exporters
@@ -58,7 +59,7 @@ public abstract class Exporter {
     /**
      * Tag for logging
      */
-    protected static String LOG_TAG = "Exporter";
+    protected String LOG_TAG = this.getClass().getName();
 
     /**
      * Application folder on external storage
@@ -71,7 +72,7 @@ public abstract class Exporter {
     /**
      * Application folder on external storage
      */
-    public static final String BASE_FOLDER_PATH = GnuCashApplication.getAppContext().getExternalFilesDir(null).getAbsolutePath();
+    public static final String BASE_FOLDER_PATH = Objects.requireNonNull(GnuCashApplication.getAppContext().getExternalFilesDir(null)).getAbsolutePath();
 
     /**
      * Export options
@@ -140,8 +141,11 @@ public abstract class Exporter {
         mBookUID = new File(mDb.getPath()).getName(); //this depends on the database file always having the name of the book GUID
         mExportCacheFilePath = null;
         mCacheDir = new File(mContext.getCacheDir(), params.getExportFormat().name());
-        mCacheDir.mkdir();
-        purgeDirectory(mCacheDir);
+        if (!mCacheDir.exists()) {
+            mCacheDir.mkdirs();
+        } else {
+            purgeDirectory(mCacheDir);
+        }
     }
 
     /**
@@ -152,7 +156,7 @@ public abstract class Exporter {
      * @return Sanitized file name
      */
     public static String sanitizeFilename(String inputName) {
-        return inputName.replaceAll("[^a-zA-Z0-9-_\\.]", "_");
+        return inputName.replaceAll("[^a-zA-Z0-9-_.]", "_");
     }
 
     /**
@@ -184,6 +188,7 @@ public abstract class Exporter {
         }
         try {
             Date date = EXPORT_FILENAME_DATE_FORMAT.parse(tokens[0] + "_" + tokens[1]);
+            assert date != null;
             timeMillis = date.getTime();
         } catch (ParseException e) {
             Log.e("Exporter", "Error parsing time from file name: " + e.getMessage());
@@ -205,11 +210,16 @@ public abstract class Exporter {
      * @param directory File descriptor for directory
      */
     private void purgeDirectory(File directory) {
-        for (File file : directory.listFiles()) {
-            if (file.isDirectory())
+        File[] files = directory.listFiles();
+        if (files == null) {
+            return;
+        }
+        for (File file : files) {
+            if (file.isDirectory()) {
                 purgeDirectory(file);
-            else
+            } else {
                 file.delete();
+            }
         }
     }
 
@@ -244,29 +254,16 @@ public abstract class Exporter {
     public static String getExportFolderPath(String bookUID) {
         String path = BASE_FOLDER_PATH + "/" + bookUID + "/exports/";
         File file = new File(path);
-        if (!file.exists())
+        if (!file.exists()) {
             file.mkdirs();
+        }
         return path;
-    }
-
-
-    /**
-     * Returns the MIME type for this exporter.
-     *
-     * @return MIME type as string
-     */
-    public String getExportMimeType() {
-        return "text/plain";
     }
 
     public static class ExporterException extends RuntimeException {
 
-        public ExporterException(ExportParams params) {
-            super("Failed to generate export with parameters:  " + params.toString());
-        }
-
         public ExporterException(@NonNull ExportParams params, @NonNull String msg) {
-            super("Failed to generate export with parameters: " + params.toString() + " - " + msg);
+            super("Failed to generate export with parameters: " + params + " - " + msg);
         }
 
         public ExporterException(ExportParams params, Throwable throwable) {

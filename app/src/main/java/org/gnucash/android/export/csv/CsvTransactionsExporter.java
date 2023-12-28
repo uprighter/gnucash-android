@@ -38,12 +38,14 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Creates a GnuCash CSV transactions representation of the accounts and transactions
@@ -52,9 +54,9 @@ import java.util.Map;
  */
 public class CsvTransactionsExporter extends Exporter {
 
-    private char mCsvSeparator;
+    private final char mCsvSeparator;
 
-    private DateFormat dateFormat = new SimpleDateFormat("YYYY-MM-dd", Locale.US);
+    private final DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
 
     /**
      * Construct a new exporter with export parameters
@@ -64,7 +66,6 @@ public class CsvTransactionsExporter extends Exporter {
     public CsvTransactionsExporter(ExportParams params) {
         super(params, null);
         mCsvSeparator = params.getCsvSeparator();
-        LOG_TAG = "GncXmlExporter";
     }
 
     /**
@@ -77,14 +78,13 @@ public class CsvTransactionsExporter extends Exporter {
     public CsvTransactionsExporter(ExportParams params, SQLiteDatabase db) {
         super(params, db);
         mCsvSeparator = params.getCsvSeparator();
-        LOG_TAG = "GncXmlExporter";
     }
 
     @Override
     public List<String> generateExport() throws ExporterException {
         String outputFile = getExportCacheFilePath();
 
-        try (CsvWriter csvWriter = new CsvWriter(new FileWriter(outputFile), "" + mCsvSeparator)) {
+        try (CsvWriter csvWriter = new CsvWriter(new FileWriter(outputFile), String.valueOf(mCsvSeparator))) {
             generateExport(csvWriter);
         } catch (IOException ex) {
             FirebaseCrashlytics.getInstance().log("Error exporting CSV");
@@ -92,7 +92,9 @@ public class CsvTransactionsExporter extends Exporter {
             throw new ExporterException(mExportParams, ex);
         }
 
-        return Arrays.asList(outputFile);
+        ArrayList<String> exportedFiles = new ArrayList<>();
+        exportedFiles.add(outputFile);
+        return exportedFiles;
     }
 
     /**
@@ -107,13 +109,14 @@ public class CsvTransactionsExporter extends Exporter {
 
         for (Split split : splits) {
             if (index++ > 0) { // the first split is on the same line as the transactions. But after that, we
-                writer.write("" + mCsvSeparator + mCsvSeparator + mCsvSeparator + mCsvSeparator
+                writer.write(String.valueOf(mCsvSeparator) + mCsvSeparator + mCsvSeparator + mCsvSeparator
                         + mCsvSeparator + mCsvSeparator + mCsvSeparator + mCsvSeparator);
             }
             writer.writeToken(split.getMemo());
 
             //cache accounts so that we do not have to go to the DB each time
             String accountUID = split.getAccountUID();
+            assert accountUID != null;
             Account account;
             if (uidAccountMap.containsKey(accountUID)) {
                 account = uidAccountMap.get(accountUID);
@@ -122,20 +125,21 @@ public class CsvTransactionsExporter extends Exporter {
                 uidAccountMap.put(accountUID, account);
             }
 
+            assert account != null;
             writer.writeToken(account.getFullName());
             writer.writeToken(account.getName());
 
             String sign = split.getType() == TransactionType.CREDIT ? "-" : "";
-            writer.writeToken(sign + split.getQuantity().formattedString());
+            writer.writeToken(sign + Objects.requireNonNull(split.getQuantity()).formattedString());
             writer.writeToken(sign + split.getQuantity().toLocaleString());
-            writer.writeToken("" + split.getReconcileState());
+            writer.writeToken(String.valueOf(split.getReconcileState()));
             if (split.getReconcileState() == Split.FLAG_RECONCILED) {
                 String recDateString = dateFormat.format(new Date(split.getReconcileDate().getTime()));
                 writer.writeToken(recDateString);
             } else {
                 writer.writeToken(null);
             }
-            writer.writeEndToken(split.getQuantity().divide(split.getValue()).toLocaleString());
+            writer.writeEndToken(split.getQuantity().divide(Objects.requireNonNull(split.getValue())).toLocaleString());
         }
     }
 

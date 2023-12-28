@@ -45,6 +45,8 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -119,7 +121,7 @@ public class QifExporter extends Exporter {
             );
 
             File file = new File(getExportCacheFilePath());
-            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file), "UTF-8"));
+            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file), StandardCharsets.UTF_8));
 
             try {
                 String currentCurrencyCode = "";
@@ -135,10 +137,6 @@ public class QifExporter extends Exporter {
                             // end last transaction
                         }
                         if (!accountUID.equals(currentAccountUID)) {
-                            // no need to end account
-                            //if (!currentAccountUID.equals("")) {
-                            //    // end last account
-                            //}
                             if (!currencyCode.equals(currentCurrencyCode)) {
                                 currentCurrencyCode = currencyCode;
                                 writer.append(QifHelper.INTERNAL_CURRENCY_PREFIX)
@@ -170,7 +168,7 @@ public class QifExporter extends Exporter {
                                 .append(newLine);
                         // deal with imbalance first
                         double imbalance = cursor.getDouble(cursor.getColumnIndexOrThrow("trans_acct_balance"));
-                        BigDecimal decimalImbalance = BigDecimal.valueOf(imbalance).setScale(2, BigDecimal.ROUND_HALF_UP);
+                        BigDecimal decimalImbalance = BigDecimal.valueOf(imbalance).setScale(2, RoundingMode.HALF_UP);
                         if (decimalImbalance.compareTo(BigDecimal.ZERO) != 0) {
                             writer.append(QifHelper.SPLIT_CATEGORY_PREFIX)
                                     .append(AccountsDbAdapter.getImbalanceAccountName(
@@ -199,14 +197,14 @@ public class QifExporter extends Exporter {
                                 .append(newLine);
                     }
                     String splitType = cursor.getString(cursor.getColumnIndexOrThrow("split_type"));
-                    Double quantity_num = cursor.getDouble(cursor.getColumnIndexOrThrow("split_quantity_num"));
+                    double quantity_num = cursor.getDouble(cursor.getColumnIndexOrThrow("split_quantity_num"));
                     int quantity_denom = cursor.getInt(cursor.getColumnIndexOrThrow("split_quantity_denom"));
                     int precision = 0;
                     switch (quantity_denom) {
                         case 0: // will sometimes happen for zero values
                             break;
                         case 1:
-                            precision = 0;
+                            // precision = 0;
                             break;
                         case 10:
                             precision = 1;
@@ -229,14 +227,14 @@ public class QifExporter extends Exporter {
                         default:
                             throw new ExporterException(mExportParams, "split quantity has illegal denominator: " + quantity_denom);
                     }
-                    Double quantity = 0.0;
+                    double quantity = 0.0;
                     if (quantity_denom != 0) {
                         quantity = quantity_num / quantity_denom;
                     }
                     final Locale noLocale = null;
                     writer.append(QifHelper.SPLIT_AMOUNT_PREFIX)
                             .append(splitType.equals("DEBIT") ? "-" : "")
-                            .append(String.format(noLocale, "%." + precision + "f", quantity))
+                            .append(String.format(noLocale, String.format(noLocale, "%%.%df", + precision), quantity))
                             .append(newLine);
                 }
                 if (!currentTransactionUID.equals("")) {
@@ -285,7 +283,7 @@ public class QifExporter extends Exporter {
      */
     private List<String> splitQIF(File file) throws IOException {
         // split only at the last dot
-        String[] pathParts = file.getPath().split("(?=\\.[^\\.]+$)");
+        String[] pathParts = file.getPath().split("(?=\\.[^.]+$)");
         ArrayList<String> splitFiles = new ArrayList<>();
         String line;
         BufferedReader in = new BufferedReader(new FileReader(file));

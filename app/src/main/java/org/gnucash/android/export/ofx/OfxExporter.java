@@ -18,14 +18,14 @@
 package org.gnucash.android.export.ofx;
 
 import android.database.sqlite.SQLiteDatabase;
-import android.preference.PreferenceManager;
 import android.util.Log;
+
+import androidx.preference.PreferenceManager;
 
 import com.google.firebase.crashlytics.FirebaseCrashlytics;
 
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
-import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.export.ExportParams;
 import org.gnucash.android.export.Exporter;
 import org.gnucash.android.model.Account;
@@ -38,14 +38,15 @@ import org.w3c.dom.Node;
 import org.w3c.dom.ProcessingInstruction;
 
 import java.io.BufferedWriter;
-import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.StringWriter;
 import java.io.Writer;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -75,7 +76,6 @@ public class OfxExporter extends Exporter {
      */
     public OfxExporter(ExportParams params) {
         super(params, null);
-        LOG_TAG = "OfxExporter";
     }
 
     /**
@@ -86,7 +86,6 @@ public class OfxExporter extends Exporter {
      */
     public OfxExporter(ExportParams params, SQLiteDatabase db) {
         super(params, db);
-        LOG_TAG = "OfxExporter";
     }
 
     /**
@@ -108,13 +107,12 @@ public class OfxExporter extends Exporter {
 
         parent.appendChild(bankmsgs);
 
-        AccountsDbAdapter accountsDbAdapter = mAccountsDbAdapter;
         for (Account account : mAccountsList) {
             if (account.getTransactionCount() == 0)
                 continue;
 
             //do not export imbalance accounts for OFX transactions and double-entry disabled
-            if (!GnuCashApplication.isDoubleEntryEnabled() && account.getName().contains(mContext.getString(R.string.imbalance_account_name)))
+            if (!GnuCashApplication.isDoubleEntryEnabled() && Objects.requireNonNull(account.getName()).contains(mContext.getString(R.string.imbalance_account_name)))
                 continue;
 
 
@@ -122,7 +120,7 @@ public class OfxExporter extends Exporter {
             account.toOfx(doc, statementTransactionResponse, mExportParams.getExportStartTime());
 
             //mark as exported
-            int marked = accountsDbAdapter.markAsExported(account.getUID());
+            int marked = mAccountsDbAdapter.markAsExported(account.getUID());
             Log.d(LOG_TAG, String.format("%d transactions for account %s are marked as exported.", marked, account));
         }
     }
@@ -131,7 +129,6 @@ public class OfxExporter extends Exporter {
      * Generate OFX export file from the transactions in the database
      *
      * @return String containing OFX export
-     * @throws ExporterException
      */
     private String generateOfxExport() throws ExporterException {
         DocumentBuilderFactory docFactory = DocumentBuilderFactory
@@ -165,32 +162,22 @@ public class OfxExporter extends Exporter {
         } else {
             Node ofxNode = document.getElementsByTagName("OFX").item(0);
             write(ofxNode, stringWriter, true);
-            return OfxHelper.OFX_SGML_HEADER + '\n' + stringWriter.toString();
+            return OfxHelper.OFX_SGML_HEADER + '\n' + stringWriter;
         }
     }
 
     @Override
     public List<String> generateExport() throws ExporterException {
         mAccountsList = mAccountsDbAdapter.getExportableAccounts(mExportParams.getExportStartTime());
-        if (mAccountsList.isEmpty())
+        if (mAccountsList.isEmpty()) {
             return new ArrayList<>(); // Nothing to export, so no files generated
+        }
 
-        BufferedWriter writer = null;
-
-        try {
-            File file = new File(getExportCacheFilePath());
-            writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file), "UTF-8"));
+        try (FileOutputStream outputStream = new FileOutputStream(getExportCacheFilePath());
+            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8))) {
             writer.write(generateOfxExport());
         } catch (IOException e) {
             throw new ExporterException(mExportParams, e);
-        } finally {
-            if (writer != null) {
-                try {
-                    writer.close();
-                } catch (IOException e) {
-                    throw new ExporterException(mExportParams, e);
-                }
-            }
         }
 
         List<String> exportedFiles = new ArrayList<>();
@@ -222,7 +209,7 @@ public class OfxExporter extends Exporter {
 
             transformer.transform(source, result);
         } catch (TransformerException tfException) {
-            Log.e(LOG_TAG, tfException.getMessage());
+            Log.e(LOG_TAG, String.format("tfException: %s", tfException.getMessage()));
             FirebaseCrashlytics.getInstance().recordException(tfException);
         }
     }
