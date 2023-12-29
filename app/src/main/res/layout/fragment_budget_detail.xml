@@ -20,13 +20,12 @@
     android:layout_height="match_parent">
 
     <include
-        android:id="@+id/list_item_2_lines"
+        android:id="@+id/list_item_two_lines"
         layout="@layout/list_item_2_lines"
         android:paddingTop="6dp"
         android:layout_height="wrap_content"
         android:layout_width="match_parent"
-        android:layout_margin="@dimen/dialog_padding"
-        android:layout_toRightOf="@id/account_color_strip" />
+        android:layout_margin="@dimen/dialog_padding" />
 
     <TextView
         android:id="@+id/budget_recurrence"
@@ -36,7 +35,7 @@
         android:layout_marginRight="@dimen/dialog_padding"
         android:singleLine="true"
         android:textSize="15sp"
-        android:gravity="left|start"
+        android:gravity="start"
         tools:text="$2,500 monthly" />
 
     <org.gnucash.android.ui.util.widget.EmptyRecyclerView

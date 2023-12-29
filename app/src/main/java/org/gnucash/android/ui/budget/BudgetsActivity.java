@@ -17,13 +17,17 @@ package org.gnucash.android.ui.budget;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
 import androidx.viewbinding.ViewBinding;
 
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
+
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
 import org.gnucash.android.databinding.ActivityBudgetsBinding;
@@ -35,8 +39,12 @@ import org.gnucash.android.ui.common.UxArgument;
  * Activity for managing display and editing of budgets
  */
 public class BudgetsActivity extends BaseDrawerActivity implements View.OnClickListener {
+    public static final String LOG_TAG = BudgetsActivity.class.getName();
 
-    public static final int REQUEST_CREATE_BUDGET = 0xA;
+    private final ActivityResultLauncher<Intent> launcher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> Log.d(LOG_TAG, "launch intent: result = " + result)
+    );
 
     @Override
     public ViewBinding bindViews() {
@@ -80,7 +88,7 @@ public class BudgetsActivity extends BaseDrawerActivity implements View.OnClickL
         Intent addAccountIntent = new Intent(BudgetsActivity.this, FormActivity.class);
         addAccountIntent.setAction(Intent.ACTION_INSERT_OR_EDIT);
         addAccountIntent.putExtra(UxArgument.FORM_TYPE, FormActivity.FormType.BUDGET.name());
-        startActivityForResult(addAccountIntent, REQUEST_CREATE_BUDGET);
+        launcher.launch(addAccountIntent);
     }
 
     /**
