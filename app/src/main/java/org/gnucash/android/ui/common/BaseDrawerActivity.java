@@ -15,18 +15,23 @@
  */
 package org.gnucash.android.ui.common;
 
+import android.app.Activity;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.database.Cursor;
+import android.graphics.BlendMode;
+import android.graphics.BlendModeColorFilter;
 import android.graphics.Color;
-import android.graphics.PorterDuff;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.StringRes;
 import androidx.appcompat.app.ActionBar;
@@ -70,6 +75,8 @@ import org.gnucash.android.util.BookUtils;
 public abstract class BaseDrawerActivity extends PasscodeLockActivity implements
         PopupMenu.OnMenuItemClickListener {
 
+    public final String LOG_TAG = this.getClass().getName();
+
     public static final int ID_MANAGE_BOOKS = 0xB00C;
     protected DrawerLayout mDrawerLayout;
     protected NavigationView mNavigationView;
@@ -80,7 +87,16 @@ public abstract class BaseDrawerActivity extends PasscodeLockActivity implements
 
     protected ActionBarDrawerToggle mDrawerToggle;
 
-    public static final int REQUEST_OPEN_DOCUMENT = 0x20;
+
+    private final ActivityResultLauncher<Intent> openLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                Log.d(LOG_TAG, "launch intent: result = " + result);
+                if (result.getResultCode() == Activity.RESULT_CANCELED) {
+                    Log.d(LOG_TAG, "intent cancelled.");
+                }
+            }
+    );
 
     private class DrawerItemClickListener implements NavigationView.OnNavigationItemSelectedListener {
 
@@ -112,23 +128,13 @@ public abstract class BaseDrawerActivity extends PasscodeLockActivity implements
             actionBar.setTitle(getTitleRes());
         }
 
-        mToolbarProgress.getIndeterminateDrawable().setColorFilter(Color.WHITE, PorterDuff.Mode.SRC_IN);
+        mToolbarProgress.getIndeterminateDrawable().setColorFilter(new BlendModeColorFilter(Color.WHITE, BlendMode.SRC_IN));
 
         View headerView = mNavigationView.getHeaderView(0);
-        headerView.findViewById(R.id.drawer_title).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                onClickAppTitle(v);
-            }
-        });
+        headerView.findViewById(R.id.drawer_title).setOnClickListener(this::onClickAppTitle);
 
         mBookNameTextView = headerView.findViewById(R.id.book_name);
-        mBookNameTextView.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                onClickBook(v);
-            }
-        });
+        mBookNameTextView.setOnClickListener(this::onClickBook);
         updateActiveBookName();
         setUpNavigationDrawer();
     }
@@ -185,7 +191,7 @@ public abstract class BaseDrawerActivity extends PasscodeLockActivity implements
             }
         };
 
-        mDrawerLayout.setDrawerListener(mDrawerToggle);
+        mDrawerLayout.addDrawerListener(mDrawerToggle);
     }
 
     @Override
@@ -224,51 +230,36 @@ public abstract class BaseDrawerActivity extends PasscodeLockActivity implements
      * Handler for the navigation drawer items
      */
     protected void onDrawerMenuItemClicked(int itemId) {
-        switch (itemId) {
-            case R.id.nav_item_open: { //Open... files
-                //use the storage access framework
-                Intent openDocument = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-                openDocument.addCategory(Intent.CATEGORY_OPENABLE);
-                openDocument.setType("text/*|application/*");
-                String[] mimeTypes = {"text/*", "application/*"};
-                openDocument.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes);
-                startActivityForResult(openDocument, REQUEST_OPEN_DOCUMENT);
-            }
-            break;
-
-            case R.id.nav_item_favorites: { //favorite accounts
-                Intent intent = new Intent(this, AccountsActivity.class);
-                intent.putExtra(AccountsActivity.EXTRA_TAB_INDEX,
-                        AccountsActivity.INDEX_FAVORITE_ACCOUNTS_FRAGMENT);
-                intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-                startActivity(intent);
-            }
-            break;
-
-            case R.id.nav_item_reports: {
-                Intent intent = new Intent(this, ReportsActivity.class);
-                intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-                startActivity(intent);
-            }
-            break;
-
-            case R.id.nav_item_scheduled_actions: { //show scheduled transactions
-                Intent intent = new Intent(this, ScheduledActionsActivity.class);
-                intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-                startActivity(intent);
-            }
-            break;
-
-            case R.id.nav_item_export:
-                AccountsActivity.openExportFragment(this);
-                break;
-
-            case R.id.nav_item_settings: //Settings activity
-                startActivity(new Intent(this, PreferenceActivity.class));
-                break;
-
-            case R.id.nav_item_help:
-                break;
+        if (itemId == R.id.nav_item_open) { //Open... files
+            //use the storage access framework
+            Intent openDocument = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+            openDocument.addCategory(Intent.CATEGORY_OPENABLE);
+            openDocument.setType("text/*|application/*");
+            String[] mimeTypes = {"text/*", "application/*"};
+            openDocument.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes);
+            openLauncher.launch(openDocument);
+        } else if (itemId == R.id.nav_item_favorites) { //favorite accounts
+            Intent intent = new Intent(this, AccountsActivity.class);
+            intent.putExtra(AccountsActivity.EXTRA_TAB_INDEX,
+                    AccountsActivity.INDEX_FAVORITE_ACCOUNTS_FRAGMENT);
+            intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            startActivity(intent);
+        } else if (itemId == R.id.nav_item_reports) {
+            Intent intent = new Intent(this, ReportsActivity.class);
+            intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            startActivity(intent);
+        } else if (itemId == R.id.nav_item_scheduled_actions) { //show scheduled transactions
+            Intent intent = new Intent(this, ScheduledActionsActivity.class);
+            intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            startActivity(intent);
+        } else if (itemId == R.id.nav_item_export) {
+            AccountsActivity.openExportFragment(this);
+        } else if (itemId == R.id.nav_item_settings) { //Settings activity
+            startActivity(new Intent(this, PreferenceActivity.class));
+        } else if (itemId == R.id.nav_item_help) {
+            Log.d(LOG_TAG, "nav_item_help onDrawerMenuItemClicked.");
+        } else {
+            Log.d(LOG_TAG, String.format("unknown onDrawerMenuItemClicked itemId = %d.", itemId));
         }
         mDrawerLayout.closeDrawer(mNavigationView);
     }
@@ -304,12 +295,13 @@ public abstract class BaseDrawerActivity extends PasscodeLockActivity implements
 
         Menu menu = popup.getMenu();
         int maxRecent = 0;
-        Cursor cursor = BooksDbAdapter.getInstance().fetchAllRecords(null, null,
-                DatabaseSchema.BookEntry.COLUMN_MODIFIED_AT + " DESC");
-        while (cursor.moveToNext() && maxRecent++ < 5) {
-            long id = cursor.getLong(cursor.getColumnIndexOrThrow(DatabaseSchema.BookEntry._ID));
-            String name = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseSchema.BookEntry.COLUMN_DISPLAY_NAME));
-            menu.add(0, (int) id, maxRecent, name);
+        try (Cursor cursor = BooksDbAdapter.getInstance().fetchAllRecords(null, null,
+                DatabaseSchema.BookEntry.COLUMN_MODIFIED_AT + " DESC")) {
+            while (cursor.moveToNext() && maxRecent++ < 5) {
+                long id = cursor.getLong(cursor.getColumnIndexOrThrow(DatabaseSchema.BookEntry._ID));
+                String name = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseSchema.BookEntry.COLUMN_DISPLAY_NAME));
+                menu.add(0, (int) id, maxRecent, name);
+            }
         }
         menu.add(0, ID_MANAGE_BOOKS, maxRecent, R.string.menu_manage_books);
 
