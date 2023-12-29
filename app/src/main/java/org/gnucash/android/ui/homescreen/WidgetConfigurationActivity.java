@@ -28,6 +28,7 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.Button;
@@ -41,6 +42,7 @@ import androidx.cursoradapter.widget.SimpleCursorAdapter;
 import androidx.preference.PreferenceManager;
 
 import org.gnucash.android.R;
+import org.gnucash.android.databinding.WidgetConfigurationBinding;
 import org.gnucash.android.db.BookDbHelper;
 import org.gnucash.android.db.DatabaseHelper;
 import org.gnucash.android.db.DatabaseSchema;
@@ -59,9 +61,6 @@ import org.gnucash.android.util.QualifiedAccountNameCursorAdapter;
 
 import java.util.Locale;
 
-import butterknife.BindView;
-import butterknife.ButterKnife;
-
 /**
  * Activity for configuration which account to display on a widget.
  * The activity is opened each time a widget is added to the homescreen
@@ -72,15 +71,10 @@ public class WidgetConfigurationActivity extends Activity {
     private AccountsDbAdapter mAccountsDbAdapter;
     private int mAppWidgetId;
 
-    @BindView(R.id.input_accounts_spinner)
     Spinner mAccountsSpinner;
-    @BindView(R.id.input_books_spinner)
     Spinner mBooksSpinner;
-    @BindView(R.id.input_hide_account_balance)
     CheckBox mHideAccountBalance;
-    @BindView(R.id.btn_save)
     Button mOkButton;
-    @BindView(R.id.btn_cancel)
     Button mCancelButton;
 
 
@@ -90,10 +84,18 @@ public class WidgetConfigurationActivity extends Activity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.widget_configuration);
-        setResult(RESULT_CANCELED);
 
-        ButterKnife.bind(this);
+        WidgetConfigurationBinding binding = WidgetConfigurationBinding.inflate(LayoutInflater.from(this));
+
+        mAccountsSpinner = binding.inputAccountsSpinner;
+        mBooksSpinner = binding.inputBooksSpinner;
+        mHideAccountBalance = binding.inputHideAccountBalance;
+        mOkButton = binding.defaultButtons.btnSave;
+        mCancelButton = binding.defaultButtons.btnCancel;
+
+        setContentView(binding.getRoot());
+
+        setResult(RESULT_CANCELED);
 
         BooksDbAdapter booksDbAdapter = BooksDbAdapter.getInstance();
         Cursor booksCursor = booksDbAdapter.fetchAllRecords();
@@ -144,12 +146,13 @@ public class WidgetConfigurationActivity extends Activity {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 Book book = BooksDbAdapter.getInstance().getRecord(id);
-                SQLiteDatabase db = new DatabaseHelper(WidgetConfigurationActivity.this, book.getUID()).getWritableDatabase();
-                mAccountsDbAdapter = new AccountsDbAdapter(db);
-
-                Cursor cursor = mAccountsDbAdapter.fetchAllRecordsOrderedByFullName();
-                mAccountsCursorAdapter.swapCursor(cursor);
-                mAccountsCursorAdapter.notifyDataSetChanged();
+                try(DatabaseHelper dbHelper = new DatabaseHelper(WidgetConfigurationActivity.this, book.getUID())) {
+                    SQLiteDatabase db = dbHelper.getWritableDatabase();
+                    mAccountsDbAdapter = new AccountsDbAdapter(db);
+                    Cursor cursor = mAccountsDbAdapter.fetchAllRecordsOrderedByFullName();
+                    mAccountsCursorAdapter.swapCursor(cursor);
+                    mAccountsCursorAdapter.notifyDataSetChanged();
+                }
             }
 
             @Override
@@ -158,44 +161,34 @@ public class WidgetConfigurationActivity extends Activity {
             }
         });
 
-        mOkButton.setOnClickListener(new View.OnClickListener() {
-
-            @Override
-            public void onClick(View v) {
-                Intent intent = getIntent();
-                Bundle extras = intent.getExtras();
-                if (extras != null) {
-                    mAppWidgetId = extras.getInt(
-                            AppWidgetManager.EXTRA_APPWIDGET_ID,
-                            AppWidgetManager.INVALID_APPWIDGET_ID);
-                }
-
-                if (mAppWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
-                    finish();
-                    return;
-                }
-
-                String bookUID = BooksDbAdapter.getInstance().getUID(mBooksSpinner.getSelectedItemId());
-                String accountUID = mAccountsDbAdapter.getUID(mAccountsSpinner.getSelectedItemId());
-                boolean hideAccountBalance = mHideAccountBalance.isChecked();
-
-                configureWidget(WidgetConfigurationActivity.this, mAppWidgetId, bookUID, accountUID, hideAccountBalance);
-                updateWidget(WidgetConfigurationActivity.this, mAppWidgetId);
-
-                Intent resultValue = new Intent();
-                resultValue.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, mAppWidgetId);
-                setResult(RESULT_OK, resultValue);
-                finish();
+        mOkButton.setOnClickListener(v -> {
+            Intent intent = getIntent();
+            Bundle extras = intent.getExtras();
+            if (extras != null) {
+                mAppWidgetId = extras.getInt(
+                        AppWidgetManager.EXTRA_APPWIDGET_ID,
+                        AppWidgetManager.INVALID_APPWIDGET_ID);
             }
+
+            if (mAppWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
+                finish();
+                return;
+            }
+
+            String bookUID = BooksDbAdapter.getInstance().getUID(mBooksSpinner.getSelectedItemId());
+            String accountUID = mAccountsDbAdapter.getUID(mAccountsSpinner.getSelectedItemId());
+            boolean hideAccountBalance = mHideAccountBalance.isChecked();
+
+            configureWidget(WidgetConfigurationActivity.this, mAppWidgetId, bookUID, accountUID, hideAccountBalance);
+            updateWidget(WidgetConfigurationActivity.this, mAppWidgetId);
+
+            Intent resultValue = new Intent();
+            resultValue.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, mAppWidgetId);
+            setResult(RESULT_OK, resultValue);
+            finish();
         });
 
-        mCancelButton.setOnClickListener(new View.OnClickListener() {
-
-            @Override
-            public void onClick(View v) {
-                finish();
-            }
-        });
+        mCancelButton.setOnClickListener(v -> finish());
     }
 
     /**
@@ -286,7 +279,7 @@ public class WidgetConfigurationActivity extends Activity {
             views.setTextViewText(R.id.transactions_summary, "");
             //set it to simply open the app
             PendingIntent pendingIntent = PendingIntent.getActivity(context, 0,
-                    new Intent(context, AccountsActivity.class), 0);
+                    new Intent(context, AccountsActivity.class), PendingIntent.FLAG_IMMUTABLE);
             views.setOnClickPendingIntent(R.id.widget_layout, pendingIntent);
             views.setOnClickPendingIntent(R.id.btn_new_transaction, pendingIntent);
             appWidgetManager.updateAppWidget(appWidgetId, views);
@@ -318,7 +311,7 @@ public class WidgetConfigurationActivity extends Activity {
         accountViewIntent.putExtra(UxArgument.SELECTED_ACCOUNT_UID, accountUID);
         accountViewIntent.putExtra(UxArgument.BOOK_UID, bookUID);
         PendingIntent accountPendingIntent = PendingIntent
-                .getActivity(context, appWidgetId, accountViewIntent, 0);
+                .getActivity(context, appWidgetId, accountViewIntent, PendingIntent.FLAG_IMMUTABLE);
         views.setOnClickPendingIntent(R.id.widget_layout, accountPendingIntent);
 
         if (accountsDbAdapter.isPlaceholderAccount(accountUID)) {
@@ -332,7 +325,7 @@ public class WidgetConfigurationActivity extends Activity {
             newTransactionIntent.putExtra(UxArgument.BOOK_UID, bookUID);
             newTransactionIntent.putExtra(UxArgument.SELECTED_ACCOUNT_UID, accountUID);
             PendingIntent pendingIntent = PendingIntent
-                    .getActivity(context, appWidgetId, newTransactionIntent, 0);
+                    .getActivity(context, appWidgetId, newTransactionIntent, PendingIntent.FLAG_IMMUTABLE);
             views.setOnClickPendingIntent(R.id.btn_new_transaction, pendingIntent);
             views.setViewVisibility(R.id.btn_view_account, View.GONE);
         }
@@ -353,12 +346,9 @@ public class WidgetConfigurationActivity extends Activity {
 
         //update widgets asynchronously so as not to block method which called the update
         //inside the computation of the account balance
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                for (final int widgetId : appWidgetIds) {
-                    updateWidget(context, widgetId);
-                }
+        new Thread(() -> {
+            for (final int widgetId : appWidgetIds) {
+                updateWidget(context, widgetId);
             }
         }).start();
     }
