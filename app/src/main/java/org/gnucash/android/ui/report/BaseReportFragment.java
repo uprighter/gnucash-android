@@ -26,12 +26,13 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
-import androidx.annotation.LayoutRes;
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
+import androidx.viewbinding.ViewBinding;
 
 import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.highlight.Highlight;
@@ -47,16 +48,11 @@ import org.joda.time.LocalDateTime;
 import org.joda.time.Months;
 import org.joda.time.Years;
 
-import butterknife.BindView;
-import butterknife.ButterKnife;
-
 /**
  * Base class for report fragments.
  * <p>All report fragments should extend this class. At the minimum, reports must implement
- * {@link #getLayoutResource()}, {@link #getReportType()}, {@link #generateReport()}, {@link #displayReport()} and {@link #getTitle()}</p>
- * <p>Implementing classes should create their own XML layouts and provide it in {@link #getLayoutResource()}.
- * Then annotate any views in the resource using {@code @Bind} annotation from ButterKnife library.
- * This base activity will automatically call {@link ButterKnife#bind(View)} for the layout.
+ * {@link #bindViews()}, {@link #getReportType()}, {@link #generateReport()}, {@link #displayReport()} and {@link #getTitle()}</p>
+ * <p>Sub-classes should provide their layout and bind the views using {@link #bindViews()}.
  * </p>
  * <p>Any custom information to be initialized for the report should be done in {@link #onActivityCreated(Bundle)} in implementing classes.
  * The report is then generated in {@link #onStart()}
@@ -72,7 +68,7 @@ public abstract class BaseReportFragment extends Fragment implements
      */
     public static final int NO_DATA_COLOR = Color.LTGRAY;
 
-    protected static String TAG = "BaseReportFragment";
+    protected String LOG_TAG = this.getClass().getName();
 
     /**
      * Reporting period start time
@@ -106,7 +102,6 @@ public abstract class BaseReportFragment extends Fragment implements
     protected ReportsActivity mReportsActivity;
 
     @Nullable
-    @BindView(R.id.selected_chart_slice)
     protected TextView mSelectedValueTextView;
 
     private AsyncTask<Void, Void, Void> mReportGenerator;
@@ -119,11 +114,11 @@ public abstract class BaseReportFragment extends Fragment implements
     public abstract @StringRes int getTitle();
 
     /**
-     * Returns the layout resource to use for this report
+     * Binds the views and returns the ViewBinding.
      *
-     * @return Layout resource identifier
+     * @return ViewBinding
      */
-    public abstract @LayoutRes int getLayoutResource();
+    public abstract ViewBinding bindViews();
 
     /**
      * Returns what kind of report this is
@@ -169,20 +164,20 @@ public abstract class BaseReportFragment extends Fragment implements
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        TAG = this.getClass().getSimpleName();
+        LOG_TAG = this.getClass().getSimpleName();
     }
 
     @Nullable
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-        View view = inflater.inflate(getLayoutResource(), container, false);
-        ButterKnife.bind(this, view);
-        return view;
+    public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+        ViewBinding viewBinding = bindViews();
+
+        return viewBinding.getRoot();
     }
 
     @Override
-    public void onActivityCreated(@Nullable Bundle savedInstanceState) {
-        super.onActivityCreated(savedInstanceState);
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
 
         ActionBar actionBar = ((AppCompatActivity) getActivity()).getSupportActionBar();
         assert actionBar != null;
@@ -213,7 +208,7 @@ public abstract class BaseReportFragment extends Fragment implements
     }
 
     @Override
-    public void onAttach(Context context) {
+    public void onAttach(@NonNull Context context) {
         super.onAttach(context);
         if (!(getActivity() instanceof ReportsActivity))
             throw new RuntimeException("Report fragments can only be used with the ReportsActivity");
@@ -252,15 +247,19 @@ public abstract class BaseReportFragment extends Fragment implements
      */
     protected int getDateDiff(LocalDateTime start, LocalDateTime end) {
         switch (mGroupInterval) {
-            case QUARTER:
+            case QUARTER -> {
                 int y = Years.yearsBetween(start.withDayOfYear(1).withMillisOfDay(0), end.withDayOfYear(1).withMillisOfDay(0)).getYears();
                 return getQuarter(end) - getQuarter(start) + y * 4;
-            case MONTH:
+            }
+            case MONTH -> {
                 return Months.monthsBetween(start.withDayOfMonth(1).withMillisOfDay(0), end.withDayOfMonth(1).withMillisOfDay(0)).getMonths();
-            case YEAR:
+            }
+            case YEAR -> {
                 return Years.yearsBetween(start.withDayOfYear(1).withMillisOfDay(0), end.withDayOfYear(1).withMillisOfDay(0)).getYears();
-            default:
+            }
+            default -> {
                 return -1;
+            }
         }
     }
 
@@ -277,16 +276,17 @@ public abstract class BaseReportFragment extends Fragment implements
 
 
     @Override
-    public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
+    public void onCreateOptionsMenu(@NonNull Menu menu, MenuInflater inflater) {
         inflater.inflate(R.menu.chart_actions, menu);
     }
 
     @Override
     public void refresh() {
-        if (mReportGenerator != null)
+        if (mReportGenerator != null) {
             mReportGenerator.cancel(true);
+        }
 
-        mReportGenerator = new AsyncTask<Void, Void, Void>() {
+        mReportGenerator = new AsyncTask<>() {
 
             @Override
             protected void onPreExecute() {

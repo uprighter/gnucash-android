@@ -27,22 +27,23 @@ limitations under the License.
         android:layout_marginBottom="@dimen/edge_padding">
 
         <TableRow>
-
             <Button
                 android:id="@+id/btn_pie_chart"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:drawableLeft="@drawable/ic_data_usage_white_24dp"
-                android:text="@string/title_pie_chart" />
+                android:drawableStart="@drawable/ic_data_usage_white_24dp"
+                android:text="@string/title_pie_chart"
+                tools:ignore="ButtonStyle" />
 
             <Button
                 android:id="@+id/btn_bar_chart"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:drawableLeft="@drawable/ic_equalizer_white_24dp"
-                android:text="@string/title_bar_chart" />
+                android:drawableStart="@drawable/ic_equalizer_white_24dp"
+                android:text="@string/title_bar_chart"
+                tools:ignore="ButtonStyle" />
         </TableRow>
 
         <TableRow>
@@ -52,18 +53,18 @@ limitations under the License.
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:drawableLeft="@drawable/ic_trending_up_white_24dp"
                 android:drawableStart="@drawable/ic_trending_up_white_24dp"
-                android:text="@string/title_line_chart" />
+                android:text="@string/title_line_chart"
+                tools:ignore="ButtonStyle" />
 
             <Button
                 android:id="@+id/btn_balance_sheet"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:drawableLeft="@drawable/ic_subject_white_24dp"
                 android:drawableStart="@drawable/ic_subject_white_24dp"
-                android:text="@string/title_report_sheet" />
+                android:text="@string/title_report_sheet"
+                tools:ignore="ButtonStyle" />
 
         </TableRow>
     </TableLayout>
@@ -112,7 +113,7 @@ limitations under the License.
                 <TextView
                     android:id="@+id/total_assets"
                     android:layout_weight="1"
-                    android:gravity="right"
+                    android:gravity="end"
                     android:textSize="18sp"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
@@ -133,7 +134,7 @@ limitations under the License.
                     android:layout_weight="1"
                     android:textSize="18sp"
                     tools:text="$ 2,700"
-                    android:gravity="right"
+                    android:gravity="end"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content" />
             </TableRow>
@@ -152,7 +153,7 @@ limitations under the License.
                     android:layout_weight="1"
                     tools:text="$ -200"
                     android:textSize="18sp"
-                    android:gravity="right"
+                    android:gravity="end"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content" />
             </TableRow>

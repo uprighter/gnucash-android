@@ -20,8 +20,8 @@ package org.gnucash.android.ui.report;
 import android.app.DatePickerDialog;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
-import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -67,6 +67,8 @@ public class ReportsActivity extends BaseDrawerActivity implements AdapterView.O
         DatePickerDialog.OnDateSetListener, DateRangePickerDialogFragment.OnDateRangeSetListener,
         Refreshable {
 
+    public static final String LOG_TAG = ReportsActivity.class.getName();
+
     public static final int[] COLORS = {
             Color.parseColor("#17ee4e"), Color.parseColor("#cc1f09"), Color.parseColor("#3940f7"),
             Color.parseColor("#f9cd04"), Color.parseColor("#5f33a8"), Color.parseColor("#e005b6"),
@@ -97,9 +99,9 @@ public class ReportsActivity extends BaseDrawerActivity implements AdapterView.O
     private boolean mSkipNextReportTypeSelectedRun = false;
 
     AdapterView.OnItemSelectedListener mReportTypeSelectedListener = new AdapterView.OnItemSelectedListener() {
-
         @Override
         public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+            Log.d(LOG_TAG, String.format("mReportTypeSelectedListener onItemSelected %d, %d; name=%s", position, id, parent.getItemAtPosition(position).toString()));
             if (mSkipNextReportTypeSelectedRun) {
                 mSkipNextReportTypeSelectedRun = false;
             } else {
@@ -137,7 +139,7 @@ public class ReportsActivity extends BaseDrawerActivity implements AdapterView.O
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         if (savedInstanceState != null) {
-            mReportType = (ReportType) savedInstanceState.getSerializable(STATE_REPORT_TYPE);
+            mReportType = savedInstanceState.getSerializable(STATE_REPORT_TYPE, ReportType.class);
         }
 
         super.onCreate(savedInstanceState);
@@ -157,13 +159,10 @@ public class ReportsActivity extends BaseDrawerActivity implements AdapterView.O
         mAccountTypeSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> adapterView, View view, int position, long id) {
-                switch (position) {
-                    default:
-                    case 0:
-                        mAccountType = AccountType.EXPENSE;
-                        break;
-                    case 1:
-                        mAccountType = AccountType.INCOME;
+                if (position == 1) {
+                    mAccountType = AccountType.INCOME;
+                } else {
+                    mAccountType = AccountType.EXPENSE;
                 }
                 updateAccountTypeOnFragments();
             }
@@ -179,16 +178,14 @@ public class ReportsActivity extends BaseDrawerActivity implements AdapterView.O
         if (savedInstanceState == null) {
             loadFragment(mReportsOverviewFragment);
         }
-    }
 
-    @Override
-    public void onAttachFragment(Fragment fragment) {
-        super.onAttachFragment(fragment);
-
-        if (fragment instanceof BaseReportFragment) {
-            BaseReportFragment reportFragment = (BaseReportFragment) fragment;
-            updateReportTypeSpinner(reportFragment.getReportType(), getString(reportFragment.getTitle()));
-        }
+        // Update the report type spinner
+        FragmentManager fm = this.getSupportFragmentManager();
+        fm.addFragmentOnAttachListener((fragmentManager, fragment) -> {
+            if (fragment instanceof BaseReportFragment reportFragment) {
+                updateReportTypeSpinner(reportFragment.getReportType(), getString(reportFragment.getTitle()));
+            }
+        });
     }
 
     /**
@@ -209,8 +206,13 @@ public class ReportsActivity extends BaseDrawerActivity implements AdapterView.O
      * Update the report type spinner
      */
     public void updateReportTypeSpinner(ReportType reportType, String reportName) {
-        if (reportType == mReportType)//if it is the same report type, don't change anything
+        Log.d(LOG_TAG, String.format("updateReportTypeSpinner mReportType=%s, reportType=%s; reportName=%s, reportType.getReportNames()=%s.",
+                mReportType, reportType, reportName, reportType.getReportNames()));
+
+        if (reportType == mReportType) {
+            //if it is the same report type, don't change anything
             return;
+        }
 
         mReportType = reportType;
         ActionBar actionBar = getSupportActionBar();
@@ -223,7 +225,6 @@ public class ReportsActivity extends BaseDrawerActivity implements AdapterView.O
         mReportTypeSpinner.setAdapter(arrayAdapter);
         mReportTypeSpinner.setSelection(arrayAdapter.getPosition(reportName));
         mReportTypeSpinner.setOnItemSelectedListener(mReportTypeSelectedListener);
-
 
         toggleToolbarTitleVisibility();
     }
@@ -248,8 +249,7 @@ public class ReportsActivity extends BaseDrawerActivity implements AdapterView.O
         if (getSupportActionBar() != null)
             getSupportActionBar().setBackgroundDrawable(new ColorDrawable(resolvedColor));
 
-        if (Build.VERSION.SDK_INT > 20)
-            getWindow().setStatusBarColor(GnuCashApplication.darken(resolvedColor));
+        getWindow().setStatusBarColor(GnuCashApplication.darken(resolvedColor));
     }
 
     /**
@@ -296,58 +296,48 @@ public class ReportsActivity extends BaseDrawerActivity implements AdapterView.O
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        switch (item.getItemId()) {
-            case R.id.menu_group_reports_by:
-                return true;
-
-            case R.id.group_by_month:
-                item.setChecked(true);
-                mReportGroupInterval = GroupInterval.MONTH;
-                updateGroupingOnFragments();
-                return true;
-
-            case R.id.group_by_quarter:
-                item.setChecked(true);
-                mReportGroupInterval = GroupInterval.QUARTER;
-                updateGroupingOnFragments();
-                return true;
-
-            case R.id.group_by_year:
-                item.setChecked(true);
-                mReportGroupInterval = GroupInterval.YEAR;
-                updateGroupingOnFragments();
-                return true;
-
-            case android.R.id.home:
-                super.onOptionsItemSelected(item);
-
-            default:
-                return false;
+        if (item.getItemId() == R.id.menu_group_reports_by) {
+            return true;
+        } else if (item.getItemId() == R.id.group_by_month) {
+            item.setChecked(true);
+            mReportGroupInterval = GroupInterval.MONTH;
+            updateGroupingOnFragments();
+            return true;
+        } else if (item.getItemId() == R.id.group_by_quarter) {
+            item.setChecked(true);
+            mReportGroupInterval = GroupInterval.QUARTER;
+            updateGroupingOnFragments();
+            return true;
+        } else if (item.getItemId() == R.id.group_by_year) {
+            item.setChecked(true);
+            mReportGroupInterval = GroupInterval.YEAR;
+            updateGroupingOnFragments();
+            return true;
+        } else if (item.getItemId() == android.R.id.home) {
+            super.onOptionsItemSelected(item);
+            return true;
+        } else {
+            return false;
         }
-
     }
 
     @Override
     public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
         mReportPeriodEnd = new LocalDate().plusDays(1).toDate().getTime();
         switch (position) {
-            case 0: //current month
-                mReportPeriodStart = new LocalDate().dayOfMonth().withMinimumValue().toDate().getTime();
-                break;
-            case 1: // last 3 months. x-2, x-1, x
-                mReportPeriodStart = new LocalDate().minusMonths(2).dayOfMonth().withMinimumValue().toDate().getTime();
-                break;
-            case 2:
-                mReportPeriodStart = new LocalDate().minusMonths(5).dayOfMonth().withMinimumValue().toDate().getTime();
-                break;
-            case 3:
-                mReportPeriodStart = new LocalDate().minusMonths(11).dayOfMonth().withMinimumValue().toDate().getTime();
-                break;
-            case 4: //ALL TIME
+            case 0 -> //current month
+                    mReportPeriodStart = new LocalDate().dayOfMonth().withMinimumValue().toDate().getTime();
+            case 1 -> // last 3 months. x-2, x-1, x
+                    mReportPeriodStart = new LocalDate().minusMonths(2).dayOfMonth().withMinimumValue().toDate().getTime();
+            case 2 ->
+                    mReportPeriodStart = new LocalDate().minusMonths(5).dayOfMonth().withMinimumValue().toDate().getTime();
+            case 3 ->
+                    mReportPeriodStart = new LocalDate().minusMonths(11).dayOfMonth().withMinimumValue().toDate().getTime();
+            case 4 -> { //ALL TIME
                 mReportPeriodStart = -1;
                 mReportPeriodEnd = -1;
-                break;
-            case 5:
+            }
+            case 5 -> {
                 String mCurrencyCode = GnuCashApplication.getDefaultCurrencyCode();
                 long earliestTransactionTime = mTransactionsDbAdapter.getTimestampOfEarliestTransaction(mAccountType, mCurrencyCode);
                 DialogFragment rangeFragment = DateRangePickerDialogFragment.newInstance(
@@ -355,7 +345,7 @@ public class ReportsActivity extends BaseDrawerActivity implements AdapterView.O
                         new LocalDate().plusDays(1).toDate().getTime(),
                         this);
                 rangeFragment.show(getSupportFragmentManager(), "range_dialog");
-                break;
+            }
         }
         if (position != 5) { //the date picker will trigger the update itself
             updateDateRangeOnFragment();

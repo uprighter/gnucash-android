@@ -18,18 +18,18 @@ package org.gnucash.android.ui.report;
 import static com.github.mikephil.charting.components.Legend.LegendPosition;
 
 import android.content.res.ColorStateList;
-import android.os.Build;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.widget.AppCompatButton;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.ViewCompat;
 import androidx.fragment.app.FragmentManager;
+import androidx.viewbinding.ViewBinding;
 
 import com.github.mikephil.charting.charts.PieChart;
 import com.github.mikephil.charting.components.Legend;
@@ -39,6 +39,7 @@ import com.github.mikephil.charting.data.PieData;
 import com.github.mikephil.charting.data.PieDataSet;
 
 import org.gnucash.android.R;
+import org.gnucash.android.databinding.FragmentReportSummaryBinding;
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.model.Account;
 import org.gnucash.android.model.AccountType;
@@ -53,9 +54,7 @@ import org.joda.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-
-import butterknife.BindView;
-import butterknife.OnClick;
+import java.util.Locale;
 
 /**
  * Shows a summary of reports
@@ -66,22 +65,14 @@ public class ReportsOverviewFragment extends BaseReportFragment {
 
     public static final int LEGEND_TEXT_SIZE = 14;
 
-    @BindView(R.id.btn_pie_chart)
     Button mPieChartButton;
-    @BindView(R.id.btn_bar_chart)
     Button mBarChartButton;
-    @BindView(R.id.btn_line_chart)
     Button mLineChartButton;
-    @BindView(R.id.btn_balance_sheet)
     Button mBalanceSheetButton;
 
-    @BindView(R.id.pie_chart)
     PieChart mChart;
-    @BindView(R.id.total_assets)
     TextView mTotalAssets;
-    @BindView(R.id.total_liabilities)
     TextView mTotalLiabilities;
-    @BindView(R.id.net_worth)
     TextView mNetWorth;
 
     private AccountsDbAdapter mAccountsDbAdapter;
@@ -97,8 +88,23 @@ public class ReportsOverviewFragment extends BaseReportFragment {
     }
 
     @Override
-    public int getLayoutResource() {
-        return R.layout.fragment_report_summary;
+    public ViewBinding bindViews() {
+        FragmentReportSummaryBinding viewBinding = FragmentReportSummaryBinding.inflate(getLayoutInflater());
+
+        mPieChartButton = viewBinding.btnPieChart;
+        mPieChartButton.setOnClickListener(this::onClickChartTypeButton);
+        mBarChartButton = viewBinding.btnBarChart;
+        mBarChartButton.setOnClickListener(this::onClickChartTypeButton);
+        mLineChartButton = viewBinding.btnLineChart;
+        mLineChartButton.setOnClickListener(this::onClickChartTypeButton);
+        mBalanceSheetButton = viewBinding.btnBalanceSheet;
+        mBalanceSheetButton.setOnClickListener(this::onClickChartTypeButton);
+
+        mChart = viewBinding.pieChart;
+        mTotalAssets = viewBinding.totalAssets;
+        mTotalLiabilities = viewBinding.totalLiabilities;
+        mNetWorth = viewBinding.netWorth;
+        return viewBinding;
     }
 
     @Override
@@ -122,8 +128,8 @@ public class ReportsOverviewFragment extends BaseReportFragment {
     }
 
     @Override
-    public void onActivityCreated(@Nullable Bundle savedInstanceState) {
-        super.onActivityCreated(savedInstanceState);
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
 
         setHasOptionsMenu(false);
 
@@ -155,12 +161,12 @@ public class ReportsOverviewFragment extends BaseReportFragment {
     @Override
     protected void generateReport() {
         PieData pieData = PieChartFragment.groupSmallerSlices(getData(), getActivity());
-        if (pieData != null && pieData.getYValCount() != 0) {
+        if (pieData.getYValCount() != 0) {
             mChart.setData(pieData);
             float sum = mChart.getData().getYValueSum();
             String total = getResources().getString(R.string.label_chart_total);
             String currencySymbol = mCommodity.getSymbol();
-            mChart.setCenterText(String.format(PieChartFragment.TOTAL_VALUE_LABEL_PATTERN, total, sum, currencySymbol));
+            mChart.setCenterText(String.format(Locale.getDefault(), PieChartFragment.TOTAL_VALUE_LABEL_PATTERN, total, sum, currencySymbol));
             mChartHasData = true;
         } else {
             mChart.setData(getEmptyData());
@@ -242,25 +248,18 @@ public class ReportsOverviewFragment extends BaseReportFragment {
         return new PieData(Collections.singletonList(""), dataSet);
     }
 
-    @OnClick({R.id.btn_bar_chart, R.id.btn_pie_chart, R.id.btn_line_chart, R.id.btn_balance_sheet})
     public void onClickChartTypeButton(View view) {
         BaseReportFragment fragment;
-        switch (view.getId()) {
-            case R.id.btn_pie_chart:
-                fragment = new PieChartFragment();
-                break;
-            case R.id.btn_bar_chart:
-                fragment = new StackedBarChartFragment();
-                break;
-            case R.id.btn_line_chart:
-                fragment = new CashFlowLineChartFragment();
-                break;
-            case R.id.btn_balance_sheet:
-                fragment = new BalanceSheetFragment();
-                break;
-            default:
-                fragment = this;
-                break;
+        if (view.getId() == R.id.btn_pie_chart) {
+            fragment = new PieChartFragment();
+        } else if (view.getId() == R.id.btn_bar_chart) {
+            fragment = new StackedBarChartFragment();
+        } else if (view.getId() == R.id.btn_line_chart) {
+            fragment = new CashFlowLineChartFragment();
+        } else if (view.getId() == R.id.btn_balance_sheet) {
+            fragment = new BalanceSheetFragment();
+        } else {
+            fragment = this;
         }
         FragmentManager fragmentManager = getActivity().getSupportFragmentManager();
         fragmentManager.beginTransaction()
@@ -269,11 +268,7 @@ public class ReportsOverviewFragment extends BaseReportFragment {
     }
 
     public void setButtonTint(Button button, ColorStateList tint) {
-        if (Build.VERSION.SDK_INT == Build.VERSION_CODES.LOLLIPOP && button instanceof AppCompatButton) {
-            ((AppCompatButton) button).setSupportBackgroundTintList(tint);
-        } else {
-            ViewCompat.setBackgroundTintList(button, tint);
-        }
+        ViewCompat.setBackgroundTintList(button, tint);
         button.setTextColor(ContextCompat.getColor(getContext(), android.R.color.white));
     }
 

@@ -23,11 +23,14 @@ import static com.github.mikephil.charting.components.Legend.LegendPosition;
 import android.content.Context;
 import android.graphics.Color;
 import android.os.Bundle;
-import android.preference.PreferenceManager;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.preference.PreferenceManager;
+import androidx.viewbinding.ViewBinding;
 
 import com.github.mikephil.charting.charts.PieChart;
 import com.github.mikephil.charting.data.Entry;
@@ -36,6 +39,7 @@ import com.github.mikephil.charting.data.PieDataSet;
 import com.github.mikephil.charting.highlight.Highlight;
 
 import org.gnucash.android.R;
+import org.gnucash.android.databinding.FragmentPieChartBinding;
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.model.Account;
 import org.gnucash.android.ui.report.BaseReportFragment;
@@ -45,8 +49,7 @@ import org.gnucash.android.ui.report.ReportsActivity;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-
-import butterknife.BindView;
+import java.util.Locale;
 
 /**
  * Activity used for drawing a pie chart
@@ -68,7 +71,6 @@ public class PieChartFragment extends BaseReportFragment {
      */
     private static final double GROUPING_SMALLER_SLICES_THRESHOLD = 5;
 
-    @BindView(R.id.pie_chart)
     PieChart mChart;
 
     private AccountsDbAdapter mAccountsDbAdapter;
@@ -80,8 +82,8 @@ public class PieChartFragment extends BaseReportFragment {
     private boolean mGroupSmallerSlices = true;
 
     @Override
-    public void onActivityCreated(@Nullable Bundle savedInstanceState) {
-        super.onActivityCreated(savedInstanceState);
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
 
         mUseAccountColor = PreferenceManager.getDefaultSharedPreferences(getActivity())
                 .getBoolean(getString(R.string.key_use_account_color), false);
@@ -109,20 +111,24 @@ public class PieChartFragment extends BaseReportFragment {
     }
 
     @Override
-    public int getLayoutResource() {
-        return R.layout.fragment_pie_chart;
+    public ViewBinding bindViews() {
+        FragmentPieChartBinding viewBinding = FragmentPieChartBinding.inflate(getLayoutInflater());
+        mSelectedValueTextView = viewBinding.selectedChartSlice;
+
+        mChart = viewBinding.pieChart;
+        return viewBinding;
     }
 
     @Override
     protected void generateReport() {
         PieData pieData = getData();
-        if (pieData != null && pieData.getYValCount() != 0) {
+        if (pieData.getYValCount() != 0) {
             mChartDataPresent = true;
             mChart.setData(mGroupSmallerSlices ? groupSmallerSlices(pieData, getActivity()) : pieData);
             float sum = mChart.getData().getYValueSum();
             String total = getResources().getString(R.string.label_chart_total);
             String currencySymbol = mCommodity.getSymbol();
-            mChart.setCenterText(String.format(TOTAL_VALUE_LABEL_PATTERN, total, sum, currencySymbol));
+            mChart.setCenterText(String.format(Locale.getDefault(), TOTAL_VALUE_LABEL_PATTERN, total, sum, currencySymbol));
         } else {
             mChartDataPresent = false;
             mChart.setCenterText(getResources().getString(R.string.label_chart_no_data));
@@ -238,33 +244,28 @@ public class PieChartFragment extends BaseReportFragment {
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        if (item.isCheckable())
+        if (item.isCheckable()) {
             item.setChecked(!item.isChecked());
-        switch (item.getItemId()) {
-            case R.id.menu_order_by_size: {
-                bubbleSort();
-                return true;
-            }
-            case R.id.menu_toggle_legend: {
-                mChart.getLegend().setEnabled(!mChart.getLegend().isEnabled());
-                mChart.notifyDataSetChanged();
-                mChart.invalidate();
-                return true;
-            }
-            case R.id.menu_toggle_labels: {
-                mChart.getData().setDrawValues(!mChart.isDrawSliceTextEnabled());
-                mChart.setDrawSliceText(!mChart.isDrawSliceTextEnabled());
-                mChart.invalidate();
-                return true;
-            }
-            case R.id.menu_group_other_slice: {
-                mGroupSmallerSlices = !mGroupSmallerSlices;
-                refresh();
-                return true;
-            }
-
-            default:
-                return super.onOptionsItemSelected(item);
+        }
+        if (item.getItemId() == R.id.menu_order_by_size) {
+            bubbleSort();
+            return true;
+        } else if (item.getItemId() == R.id.menu_toggle_legend) {
+            mChart.getLegend().setEnabled(!mChart.getLegend().isEnabled());
+            mChart.notifyDataSetChanged();
+            mChart.invalidate();
+            return true;
+        } else if (item.getItemId() == R.id.menu_toggle_labels) {
+            mChart.getData().setDrawValues(!mChart.isDrawSliceTextEnabled());
+            mChart.setDrawSliceText(!mChart.isDrawSliceTextEnabled());
+            mChart.invalidate();
+            return true;
+        } else if (item.getItemId() == R.id.menu_group_other_slice) {
+            mGroupSmallerSlices = !mGroupSmallerSlices;
+            refresh();
+            return true;
+        } else {
+            return super.onOptionsItemSelected(item);
         }
     }
 
@@ -310,6 +311,6 @@ public class PieChartFragment extends BaseReportFragment {
         String label = mChart.getData().getXVals().get(e.getXIndex());
         float value = e.getVal();
         float percent = value / mChart.getData().getYValueSum() * 100;
-        mSelectedValueTextView.setText(String.format(SELECTED_VALUE_PATTERN, label, value, percent));
+        mSelectedValueTextView.setText(String.format(Locale.getDefault(), SELECTED_VALUE_PATTERN, label, value, percent));
     }
 }

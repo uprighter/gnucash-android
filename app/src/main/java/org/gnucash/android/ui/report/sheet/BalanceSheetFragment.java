@@ -25,9 +25,13 @@ import android.view.View;
 import android.widget.TableLayout;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.viewbinding.ViewBinding;
 
 import org.gnucash.android.R;
+import org.gnucash.android.databinding.FragmentTextReportBinding;
+import org.gnucash.android.databinding.RowBalanceSheetBinding;
 import org.gnucash.android.db.DatabaseSchema;
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.model.AccountType;
@@ -39,8 +43,6 @@ import org.gnucash.android.ui.transaction.TransactionsActivity;
 import java.util.ArrayList;
 import java.util.List;
 
-import butterknife.BindView;
-
 /**
  * Balance sheet report fragment
  *
@@ -48,14 +50,9 @@ import butterknife.BindView;
  */
 public class BalanceSheetFragment extends BaseReportFragment {
 
-    @BindView(R.id.table_assets)
     TableLayout mAssetsTableLayout;
-    @BindView(R.id.table_liabilities)
     TableLayout mLiabilitiesTableLayout;
-    @BindView(R.id.table_equity)
     TableLayout mEquityTableLayout;
-
-    @BindView(R.id.total_liability_and_equity)
     TextView mNetWorth;
 
     AccountsDbAdapter mAccountsDbAdapter = AccountsDbAdapter.getInstance();
@@ -67,8 +64,14 @@ public class BalanceSheetFragment extends BaseReportFragment {
     private List<AccountType> mEquityAccountTypes;
 
     @Override
-    public int getLayoutResource() {
-        return R.layout.fragment_text_report;
+    public ViewBinding bindViews() {
+        FragmentTextReportBinding viewBinding = FragmentTextReportBinding.inflate(getLayoutInflater());
+
+        mAssetsTableLayout = viewBinding.tableAssets;
+        mLiabilitiesTableLayout = viewBinding.tableLiabilities;
+        mEquityTableLayout = viewBinding.tableEquity;
+        mNetWorth = viewBinding.totalLiabilityAndEquity;
+        return viewBinding;
     }
 
     @Override
@@ -82,8 +85,8 @@ public class BalanceSheetFragment extends BaseReportFragment {
     }
 
     @Override
-    public void onActivityCreated(@Nullable Bundle savedInstanceState) {
-        super.onActivityCreated(savedInstanceState);
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
         mAssetAccountTypes = new ArrayList<>();
         mAssetAccountTypes.add(AccountType.ASSET);
         mAssetAccountTypes.add(AccountType.CASH);
@@ -123,7 +126,7 @@ public class BalanceSheetFragment extends BaseReportFragment {
     }
 
     @Override
-    public void onPrepareOptionsMenu(Menu menu) {
+    public void onPrepareOptionsMenu(@NonNull Menu menu) {
         super.onPrepareOptionsMenu(menu);
         menu.findItem(R.id.menu_group_reports_by).setVisible(false);
     }
@@ -137,36 +140,37 @@ public class BalanceSheetFragment extends BaseReportFragment {
     private void loadAccountViews(List<AccountType> accountTypes, TableLayout tableLayout) {
         LayoutInflater inflater = LayoutInflater.from(getActivity());
 
-        Cursor cursor = mAccountsDbAdapter.fetchAccounts(DatabaseSchema.AccountEntry.COLUMN_TYPE
+        try (Cursor cursor = mAccountsDbAdapter.fetchAccounts(DatabaseSchema.AccountEntry.COLUMN_TYPE
                         + " IN ( '" + TextUtils.join("' , '", accountTypes) + "' ) AND "
                         + DatabaseSchema.AccountEntry.COLUMN_PLACEHOLDER + " = 0",
-                null, DatabaseSchema.AccountEntry.COLUMN_FULL_NAME + " ASC");
+                null, DatabaseSchema.AccountEntry.COLUMN_FULL_NAME + " ASC")) {
 
-        while (cursor.moveToNext()) {
-            String accountUID = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseSchema.AccountEntry.COLUMN_UID));
-            String name = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseSchema.AccountEntry.COLUMN_NAME));
-            Money balance = mAccountsDbAdapter.getAccountBalance(accountUID);
-            View view = inflater.inflate(R.layout.row_balance_sheet, tableLayout, false);
-            ((TextView) view.findViewById(R.id.account_name)).setText(name);
-            TextView balanceTextView = (TextView) view.findViewById(R.id.account_balance);
-            TransactionsActivity.displayBalance(balanceTextView, balance);
-            tableLayout.addView(view);
+            while (cursor.moveToNext()) {
+                String accountUID = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseSchema.AccountEntry.COLUMN_UID));
+                String name = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseSchema.AccountEntry.COLUMN_NAME));
+                Money balance = mAccountsDbAdapter.getAccountBalance(accountUID);
+                RowBalanceSheetBinding rowBinding = RowBalanceSheetBinding.inflate(inflater, tableLayout, false);
+                rowBinding.accountName.setText(name);
+                TextView balanceTextView = rowBinding.accountBalance;
+                TransactionsActivity.displayBalance(balanceTextView, balance);
+                tableLayout.addView(rowBinding.getRoot());
+            }
         }
 
-        View totalView = inflater.inflate(R.layout.row_balance_sheet, tableLayout, false);
+        RowBalanceSheetBinding totalBinding = RowBalanceSheetBinding.inflate(inflater, tableLayout, false);
+        View totalView = totalBinding.getRoot();
         TableLayout.LayoutParams layoutParams = (TableLayout.LayoutParams) totalView.getLayoutParams();
         layoutParams.setMargins(layoutParams.leftMargin, 20, layoutParams.rightMargin, layoutParams.bottomMargin);
         totalView.setLayoutParams(layoutParams);
 
-        TextView accountName = (TextView) totalView.findViewById(R.id.account_name);
+        TextView accountName = totalBinding.accountName;
         accountName.setTextSize(16);
         accountName.setText(R.string.label_balance_sheet_total);
-        TextView accountBalance = (TextView) totalView.findViewById(R.id.account_balance);
+        TextView accountBalance = totalBinding.accountBalance;
         accountBalance.setTextSize(16);
         accountBalance.setTypeface(null, Typeface.BOLD);
         TransactionsActivity.displayBalance(accountBalance, mAccountsDbAdapter.getAccountBalance(accountTypes, -1, System.currentTimeMillis()));
 
         tableLayout.addView(totalView);
     }
-
 }

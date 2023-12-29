@@ -40,28 +40,16 @@ import java.util.Map;
 public enum ReportType {
     PIE_CHART(0), BAR_CHART(1), LINE_CHART(2), TEXT(3), NONE(4);
 
-    Map<String, Class> mReportTypeMap = new HashMap<>();
-    int mValue = 4;
+    final Map<String, Class> mReportTypeMap = new HashMap<>();
+    final int mValue;
 
     ReportType(int index) {
         mValue = index;
         Context context = GnuCashApplication.getAppContext();
-        switch (index) {
-            case 0:
-                mReportTypeMap.put(context.getString(R.string.title_pie_chart), PieChartFragment.class);
-                break;
-            case 1:
-                mReportTypeMap.put(context.getString(R.string.title_bar_chart), StackedBarChartFragment.class);
-                break;
-            case 2:
-                mReportTypeMap.put(context.getString(R.string.title_cash_flow_report), CashFlowLineChartFragment.class);
-                break;
-            case 3:
-                mReportTypeMap.put(context.getString(R.string.title_balance_sheet_report), BalanceSheetFragment.class);
-                break;
-            case 4:
-                break;
-        }
+        mReportTypeMap.put(context.getString(R.string.title_pie_chart), PieChartFragment.class);
+        mReportTypeMap.put(context.getString(R.string.title_bar_chart), StackedBarChartFragment.class);
+        mReportTypeMap.put(context.getString(R.string.title_cash_flow_report), CashFlowLineChartFragment.class);
+        mReportTypeMap.put(context.getString(R.string.title_balance_sheet_report), BalanceSheetFragment.class);
     }
 
     /**
@@ -70,19 +58,13 @@ public enum ReportType {
      * @return Color resource
      */
     public @ColorRes int getTitleColor() {
-        switch (mValue) {
-            case 0:
-                return R.color.account_green;
-            case 1:
-                return R.color.account_red;
-            case 2:
-                return R.color.account_blue;
-            case 3:
-                return R.color.account_purple;
-            case 4:
-            default:
-                return R.color.theme_primary;
-        }
+        return switch (mValue) {
+            case 0 -> R.color.account_green;
+            case 1 -> R.color.account_red;
+            case 2 -> R.color.account_blue;
+            case 3 -> R.color.account_purple;
+            default -> R.color.theme_primary;
+        };
     }
 
     public List<String> getReportNames() {
@@ -93,9 +75,7 @@ public enum ReportType {
         BaseReportFragment fragment = null;
         try {
             fragment = (BaseReportFragment) mReportTypeMap.get(name).newInstance();
-        } catch (InstantiationException e) {
-            e.printStackTrace();
-        } catch (IllegalAccessException e) {
+        } catch (InstantiationException | IllegalAccessException e) {
             e.printStackTrace();
         }
         return fragment;

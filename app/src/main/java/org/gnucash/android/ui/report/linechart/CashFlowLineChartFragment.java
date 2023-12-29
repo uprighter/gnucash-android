@@ -22,6 +22,10 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
+
+import androidx.annotation.NonNull;
+import androidx.viewbinding.ViewBinding;
 
 import com.github.mikephil.charting.charts.LineChart;
 import com.github.mikephil.charting.components.Legend;
@@ -33,6 +37,7 @@ import com.github.mikephil.charting.highlight.Highlight;
 import com.github.mikephil.charting.utils.LargeValueFormatter;
 
 import org.gnucash.android.R;
+import org.gnucash.android.databinding.FragmentLineChartBinding;
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.db.adapter.TransactionsDbAdapter;
 import org.gnucash.android.model.Account;
@@ -49,9 +54,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
-
-import butterknife.BindView;
 
 /**
  * Fragment for line chart reports
@@ -73,19 +77,22 @@ public class CashFlowLineChartFragment extends BaseReportFragment {
             Color.parseColor("#0065FF"), Color.parseColor("#8F038A"),
     };
 
-    private AccountsDbAdapter mAccountsDbAdapter = AccountsDbAdapter.getInstance();
-    private Map<AccountType, Long> mEarliestTimestampsMap = new HashMap<>();
-    private Map<AccountType, Long> mLatestTimestampsMap = new HashMap<>();
+    private final AccountsDbAdapter mAccountsDbAdapter = AccountsDbAdapter.getInstance();
+    private final Map<AccountType, Long> mEarliestTimestampsMap = new HashMap<>();
+    private final Map<AccountType, Long> mLatestTimestampsMap = new HashMap<>();
     private long mEarliestTransactionTimestamp;
     private long mLatestTransactionTimestamp;
     private boolean mChartDataPresent = true;
 
-    @BindView(R.id.line_chart)
     LineChart mChart;
 
     @Override
-    public int getLayoutResource() {
-        return R.layout.fragment_line_chart;
+    public ViewBinding bindViews() {
+        FragmentLineChartBinding viewBinding = FragmentLineChartBinding.inflate(getLayoutInflater());
+        mSelectedValueTextView = viewBinding.selectedChartSlice;
+
+        mChart = viewBinding.lineChart;
+        return viewBinding;
     }
 
     @Override
@@ -94,8 +101,8 @@ public class CashFlowLineChartFragment extends BaseReportFragment {
     }
 
     @Override
-    public void onActivityCreated(Bundle savedInstanceState) {
-        super.onActivityCreated(savedInstanceState);
+    public void onViewCreated(@NonNull View view, Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
 
         mChart.setOnChartValueSelectedListener(this);
         mChart.setDescription("");
@@ -123,7 +130,7 @@ public class CashFlowLineChartFragment extends BaseReportFragment {
      * @return a {@code LineData} instance that represents a user data
      */
     private LineData getData(List<AccountType> accountTypeList) {
-        Log.w(TAG, "getData");
+        Log.w(LOG_TAG, "getData");
         calculateEarliestAndLatestTimestamps(accountTypeList);
         // LocalDateTime?
         LocalDate startDate;
@@ -137,26 +144,26 @@ public class CashFlowLineChartFragment extends BaseReportFragment {
         }
 
         int count = getDateDiff(new LocalDateTime(startDate.toDate().getTime()), new LocalDateTime(endDate.toDate().getTime()));
-        Log.d(TAG, "X-axis count" + count);
+        Log.d(LOG_TAG, "X-axis count" + count);
         List<String> xValues = new ArrayList<>();
         for (int i = 0; i <= count; i++) {
             switch (mGroupInterval) {
-                case MONTH:
+                case MONTH -> {
                     xValues.add(startDate.toString(X_AXIS_PATTERN));
-                    Log.d(TAG, "X-axis " + startDate.toString("MM yy"));
+                    Log.d(LOG_TAG, "X-axis " + startDate.toString("MM yy"));
                     startDate = startDate.plusMonths(1);
-                    break;
-                case QUARTER:
+                }
+                case QUARTER -> {
                     int quarter = getQuarter(new LocalDateTime(startDate.toDate().getTime()));
                     xValues.add("Q" + quarter + startDate.toString(" yy"));
-                    Log.d(TAG, "X-axis " + "Q" + quarter + startDate.toString(" MM yy"));
+                    Log.d(LOG_TAG, "X-axis " + "Q" + quarter + startDate.toString(" MM yy"));
                     startDate = startDate.plusMonths(3);
-                    break;
-                case YEAR:
+                }
+                case YEAR -> {
                     xValues.add(startDate.toString("yyyy"));
-                    Log.d(TAG, "X-axis " + startDate.toString("yyyy"));
+                    Log.d(LOG_TAG, "X-axis " + startDate.toString("yyyy"));
                     startDate = startDate.plusYears(1);
-                    break;
+                }
 //                default:
             }
         }
@@ -226,8 +233,8 @@ public class CashFlowLineChartFragment extends BaseReportFragment {
             earliest = new LocalDateTime(mReportPeriodStart);
             latest = new LocalDateTime(mReportPeriodEnd);
         }
-        Log.d(TAG, "Earliest " + accountType + " date " + earliest.toString("dd MM yyyy"));
-        Log.d(TAG, "Latest " + accountType + " date " + latest.toString("dd MM yyyy"));
+        Log.d(LOG_TAG, "Earliest " + accountType + " date " + earliest.toString("dd MM yyyy"));
+        Log.d(LOG_TAG, "Latest " + accountType + " date " + latest.toString("dd MM yyyy"));
 
         int xAxisOffset = getDateDiff(new LocalDateTime(mEarliestTransactionTimestamp), earliest);
         int count = getDateDiff(earliest, latest);
@@ -236,29 +243,26 @@ public class CashFlowLineChartFragment extends BaseReportFragment {
             long start = 0;
             long end = 0;
             switch (mGroupInterval) {
-                case QUARTER:
+                case QUARTER -> {
                     int quarter = getQuarter(earliest);
                     start = earliest.withMonthOfYear(quarter * 3 - 2).dayOfMonth().withMinimumValue().millisOfDay().withMinimumValue().toDate().getTime();
                     end = earliest.withMonthOfYear(quarter * 3).dayOfMonth().withMaximumValue().millisOfDay().withMaximumValue().toDate().getTime();
-
                     earliest = earliest.plusMonths(3);
-                    break;
-                case MONTH:
+                }
+                case MONTH -> {
                     start = earliest.dayOfMonth().withMinimumValue().millisOfDay().withMinimumValue().toDate().getTime();
                     end = earliest.dayOfMonth().withMaximumValue().millisOfDay().withMaximumValue().toDate().getTime();
-
                     earliest = earliest.plusMonths(1);
-                    break;
-                case YEAR:
+                }
+                case YEAR -> {
                     start = earliest.dayOfYear().withMinimumValue().millisOfDay().withMinimumValue().toDate().getTime();
                     end = earliest.dayOfYear().withMaximumValue().millisOfDay().withMaximumValue().toDate().getTime();
-
                     earliest = earliest.plusYears(1);
-                    break;
+                }
             }
             float balance = (float) mAccountsDbAdapter.getAccountsBalance(accountUIDList, start, end).asDouble();
             values.add(new Entry(balance, i + xAxisOffset));
-            Log.d(TAG, accountType + earliest.toString(" MMM yyyy") + ", balance = " + balance);
+            Log.d(LOG_TAG, accountType + earliest.toString(" MMM yyyy") + ", balance = " + balance);
 
         }
 
@@ -309,12 +313,8 @@ public class CashFlowLineChartFragment extends BaseReportFragment {
     @Override
     protected void generateReport() {
         LineData lineData = getData(new ArrayList<>(Arrays.asList(AccountType.INCOME, AccountType.EXPENSE)));
-        if (lineData != null) {
-            mChart.setData(lineData);
-            mChartDataPresent = true;
-        } else {
-            mChartDataPresent = false;
-        }
+        mChart.setData(lineData);
+        mChartDataPresent = true;
     }
 
     @Override
@@ -362,30 +362,28 @@ public class CashFlowLineChartFragment extends BaseReportFragment {
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        if (item.isCheckable())
+        if (item.isCheckable()) {
             item.setChecked(!item.isChecked());
-        switch (item.getItemId()) {
-            case R.id.menu_toggle_legend:
-                mChart.getLegend().setEnabled(!mChart.getLegend().isEnabled());
-                mChart.invalidate();
-                return true;
-
-            case R.id.menu_toggle_average_lines:
-                if (mChart.getAxisLeft().getLimitLines().isEmpty()) {
-                    for (LineDataSet set : mChart.getData().getDataSets()) {
-                        LimitLine line = new LimitLine(set.getYValueSum() / set.getEntryCount(), set.getLabel());
-                        line.enableDashedLine(10, 5, 0);
-                        line.setLineColor(set.getColor());
-                        mChart.getAxisLeft().addLimitLine(line);
-                    }
-                } else {
-                    mChart.getAxisLeft().removeAllLimitLines();
+        }
+        if (item.getItemId() == R.id.menu_toggle_legend) {
+            mChart.getLegend().setEnabled(!mChart.getLegend().isEnabled());
+            mChart.invalidate();
+            return true;
+        } else if (item.getItemId() == R.id.menu_toggle_average_lines) {
+            if (mChart.getAxisLeft().getLimitLines().isEmpty()) {
+                for (LineDataSet set : mChart.getData().getDataSets()) {
+                    LimitLine line = new LimitLine(set.getYValueSum() / set.getEntryCount(), set.getLabel());
+                    line.enableDashedLine(10, 5, 0);
+                    line.setLineColor(set.getColor());
+                    mChart.getAxisLeft().addLimitLine(line);
                 }
-                mChart.invalidate();
-                return true;
-
-            default:
-                return super.onOptionsItemSelected(item);
+            } else {
+                mChart.getAxisLeft().removeAllLimitLines();
+            }
+            mChart.invalidate();
+            return true;
+        } else {
+            return super.onOptionsItemSelected(item);
         }
     }
 
@@ -395,7 +393,7 @@ public class CashFlowLineChartFragment extends BaseReportFragment {
         String label = mChart.getData().getXVals().get(e.getXIndex());
         double value = e.getVal();
         double sum = mChart.getData().getDataSetByIndex(dataSetIndex).getYValueSum();
-        mSelectedValueTextView.setText(String.format(SELECTED_VALUE_PATTERN, label, value, value / sum * 100));
+        mSelectedValueTextView.setText(String.format(Locale.getDefault(), SELECTED_VALUE_PATTERN, label, value, value / sum * 100));
     }
 
 }
