@@ -18,11 +18,11 @@ package org.gnucash.android.ui.passcode;
 
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.preference.PreferenceManager;
 import android.util.Log;
 import android.view.WindowManager.LayoutParams;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.preference.PreferenceManager;
 
 import org.gnucash.android.app.GnuCashApplication;
 import org.gnucash.android.ui.common.UxArgument;
@@ -36,7 +36,7 @@ import org.gnucash.android.ui.common.UxArgument;
  */
 public class PasscodeLockActivity extends AppCompatActivity {
 
-    private static final String TAG = "PasscodeLockActivity";
+    private static final String LOG_TAG = PasscodeLockActivity.class.getName();
 
     @Override
     protected void onResume() {
@@ -61,7 +61,7 @@ public class PasscodeLockActivity extends AppCompatActivity {
         String passCode = prefs.getString(UxArgument.PASSCODE, "");
 
         if (isPassEnabled && !isSessionActive() && !passCode.trim().isEmpty() && !skipPasscode) {
-            Log.v(TAG, "Show passcode screen");
+            Log.v(LOG_TAG, "Show passcode screen");
             Intent intent = new Intent(this, PasscodeLockScreenActivity.class)
                     .setAction(getIntent().getAction())
                     .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK)
@@ -85,5 +85,4 @@ public class PasscodeLockActivity extends AppCompatActivity {
         return System.currentTimeMillis() - GnuCashApplication.PASSCODE_SESSION_INIT_TIME
                 < GnuCashApplication.SESSION_TIMEOUT;
     }
-
 }

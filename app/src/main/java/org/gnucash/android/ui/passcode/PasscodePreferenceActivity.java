@@ -18,13 +18,16 @@ package org.gnucash.android.ui.passcode;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.preference.PreferenceManager;
+import android.view.LayoutInflater;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.preference.PreferenceManager;
 
 import org.gnucash.android.R;
+import org.gnucash.android.databinding.FragmentNumericKeyboardBinding;
+import org.gnucash.android.databinding.PasscodeLockscreenBinding;
 import org.gnucash.android.ui.common.UxArgument;
 
 /**
@@ -44,9 +47,11 @@ public class PasscodePreferenceActivity extends AppCompatActivity
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.passcode_lockscreen);
+        PasscodeLockscreenBinding binding = PasscodeLockscreenBinding.inflate(LayoutInflater.from(this));
+        setContentView(binding.getRoot());
+        FragmentNumericKeyboardBinding fragmentNumericKeyboardBinding = FragmentNumericKeyboardBinding.bind(binding.passcodeContainer);
 
-        mPassTextView = (TextView) findViewById(R.id.passcode_label);
+        mPassTextView = fragmentNumericKeyboardBinding.passcodeLabel;
 
         mIsPassEnabled = PreferenceManager.getDefaultSharedPreferences(getApplicationContext())
                 .getBoolean(UxArgument.ENABLED_PASSCODE, false);
