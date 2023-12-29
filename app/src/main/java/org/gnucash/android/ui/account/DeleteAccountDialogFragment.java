@@ -218,9 +218,14 @@ public class DeleteAccountDialogFragment extends DialogFragment {
 
             WidgetConfigurationActivity.updateAllWidgets(getActivity());
 
-            getParentFragmentManager().setFragmentResult("delete_account_" + mOriginAccountUID, new Bundle());
+            getParentFragmentManager().setFragmentResult(getRequestKey(mOriginAccountUID), new Bundle());
 
             dismiss();
         });
+    }
+
+    @NonNull
+    public String getRequestKey(String accountUID) {
+        return "delete_account_" + accountUID;
     }
 }

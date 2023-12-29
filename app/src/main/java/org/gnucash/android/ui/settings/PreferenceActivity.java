@@ -21,6 +21,7 @@ import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.MenuItem;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
 import androidx.fragment.app.Fragment;
@@ -66,9 +67,8 @@ public class PreferenceActivity extends PasscodeLockActivity implements
     }
 
     @Override
-    public boolean onPreferenceStartFragment(PreferenceFragmentCompat caller, Preference pref) {
-        String key = pref.getKey();
-        Fragment fragment = null;
+    public boolean onPreferenceStartFragment(@NonNull PreferenceFragmentCompat caller, Preference pref) {
+        Fragment fragment;
         try {
             Class<?> clazz = Class.forName(pref.getFragment());
             fragment = (Fragment) clazz.newInstance();
@@ -96,19 +96,16 @@ public class PreferenceActivity extends PasscodeLockActivity implements
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        switch (item.getItemId()) {
-            case android.R.id.home:
-                android.app.FragmentManager fm = getFragmentManager();
-                if (fm.getBackStackEntryCount() > 0) {
-                    fm.popBackStack();
-                } else {
-                    finish();
-                }
-                return true;
-
-            default:
-                return false;
+        if (item.getItemId() == android.R.id.home) {
+            FragmentManager fm = getSupportFragmentManager();
+            if (fm.getBackStackEntryCount() > 0) {
+                fm.popBackStack();
+            } else {
+                finish();
+            }
+            return true;
         }
+        return false;
     }
 
     /**

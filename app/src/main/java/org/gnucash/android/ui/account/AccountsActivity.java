@@ -19,7 +19,6 @@ package org.gnucash.android.ui.account;
 
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -34,7 +33,6 @@ import android.util.SparseArray;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
-import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -428,50 +426,15 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
     }
 
     /**
-     * Starts Intent chooser for selecting a GnuCash accounts file to import.
-     * <p>The {@code activity} is responsible for the actual import of the file and can do so by calling {@link #importXmlFileFromIntent(Activity, Intent, TaskDelegate)}<br>
-     * The calling class should respond to the request code {@link AccountsActivity#REQUEST_PICK_ACCOUNTS_FILE} in its {@link #onActivityResult(int, int, Intent)} method</p>
-     *
-     * @param activity Activity starting the request and will also handle the response
-     * @see #importXmlFileFromIntent(Activity, Intent, TaskDelegate)
-     */
-    public static void startXmlFileChooser(Activity activity) {
-        Intent pickIntent = new Intent(Intent.ACTION_GET_CONTENT);
-        pickIntent.addCategory(Intent.CATEGORY_OPENABLE);
-        pickIntent.setType("*/*");
-        Intent chooser = Intent.createChooser(pickIntent, "Select GnuCash account file"); //todo internationalize string
-
-        try {
-            activity.startActivityForResult(chooser, REQUEST_PICK_ACCOUNTS_FILE);
-        } catch (ActivityNotFoundException ex) {
-            FirebaseCrashlytics.getInstance().log("No file manager for selecting files available");
-            FirebaseCrashlytics.getInstance().recordException(ex);
-            Toast.makeText(activity, R.string.toast_install_file_manager, Toast.LENGTH_LONG).show();
-        }
-    }
-
-    /**
-     * Overloaded method.
-     * Starts chooser for selecting a GnuCash account file to import
-     *
-     * @param fragment Fragment creating the chooser and which will also handle the result
-     * @see #startXmlFileChooser(Activity)
-     */
-    public static void startXmlFileChooser(Fragment fragment) {
-        startXmlFileChooser(fragment.requireActivity());
-    }
-
-    /**
      * Reads and XML file from an intent and imports it into the database
-     * <p>This method is usually called in response to {@link AccountsActivity#startXmlFileChooser(Activity)}</p>
      *
      * @param context      Activity context
-     * @param data         Intent data containing the XML uri
+     * @param uri          XML Uri
      * @param onFinishTask Task to be executed when import is complete
      */
-    public static void importXmlFileFromIntent(Activity context, Intent data, TaskDelegate onFinishTask) {
+    public static void importXmlFileFromIntent(Activity context, Uri uri, TaskDelegate onFinishTask) {
         BackupManager.backupActiveBook();
-        new ImportAsyncTask(context, onFinishTask, data.getData()).asyncExecute();
+        new ImportAsyncTask(context, onFinishTask, uri).asyncExecute();
     }
 
     /**

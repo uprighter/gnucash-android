@@ -223,7 +223,7 @@ public abstract class DatabaseAdapter<Model extends BaseModel> {
      * @param updateMethod Method to use for adding the record
      */
     public void addRecord(@NonNull final Model model, UpdateMethod updateMethod) {
-        Log.d(LOG_TAG, String.format("Adding %s record to database: ", model.getClass().getSimpleName()));
+        Log.d(LOG_TAG, String.format("Adding %s record to database with method %s.", model.getClass().getSimpleName(), updateMethod));
         switch (updateMethod) {
             case insert -> {
                 synchronized (getInsertStatement()) {

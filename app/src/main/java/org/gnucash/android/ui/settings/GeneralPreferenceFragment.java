@@ -20,8 +20,11 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.util.Log;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.preference.CheckBoxPreference;
@@ -41,21 +44,61 @@ import org.gnucash.android.ui.passcode.PasscodePreferenceActivity;
 public class GeneralPreferenceFragment extends PreferenceFragmentCompat implements
         Preference.OnPreferenceChangeListener, Preference.OnPreferenceClickListener {
 
-    /**
-     * Request code for retrieving passcode to store
-     */
-    public static final int PASSCODE_REQUEST_CODE = 0x2;
-    /**
-     * Request code for disabling passcode
-     */
-    public static final int REQUEST_DISABLE_PASSCODE = 0x3;
-    /**
-     * Request code for changing passcode
-     */
-    public static final int REQUEST_CHANGE_PASSCODE = 0x4;
+    public static final String LOG_TAG = GeneralPreferenceFragment.class.getName();
 
     private SharedPreferences.Editor mEditor;
     private CheckBoxPreference mCheckBoxPreference;
+
+    private final ActivityResultLauncher<Intent> retrievePasscodeLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                Log.d(LOG_TAG, "launch intent: result = " + result);
+
+                if (mEditor == null) {
+                    mEditor = getPreferenceManager().getSharedPreferences().edit();
+                }
+                if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
+                    Intent data = result.getData();
+                    mEditor.putString(UxArgument.PASSCODE, data.getStringExtra(UxArgument.PASSCODE));
+                    mEditor.putBoolean(UxArgument.ENABLED_PASSCODE, true);
+                    Toast.makeText(getActivity(), R.string.toast_passcode_set, Toast.LENGTH_SHORT).show();
+                } else if (result.getResultCode() == Activity.RESULT_CANCELED) {
+                    mEditor.putBoolean(UxArgument.ENABLED_PASSCODE, false);
+                    mCheckBoxPreference.setChecked(false);
+                }
+                mEditor.commit();
+            }
+    );
+    private final ActivityResultLauncher<Intent> disablePasscodeLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                Log.d(LOG_TAG, "launch intent: result = " + result);
+
+                if (mEditor == null) {
+                    mEditor = getPreferenceManager().getSharedPreferences().edit();
+                }
+                boolean flag = (result.getResultCode() != Activity.RESULT_OK);
+                mEditor.putBoolean(UxArgument.ENABLED_PASSCODE, flag);
+                mCheckBoxPreference.setChecked(flag);
+                mEditor.commit();
+            }
+    );
+    private final ActivityResultLauncher<Intent> changePasscodeLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                Log.d(LOG_TAG, "launch intent: result = " + result);
+
+                if (mEditor == null) {
+                    mEditor = getPreferenceManager().getSharedPreferences().edit();
+                }
+                if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
+                    mEditor.putString(UxArgument.PASSCODE, result.getData().getStringExtra(UxArgument.PASSCODE));
+                    mEditor.putBoolean(UxArgument.ENABLED_PASSCODE, true);
+                    Toast.makeText(getActivity(), R.string.toast_passcode_set, Toast.LENGTH_SHORT).show();
+                }
+                mEditor.commit();
+            }
+    );
 
     @Override
     public void onCreatePreferences(Bundle bundle, String s) {
@@ -78,19 +121,16 @@ public class GeneralPreferenceFragment extends PreferenceFragmentCompat implemen
 
         final Intent intent = new Intent(getActivity(), PasscodePreferenceActivity.class);
 
-        mCheckBoxPreference = (CheckBoxPreference) findPreference(getString(R.string.key_enable_passcode));
-        mCheckBoxPreference.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
-            @Override
-            public boolean onPreferenceChange(Preference preference, Object newValue) {
-                if ((Boolean) newValue) {
-                    startActivityForResult(intent, PASSCODE_REQUEST_CODE);
-                } else {
-                    Intent passIntent = new Intent(getActivity(), PasscodeLockScreenActivity.class);
-                    passIntent.putExtra(UxArgument.DISABLE_PASSCODE, UxArgument.DISABLE_PASSCODE);
-                    startActivityForResult(passIntent, REQUEST_DISABLE_PASSCODE);
-                }
-                return true;
+        mCheckBoxPreference = findPreference(getString(R.string.key_enable_passcode));
+        mCheckBoxPreference.setOnPreferenceChangeListener((preference, newValue) -> {
+            if ((Boolean) newValue) {
+                retrievePasscodeLauncher.launch(intent);
+            } else {
+                Intent passIntent = new Intent(getActivity(), PasscodeLockScreenActivity.class);
+                passIntent.putExtra(UxArgument.DISABLE_PASSCODE, UxArgument.DISABLE_PASSCODE);
+                disablePasscodeLauncher.launch(passIntent);
             }
+            return true;
         });
         findPreference(getString(R.string.key_change_passcode)).setOnPreferenceClickListener(this);
     }
@@ -99,10 +139,7 @@ public class GeneralPreferenceFragment extends PreferenceFragmentCompat implemen
     public boolean onPreferenceClick(Preference preference) {
         String key = preference.getKey();
         if (key.equals(getString(R.string.key_change_passcode))) {
-            startActivityForResult(
-                    new Intent(getActivity(), PasscodePreferenceActivity.class),
-                    REQUEST_CHANGE_PASSCODE
-            );
+            changePasscodeLauncher.launch(new Intent(getActivity(), PasscodePreferenceActivity.class));
             return true;
         }
         return false;
@@ -112,58 +149,20 @@ public class GeneralPreferenceFragment extends PreferenceFragmentCompat implemen
     public boolean onPreferenceChange(Preference preference, Object newValue) {
         if (preference.getKey().equals(getString(R.string.key_enable_passcode))) {
             if ((Boolean) newValue) {
-                startActivityForResult(new Intent(getActivity(), PasscodePreferenceActivity.class),
-                        GeneralPreferenceFragment.PASSCODE_REQUEST_CODE);
+                retrievePasscodeLauncher.launch(new Intent(getActivity(), PasscodePreferenceActivity.class));
             } else {
                 Intent passIntent = new Intent(getActivity(), PasscodeLockScreenActivity.class);
                 passIntent.putExtra(UxArgument.DISABLE_PASSCODE, UxArgument.DISABLE_PASSCODE);
-                startActivityForResult(passIntent, GeneralPreferenceFragment.REQUEST_DISABLE_PASSCODE);
+                disablePasscodeLauncher.launch(passIntent);
             }
         }
 
         if (preference.getKey().equals(getString(R.string.key_use_account_color))) {
             getPreferenceManager().getSharedPreferences()
                     .edit()
-                    .putBoolean(getString(R.string.key_use_account_color), Boolean.valueOf(newValue.toString()))
-                    .commit();
+                    .putBoolean(getString(R.string.key_use_account_color), Boolean.parseBoolean(newValue.toString()))
+                    .apply();
         }
         return true;
     }
-
-    @Override
-    public void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-
-        if (mEditor == null) {
-            mEditor = getPreferenceManager().getSharedPreferences().edit();
-        }
-
-        switch (requestCode) {
-            case PASSCODE_REQUEST_CODE:
-                if (resultCode == Activity.RESULT_OK && data != null) {
-                    mEditor.putString(UxArgument.PASSCODE, data.getStringExtra(UxArgument.PASSCODE));
-                    mEditor.putBoolean(UxArgument.ENABLED_PASSCODE, true);
-                    Toast.makeText(getActivity(), R.string.toast_passcode_set, Toast.LENGTH_SHORT).show();
-                }
-                if (resultCode == Activity.RESULT_CANCELED) {
-                    mEditor.putBoolean(UxArgument.ENABLED_PASSCODE, false);
-                    mCheckBoxPreference.setChecked(false);
-                }
-                break;
-            case REQUEST_DISABLE_PASSCODE:
-                boolean flag = resultCode != Activity.RESULT_OK;
-                mEditor.putBoolean(UxArgument.ENABLED_PASSCODE, flag);
-                mCheckBoxPreference.setChecked(flag);
-                break;
-            case REQUEST_CHANGE_PASSCODE:
-                if (resultCode == Activity.RESULT_OK && data != null) {
-                    mEditor.putString(UxArgument.PASSCODE, data.getStringExtra(UxArgument.PASSCODE));
-                    mEditor.putBoolean(UxArgument.ENABLED_PASSCODE, true);
-                    Toast.makeText(getActivity(), R.string.toast_passcode_set, Toast.LENGTH_SHORT).show();
-                }
-                break;
-        }
-        mEditor.commit();
-    }
-
 }

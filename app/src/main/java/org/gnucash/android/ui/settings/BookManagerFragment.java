@@ -17,7 +17,6 @@
 package org.gnucash.android.ui.settings;
 
 import android.content.Context;
-import android.content.DialogInterface;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
@@ -33,6 +32,7 @@ import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AlertDialog;
@@ -67,7 +67,7 @@ import java.sql.Timestamp;
 public class BookManagerFragment extends ListFragment implements
         LoaderManager.LoaderCallbacks<Cursor>, Refreshable {
 
-    private static final String LOG_TAG = "BookManagerFragment";
+    private static final String LOG_TAG = BookManagerFragment.class.getName();
 
     private SimpleCursorAdapter mCursorAdapter;
 
@@ -88,8 +88,8 @@ public class BookManagerFragment extends ListFragment implements
     }
 
     @Override
-    public void onActivityCreated(@Nullable Bundle savedInstanceState) {
-        super.onActivityCreated(savedInstanceState);
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
 
         ActionBar actionBar = ((AppCompatActivity) getActivity()).getSupportActionBar();
         assert actionBar != null;
@@ -108,26 +108,23 @@ public class BookManagerFragment extends ListFragment implements
     }
 
     @Override
-    public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
+    public void onCreateOptionsMenu(@NonNull Menu menu, MenuInflater inflater) {
         inflater.inflate(R.menu.book_list_actions, menu);
     }
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        switch (item.getItemId()) {
-            case R.id.menu_create_book:
-                AccountsActivity.createDefaultAccounts(GnuCashApplication.getDefaultCurrencyCode(), getActivity());
-                return true;
-
-            default:
-                return false;
+        if (item.getItemId() == R.id.menu_create_book) {
+            Log.d(LOG_TAG, String.format("onOptionsItemSelected create book: %s.", GnuCashApplication.getDefaultCurrencyCode()));
+            AccountsActivity.createDefaultAccounts(GnuCashApplication.getDefaultCurrencyCode(), getActivity());
+            return true;
         }
-
+        return false;
     }
 
     @Override
     public void refresh() {
-        getLoaderManager().restartLoader(0, null, this);
+        LoaderManager.getInstance(this).restartLoader(0, null, this);
     }
 
     @Override
@@ -135,6 +132,7 @@ public class BookManagerFragment extends ListFragment implements
         refresh();
     }
 
+    @NonNull
     @Override
     public Loader<Cursor> onCreateLoader(int id, Bundle args) {
         Log.d(LOG_TAG, "Creating loader for books");
@@ -142,14 +140,14 @@ public class BookManagerFragment extends ListFragment implements
     }
 
     @Override
-    public void onLoadFinished(Loader<Cursor> loader, Cursor data) {
+    public void onLoadFinished(@NonNull Loader<Cursor> loader, Cursor data) {
         Log.d(LOG_TAG, "Finished loading books from database");
         mCursorAdapter.swapCursor(data);
         mCursorAdapter.notifyDataSetChanged();
     }
 
     @Override
-    public void onLoaderReset(Loader<Cursor> loader) {
+    public void onLoaderReset(@NonNull Loader<Cursor> loader) {
         Log.d(LOG_TAG, "Resetting books list loader");
         mCursorAdapter.swapCursor(null);
     }
@@ -170,13 +168,10 @@ public class BookManagerFragment extends ListFragment implements
             setStatisticsText(view, bookUID);
             setUpMenu(view, context, cursor, bookUID);
 
-            view.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    //do nothing if the active book is tapped
-                    if (!BooksDbAdapter.getInstance().getActiveBookUID().equals(bookUID)) {
-                        BookUtils.loadBook(bookUID);
-                    }
+            view.setOnClickListener(v -> {
+                //do nothing if the active book is tapped
+                if (!BooksDbAdapter.getInstance().getActiveBookUID().equals(bookUID)) {
+                    BookUtils.loadBook(bookUID);
                 }
             });
         }
@@ -184,44 +179,46 @@ public class BookManagerFragment extends ListFragment implements
         private void setUpMenu(View view, final Context context, Cursor cursor, final String bookUID) {
             final String bookName = cursor.getString(
                     cursor.getColumnIndexOrThrow(BookEntry.COLUMN_DISPLAY_NAME));
-            ImageView optionsMenu = (ImageView) view.findViewById(R.id.options_menu);
-            optionsMenu.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    PopupMenu popupMenu = new PopupMenu(context, v);
-                    MenuInflater menuInflater = popupMenu.getMenuInflater();
-                    menuInflater.inflate(R.menu.book_context_menu, popupMenu.getMenu());
+            ImageView optionsMenu = view.findViewById(R.id.options_menu);
+            optionsMenu.setOnClickListener(v -> {
+                PopupMenu popupMenu = new PopupMenu(context, v);
+                MenuInflater menuInflater = popupMenu.getMenuInflater();
+                menuInflater.inflate(R.menu.book_context_menu, popupMenu.getMenu());
 
-                    popupMenu.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
-                        @Override
-                        public boolean onMenuItemClick(MenuItem item) {
-                            switch (item.getItemId()) {
-                                case R.id.ctx_menu_rename_book:
-                                    return handleMenuRenameBook(bookName, bookUID);
-                                case R.id.ctx_menu_sync_book:
-                                    //TODO implement sync
-                                    return false;
-                                case R.id.ctx_menu_delete_book:
-                                    return handleMenuDeleteBook(bookUID);
-                                default:
-                                    return true;
-                            }
-                        }
-                    });
-
-                    String activeBookUID = BooksDbAdapter.getInstance().getActiveBookUID();
-                    if (activeBookUID.equals(bookUID)) {//we cannot delete the active book
-                        popupMenu.getMenu().findItem(R.id.ctx_menu_delete_book).setEnabled(false);
+                popupMenu.setOnMenuItemClickListener(item -> {
+                    if (item.getItemId() == R.id.ctx_menu_rename_book) {
+                        return handleMenuRenameBook(bookName, bookUID);
+                    } else if (item.getItemId() == R.id.ctx_menu_sync_book) {
+                        //TODO implement sync
+                        return false;
+                    } else if (item.getItemId() == R.id.ctx_menu_delete_book) {
+                        return handleMenuDeleteBook(bookUID);
+                    } else {
+                        return true;
                     }
-                    popupMenu.show();
+                });
+
+                String activeBookUID = BooksDbAdapter.getInstance().getActiveBookUID();
+                if (activeBookUID.equals(bookUID)) {//we cannot delete the active book
+                    popupMenu.getMenu().findItem(R.id.ctx_menu_delete_book).setEnabled(false);
                 }
+                popupMenu.show();
             });
         }
 
         private boolean handleMenuDeleteBook(final String bookUID) {
             DeleteBookConfirmationDialog dialog = DeleteBookConfirmationDialog.newInstance(bookUID);
-            dialog.show(getFragmentManager(), "delete_book");
-            dialog.setTargetFragment(BookManagerFragment.this, 0);
+            dialog.show(requireActivity().getSupportFragmentManager(), "delete_book");
+
+            getParentFragmentManager().setFragmentResultListener(
+                    dialog.getRequestKey(bookUID), BookManagerFragment.this, (requestKey, bundle) -> {
+                        Log.d(LOG_TAG, "onFragmentResult " + requestKey + ", " + bundle);
+                        if (bundle.getBoolean(dialog.getResultKey())) {
+                            refresh();
+                        }
+                    });
+            dialog.show(getParentFragmentManager(), "delete_confirmation_dialog");
+
             return true;
         }
 
@@ -236,23 +233,15 @@ public class BookManagerFragment extends ListFragment implements
             AlertDialog.Builder dialogBuilder = new AlertDialog.Builder(getActivity());
             dialogBuilder.setTitle(R.string.title_rename_book)
                     .setView(R.layout.dialog_rename_book)
-                    .setPositiveButton(R.string.btn_rename, new DialogInterface.OnClickListener() {
-                        @Override
-                        public void onClick(DialogInterface dialog, int which) {
-                            EditText bookTitle = (EditText) ((AlertDialog) dialog).findViewById(R.id.input_book_title);
-                            BooksDbAdapter.getInstance()
-                                    .updateRecord(bookUID,
-                                            BookEntry.COLUMN_DISPLAY_NAME,
-                                            bookTitle.getText().toString().trim());
-                            refresh();
-                        }
+                    .setPositiveButton(R.string.btn_rename, (dialog, which) -> {
+                        EditText bookTitle = ((AlertDialog) dialog).findViewById(R.id.input_book_title);
+                        BooksDbAdapter.getInstance()
+                                .updateRecord(bookUID,
+                                        BookEntry.COLUMN_DISPLAY_NAME,
+                                        bookTitle.getText().toString().trim());
+                        refresh();
                     })
-                    .setNegativeButton(R.string.btn_cancel, new DialogInterface.OnClickListener() {
-                        @Override
-                        public void onClick(DialogInterface dialog, int which) {
-                            dialog.dismiss();
-                        }
-                    });
+                    .setNegativeButton(R.string.btn_cancel, (dialog, which) -> dialog.dismiss());
             AlertDialog dialog = dialogBuilder.create();
             dialog.show();
             ((TextView) dialog.findViewById(R.id.input_book_title)).setText(bookName);
@@ -260,11 +249,11 @@ public class BookManagerFragment extends ListFragment implements
         }
 
         private void setLastExportedText(View view, String bookUID) {
-            TextView labelLastSync = (TextView) view.findViewById(R.id.label_last_sync);
+            TextView labelLastSync = view.findViewById(R.id.label_last_sync);
             labelLastSync.setText(R.string.label_last_export_time);
 
             Timestamp lastSyncTime = PreferencesHelper.getLastExportTime(bookUID);
-            TextView lastSyncText = (TextView) view.findViewById(R.id.last_sync_time);
+            TextView lastSyncText = view.findViewById(R.id.last_sync_time);
             if (lastSyncTime.equals(new Timestamp(0)))
                 lastSyncText.setText(R.string.last_export_time_never);
             else
@@ -272,22 +261,23 @@ public class BookManagerFragment extends ListFragment implements
         }
 
         private void setStatisticsText(View view, String bookUID) {
-            DatabaseHelper dbHelper = new DatabaseHelper(GnuCashApplication.getAppContext(), bookUID);
-            SQLiteDatabase db = dbHelper.getReadableDatabase();
-            TransactionsDbAdapter trnAdapter = new TransactionsDbAdapter(db, new SplitsDbAdapter(db));
-            int transactionCount = (int) trnAdapter.getRecordsCount();
-            String transactionStats = getResources().getQuantityString(R.plurals.book_transaction_stats, transactionCount, transactionCount);
+            try (DatabaseHelper dbHelper = new DatabaseHelper(GnuCashApplication.getAppContext(), bookUID)) {
+                SQLiteDatabase db = dbHelper.getReadableDatabase();
+                TransactionsDbAdapter trnAdapter = new TransactionsDbAdapter(db, new SplitsDbAdapter(db));
+                int transactionCount = (int) trnAdapter.getRecordsCount();
+                String transactionStats = getResources().getQuantityString(R.plurals.book_transaction_stats, transactionCount, transactionCount);
 
-            AccountsDbAdapter accountsDbAdapter = new AccountsDbAdapter(db, trnAdapter);
-            int accountsCount = (int) accountsDbAdapter.getRecordsCount();
-            String accountStats = getResources().getQuantityString(R.plurals.book_account_stats, accountsCount, accountsCount);
-            String stats = accountStats + ", " + transactionStats;
-            TextView statsText = (TextView) view.findViewById(R.id.secondary_text);
-            statsText.setText(stats);
+                AccountsDbAdapter accountsDbAdapter = new AccountsDbAdapter(db, trnAdapter);
+                int accountsCount = (int) accountsDbAdapter.getRecordsCount();
+                String accountStats = getResources().getQuantityString(R.plurals.book_account_stats, accountsCount, accountsCount);
+                String stats = accountStats + ", " + transactionStats;
+                TextView statsText = view.findViewById(R.id.secondary_text);
+                statsText.setText(stats);
 
-            if (bookUID.equals(BooksDbAdapter.getInstance().getActiveBookUID())) {
-                ((TextView) view.findViewById(R.id.primary_text))
-                        .setTextColor(ContextCompat.getColor(getContext(), R.color.theme_primary));
+                if (bookUID.equals(BooksDbAdapter.getInstance().getActiveBookUID())) {
+                    ((TextView) view.findViewById(R.id.primary_text))
+                            .setTextColor(ContextCompat.getColor(getContext(), R.color.theme_primary));
+                }
             }
         }
     }

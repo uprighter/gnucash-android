@@ -20,15 +20,17 @@ package org.gnucash.android.ui.wizard;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.res.Resources;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
+import android.util.Log;
 import android.util.TypedValue;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.AppCompatButton;
 import androidx.core.content.ContextCompat;
@@ -62,6 +64,7 @@ import butterknife.ButterKnife;
  */
 public class FirstRunWizardActivity extends AppCompatActivity implements
         PageFragmentCallbacks, ReviewFragment.Callbacks, ModelCallbacks {
+    public static final String LOG_TAG = FirstRunWizardActivity.class.getName();
 
     @BindView(R.id.pager)
     ViewPager mPager;
@@ -84,6 +87,13 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
     private String mAccountOptions;
     private String mCurrencyCode;
 
+
+    private final ActivityResultLauncher<String> mGetContent = registerForActivityResult(
+            new ActivityResultContracts.GetContent(),
+            uri -> {
+                Log.d(LOG_TAG, String.format("mGetContent returns %s.", uri));
+                AccountsActivity.importXmlFileFromIntent(this, uri, null);
+            });
 
     public void onCreate(Bundle savedInstanceState) {
         // we need to construct the wizard model before we call super.onCreate, because it's used in
@@ -225,7 +235,7 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
             BooksDbAdapter.getInstance().deleteBook(bookUID); //a default book is usually created
             finish();
         } else if (mAccountOptions.equals(getString(R.string.wizard_option_import_my_accounts))) {
-            AccountsActivity.startXmlFileChooser(this);
+            mGetContent.launch("*/*");
         } else { //user prefers to handle account creation themselves
             AccountsActivity.start(this);
             finish();
@@ -270,7 +280,7 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
         switch (requestCode) {
             case AccountsActivity.REQUEST_PICK_ACCOUNTS_FILE:
                 if (resultCode == Activity.RESULT_OK && data != null) {
-                    AccountsActivity.importXmlFileFromIntent(this, data, new TaskDelegate() {
+                    AccountsActivity.importXmlFileFromIntent(this, data.getData(), new TaskDelegate() {
                         @Override
                         public void onTaskComplete() {
                             finish();

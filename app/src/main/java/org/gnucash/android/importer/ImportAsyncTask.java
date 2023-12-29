@@ -74,8 +74,7 @@ public class ImportAsyncTask {
 //        mProgressBar.setTitle(R.string.title_progress_importing_accounts);
         mProgressBar.setIndeterminate(true);
         mProgressBar.setVisibility(View.VISIBLE);
-        Log.d(LOG_TAG, "mProgressBar=" + mProgressBar);
-
+        Log.d(LOG_TAG, String.format("mUri=%s, mProgressBar=%s", mUri, mProgressBar));
     }
 
     public Future<Boolean> asyncExecute() {
@@ -102,7 +101,7 @@ public class ImportAsyncTask {
         try {
             InputStream accountInputStream = mContext.getContentResolver().openInputStream(uri);
             mImportedBookUID = GncXmlImporter.parse(accountInputStream);
-
+            Log.e(LOG_TAG, "doInBackground: mImportedBookUID=" + mImportedBookUID);
         } catch (Exception exception) {
             Log.e(LOG_TAG, "doInBackground: " + exception.getMessage());
             FirebaseCrashlytics.getInstance().log("Could not open: " + uri);

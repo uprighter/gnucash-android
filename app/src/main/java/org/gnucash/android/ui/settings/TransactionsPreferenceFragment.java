@@ -74,24 +74,21 @@ public class TransactionsPreferenceFragment extends PreferenceFragmentCompat imp
         pref.setOnPreferenceChangeListener(this);
 
         String keyCompactView = getString(R.string.key_use_compact_list);
-        SwitchPreferenceCompat switchPref = (SwitchPreferenceCompat) findPreference(keyCompactView);
+        SwitchPreferenceCompat switchPref = findPreference(keyCompactView);
         switchPref.setChecked(sharedPreferences.getBoolean(keyCompactView, false));
 
         String keySaveBalance = getString(R.string.key_save_opening_balances);
-        switchPref = (SwitchPreferenceCompat) findPreference(keySaveBalance);
+        switchPref = findPreference(keySaveBalance);
         switchPref.setChecked(sharedPreferences.getBoolean(keySaveBalance, false));
 
         String keyDoubleEntry = getString(R.string.key_use_double_entry);
-        switchPref = (SwitchPreferenceCompat) findPreference(keyDoubleEntry);
+        switchPref = findPreference(keyDoubleEntry);
         switchPref.setChecked(sharedPreferences.getBoolean(keyDoubleEntry, true));
 
         Preference preference = findPreference(getString(R.string.key_delete_all_transactions));
-        preference.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
-            @Override
-            public boolean onPreferenceClick(Preference preference) {
-                showDeleteTransactionsDialog();
-                return true;
-            }
+        preference.setOnPreferenceClickListener(preference1 -> {
+            showDeleteTransactionsDialog();
+            return true;
         });
     }
 

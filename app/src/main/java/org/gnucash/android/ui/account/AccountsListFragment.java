@@ -272,7 +272,7 @@ public class AccountsListFragment extends Fragment implements
 
         Log.d(LOG_TAG, "showConfirmationDialog delete_account_" + accountUID);
         getParentFragmentManager().setFragmentResultListener(
-                "delete_account_" + accountUID, this, (requestKey, bundle) -> {
+                alertFragment.getRequestKey(accountUID), this, (requestKey, bundle) -> {
                     Log.d(LOG_TAG, "onFragmentResult " + requestKey + ", " + bundle);
                     refresh();
                 });

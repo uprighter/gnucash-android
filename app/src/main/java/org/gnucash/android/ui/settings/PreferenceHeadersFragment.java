@@ -28,10 +28,8 @@ import org.gnucash.android.R;
  * @author Ngewi Fet <ngewif@gmail.com>
  */
 public class PreferenceHeadersFragment extends PreferenceFragmentCompat {
-
     @Override
     public void onCreatePreferences(Bundle bundle, String s) {
         addPreferencesFromResource(R.xml.preference_fragment_headers);
     }
-
 }

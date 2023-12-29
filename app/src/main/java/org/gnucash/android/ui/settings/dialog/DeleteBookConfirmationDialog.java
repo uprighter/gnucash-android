@@ -17,7 +17,6 @@
 package org.gnucash.android.ui.settings.dialog;
 
 import android.app.Dialog;
-import android.content.DialogInterface;
 import android.os.Bundle;
 import android.util.Log;
 
@@ -25,7 +24,6 @@ import androidx.annotation.NonNull;
 
 import org.gnucash.android.R;
 import org.gnucash.android.db.adapter.BooksDbAdapter;
-import org.gnucash.android.ui.common.Refreshable;
 import org.gnucash.android.util.BackupManager;
 
 /**
@@ -35,6 +33,14 @@ import org.gnucash.android.util.BackupManager;
  */
 public class DeleteBookConfirmationDialog extends DoubleConfirmationDialog {
     private static final String LOG_TAG = DeleteBookConfirmationDialog.class.getName();
+
+    public String getRequestKey(String bookUID) {
+        return "delete_book_" + bookUID;
+    }
+    public String getResultKey() {
+        return "deleted";
+    }
+
     @NonNull
     public static DeleteBookConfirmationDialog newInstance(String bookUID) {
         DeleteBookConfirmationDialog frag = new DeleteBookConfirmationDialog();
@@ -51,16 +57,16 @@ public class DeleteBookConfirmationDialog extends DoubleConfirmationDialog {
                 .setTitle(R.string.title_confirm_delete_book)
                 .setIcon(R.drawable.ic_close_black_24dp)
                 .setMessage(R.string.msg_all_book_data_will_be_deleted)
-                .setPositiveButton(R.string.btn_delete_book, new DialogInterface.OnClickListener() {
-                    @SuppressWarnings("ConstantConditions")
-                    @Override
-                    public void onClick(DialogInterface dialogInterface, int which) {
-                        final String bookUID = getArguments().getString("bookUID");
-                        BackupManager.backupBook(bookUID);
-                        boolean deleted = BooksDbAdapter.getInstance().deleteBook(bookUID);
-                        Log.d(LOG_TAG, String.format("delete book %s result %b.", bookUID, deleted));
-                        ((Refreshable) getTargetFragment()).refresh();
-                    }
+                .setPositiveButton(R.string.btn_delete_book, (dialogInterface, which) -> {
+                    final String bookUID = getArguments().getString("bookUID");
+                    BackupManager.backupBook(bookUID);
+                    boolean deleted = BooksDbAdapter.getInstance().deleteBook(bookUID);
+                    Log.d(LOG_TAG, String.format("delete book %s result %b.", bookUID, deleted));
+
+                    // Notify listeners.
+                    Bundle result = new Bundle();
+                    result.putBoolean(getResultKey(), deleted);
+                    getParentFragmentManager().setFragmentResult(getRequestKey(bookUID), result);
                 })
                 .create();
     }

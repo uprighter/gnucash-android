@@ -18,12 +18,14 @@ package org.gnucash.android.ui.settings;
 
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.database.Cursor;
 import android.os.Bundle;
+import android.util.Log;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.preference.ListPreference;
@@ -58,10 +60,39 @@ import java.util.concurrent.ExecutionException;
 public class AccountPreferencesFragment extends PreferenceFragmentCompat implements
         Preference.OnPreferenceChangeListener, Preference.OnPreferenceClickListener {
 
-    private static final int REQUEST_EXPORT_FILE = 0xC5;
+    public static final String LOG_TAG = AccountPreferencesFragment.class.getName();
 
     List<CharSequence> mCurrencyEntries = new ArrayList<>();
     List<CharSequence> mCurrencyEntryValues = new ArrayList<>();
+
+    private final ActivityResultLauncher<Intent> createIntentLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                Log.d(LOG_TAG, "launch intent: result = " + result);
+                if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
+                    Intent data = result.getData();
+                    ExportParams exportParams = new ExportParams(ExportFormat.CSVA);
+                    exportParams.setExportTarget(ExportParams.ExportTarget.URI);
+                    exportParams.setExportLocation(data.getData().toString());
+                    ExportAsyncTask exportTask = new ExportAsyncTask(getActivity(), GnuCashApplication.getActiveDb(), exportParams);
+
+                    try {
+                        exportTask.asyncExecute().get();
+                    } catch (InterruptedException | ExecutionException e) {
+                        FirebaseCrashlytics.getInstance().recordException(e);
+                        Toast.makeText(getActivity(), "An error occurred during the Accounts export",
+                                Toast.LENGTH_LONG).show();
+                    }
+                }
+            }
+    );
+
+    private final ActivityResultLauncher<String> mGetContent = registerForActivityResult(
+            new ActivityResultContracts.GetContent(),
+            uri -> {
+                Log.d(LOG_TAG, String.format("mGetContent returns %s.", uri));
+                    AccountsActivity.importXmlFileFromIntent(getActivity(), uri, null);
+            });
 
     @Override
     public void onCreatePreferences(Bundle bundle, String s) {
@@ -107,39 +138,23 @@ public class AccountPreferencesFragment extends PreferenceFragmentCompat impleme
         preference.setOnPreferenceClickListener(this);
 
         preference = findPreference(getString(R.string.key_delete_all_accounts));
-        preference.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
-            @Override
-            public boolean onPreferenceClick(Preference preference) {
-                showDeleteAccountsDialog();
-                return true;
-            }
+        preference.setOnPreferenceClickListener(preference1 -> {
+            showDeleteAccountsDialog();
+            return true;
         });
 
         preference = findPreference(getString(R.string.key_create_default_accounts));
-        preference.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
-            @Override
-            public boolean onPreferenceClick(Preference preference) {
-                new AlertDialog.Builder(getActivity())
-                        .setTitle(R.string.title_create_default_accounts)
-                        .setMessage(R.string.msg_confirm_create_default_accounts_setting)
-                        .setIcon(R.drawable.ic_warning_black_24dp)
-                        .setPositiveButton(R.string.btn_create_accounts, new DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(DialogInterface dialogInterface, int i) {
-                                AccountsActivity.createDefaultAccounts(Money.DEFAULT_CURRENCY_CODE, getActivity());
-                            }
-                        })
-                        .setNegativeButton(R.string.btn_cancel, new DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(DialogInterface dialogInterface, int i) {
-                                dialogInterface.dismiss();
-                            }
-                        })
-                        .create()
-                        .show();
+        preference.setOnPreferenceClickListener(preference12 -> {
+            new AlertDialog.Builder(getActivity())
+                    .setTitle(R.string.title_create_default_accounts)
+                    .setMessage(R.string.msg_confirm_create_default_accounts_setting)
+                    .setIcon(R.drawable.ic_warning_black_24dp)
+                    .setPositiveButton(R.string.btn_create_accounts, (dialogInterface, i) -> AccountsActivity.createDefaultAccounts(Money.DEFAULT_CURRENCY_CODE, getActivity()))
+                    .setNegativeButton(R.string.btn_cancel, (dialogInterface, i) -> dialogInterface.dismiss())
+                    .create()
+                    .show();
 
-                return true;
-            }
+            return true;
         });
     }
 
@@ -148,10 +163,9 @@ public class AccountPreferencesFragment extends PreferenceFragmentCompat impleme
         String key = preference.getKey();
 
         if (key.equals(getString(R.string.key_import_accounts))) {
-            AccountsActivity.startXmlFileChooser(this);
+            mGetContent.launch("*/*");
             return true;
         }
-
         if (key.equals(getString(R.string.key_export_accounts_csv))) {
             selectExportFile();
             return true;
@@ -172,7 +186,7 @@ public class AccountPreferencesFragment extends PreferenceFragmentCompat impleme
         createIntent.setType("application/text");
 
         createIntent.putExtra(Intent.EXTRA_TITLE, filename);
-        startActivityForResult(createIntent, REQUEST_EXPORT_FILE);
+        createIntentLauncher.launch(createIntent);
     }
 
     @Override
@@ -192,32 +206,5 @@ public class AccountPreferencesFragment extends PreferenceFragmentCompat impleme
     public void showDeleteAccountsDialog() {
         DeleteAllAccountsConfirmationDialog deleteConfirmationDialog = DeleteAllAccountsConfirmationDialog.newInstance();
         deleteConfirmationDialog.show(getActivity().getSupportFragmentManager(), "account_settings");
-    }
-
-    @Override
-    public void onActivityResult(int requestCode, int resultCode, Intent data) {
-        switch (requestCode) {
-            case AccountsActivity.REQUEST_PICK_ACCOUNTS_FILE:
-                if (resultCode == Activity.RESULT_OK && data != null) {
-                    AccountsActivity.importXmlFileFromIntent(getActivity(), data, null);
-                }
-                break;
-
-            case REQUEST_EXPORT_FILE:
-                if (resultCode == Activity.RESULT_OK && data != null) {
-                    ExportParams exportParams = new ExportParams(ExportFormat.CSVA);
-                    exportParams.setExportTarget(ExportParams.ExportTarget.URI);
-                    exportParams.setExportLocation(data.getData().toString());
-                    ExportAsyncTask exportTask = new ExportAsyncTask(getActivity(), GnuCashApplication.getActiveDb(), exportParams);
-
-                    try {
-                        exportTask.asyncExecute().get();
-                    } catch (InterruptedException | ExecutionException e) {
-                        FirebaseCrashlytics.getInstance().recordException(e);
-                        Toast.makeText(getActivity(), "An error occurred during the Accounts CSV export",
-                                Toast.LENGTH_LONG).show();
-                    }
-                }
-        }
     }
 }
