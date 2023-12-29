@@ -24,9 +24,11 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.ProgressBar;
 
+import androidx.annotation.NonNull;
 import androidx.fragment.app.DialogFragment;
 
 import org.gnucash.android.R;
+import org.gnucash.android.databinding.ColorPickerDialogBinding;
 import org.gnucash.android.ui.colorpicker.ColorPickerSwatch.OnColorSelectedListener;
 
 /**
@@ -34,6 +36,8 @@ import org.gnucash.android.ui.colorpicker.ColorPickerSwatch.OnColorSelectedListe
  * select a specific color swatch, which invokes a listener.
  */
 public class ColorPickerDialog extends DialogFragment implements OnColorSelectedListener {
+
+    public static final String LOG_TAG = ColorPickerDialog.class.getName();
 
     public static final int SIZE_LARGE = 1;
     public static final int SIZE_SMALL = 2;
@@ -97,17 +101,19 @@ public class ColorPickerDialog extends DialogFragment implements OnColorSelected
 
         if (savedInstanceState != null) {
             mColors = savedInstanceState.getIntArray(KEY_COLORS);
-            mSelectedColor = (Integer) savedInstanceState.getSerializable(KEY_SELECTED_COLOR);
+            mSelectedColor = savedInstanceState.getSerializable(KEY_SELECTED_COLOR, Integer.class);
         }
     }
 
+    @NonNull
     @Override
     public Dialog onCreateDialog(Bundle savedInstanceState) {
         final Activity activity = getActivity();
 
-        View view = LayoutInflater.from(getActivity()).inflate(R.layout.color_picker_dialog, null);
-        mProgress = (ProgressBar) view.findViewById(android.R.id.progress);
-        mPalette = (ColorPickerPalette) view.findViewById(R.id.color_picker);
+        ColorPickerDialogBinding binding = ColorPickerDialogBinding.inflate(LayoutInflater.from(activity));
+        mProgress = binding.progress;
+        mPalette = binding.colorPicker;
+
         mPalette.init(mSize, mColumns, this);
 
         if (mColors != null) {
@@ -116,7 +122,7 @@ public class ColorPickerDialog extends DialogFragment implements OnColorSelected
 
         mAlertDialog = new AlertDialog.Builder(activity)
                 .setTitle(mTitleResId)
-                .setView(view)
+                .setView(binding.getRoot())
                 .create();
 
         return mAlertDialog;
@@ -127,10 +133,8 @@ public class ColorPickerDialog extends DialogFragment implements OnColorSelected
         if (mListener != null) {
             mListener.onColorSelected(color);
         }
-
-        if (getTargetFragment() instanceof OnColorSelectedListener) {
-            final OnColorSelectedListener listener =
-                    (OnColorSelectedListener) getTargetFragment();
+        assert !(getTargetFragment() instanceof OnColorSelectedListener);
+        if (getTargetFragment() instanceof OnColorSelectedListener listener) {
             listener.onColorSelected(color);
         }
 
@@ -195,7 +199,7 @@ public class ColorPickerDialog extends DialogFragment implements OnColorSelected
     }
 
     @Override
-    public void onSaveInstanceState(Bundle outState) {
+    public void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
         outState.putIntArray(KEY_COLORS, mColors);
         outState.putSerializable(KEY_SELECTED_COLOR, mSelectedColor);

@@ -24,16 +24,20 @@ import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 
+import androidx.core.content.res.ResourcesCompat;
+
 import org.gnucash.android.R;
+import org.gnucash.android.databinding.ColorPickerSwatchBinding;
 
 /**
  * Creates a circular swatch of a specified color.  Adds a checkmark if marked as checked.
  */
 public class ColorPickerSwatch extends FrameLayout implements View.OnClickListener {
-    private int mColor;
-    private ImageView mSwatchImage;
-    private ImageView mCheckmarkImage;
-    private OnColorSelectedListener mOnColorSelectedListener;
+
+    private final int mColor;
+    private final ImageView mSwatchImage;
+    private final ImageView mCheckmarkImage;
+    private final OnColorSelectedListener mOnColorSelectedListener;
 
     /**
      * Interface for a callback when a color square is selected.
@@ -43,7 +47,11 @@ public class ColorPickerSwatch extends FrameLayout implements View.OnClickListen
         /**
          * Called when a specific color square has been selected.
          */
-        public void onColorSelected(int color);
+        void onColorSelected(int color);
+    }
+
+    public ColorPickerSwatch(Context context) {
+        this(context, 0, true, null);
     }
 
     public ColorPickerSwatch(Context context, int color, boolean checked,
@@ -52,9 +60,10 @@ public class ColorPickerSwatch extends FrameLayout implements View.OnClickListen
         mColor = color;
         mOnColorSelectedListener = listener;
 
-        LayoutInflater.from(context).inflate(R.layout.color_picker_swatch, this);
-        mSwatchImage = (ImageView) findViewById(R.id.color_picker_swatch);
-        mCheckmarkImage = (ImageView) findViewById(R.id.color_picker_checkmark);
+        ColorPickerSwatchBinding binding = ColorPickerSwatchBinding.inflate(LayoutInflater.from(context), this);
+        mSwatchImage = binding.colorPickerSwatch;
+        mCheckmarkImage = binding.colorPickerCheckmark;
+
         setColor(color);
         setChecked(checked);
         setOnClickListener(this);
@@ -62,7 +71,7 @@ public class ColorPickerSwatch extends FrameLayout implements View.OnClickListen
 
     protected void setColor(int color) {
         Drawable[] colorDrawable = new Drawable[]
-                {getContext().getResources().getDrawable(R.drawable.color_picker_swatch)};
+                {ResourcesCompat.getDrawable(getContext().getResources(), R.drawable.color_picker_swatch, getContext().getTheme())};
         mSwatchImage.setImageDrawable(new ColorStateDrawable(colorDrawable, color));
     }
 

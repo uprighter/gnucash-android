@@ -16,8 +16,9 @@
 
 package org.gnucash.android.ui.colorpicker;
 
+import android.graphics.BlendMode;
+import android.graphics.BlendModeColorFilter;
 import android.graphics.Color;
-import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.LayerDrawable;
 
@@ -29,7 +30,7 @@ public class ColorStateDrawable extends LayerDrawable {
 
     private static final float PRESSED_STATE_MULTIPLIER = 0.70f;
 
-    private int mColor;
+    private final int mColor;
 
     public ColorStateDrawable(Drawable[] layers, int color) {
         super(layers);
@@ -47,9 +48,9 @@ public class ColorStateDrawable extends LayerDrawable {
         }
 
         if (pressedOrFocused) {
-            super.setColorFilter(getPressedColor(mColor), PorterDuff.Mode.SRC_ATOP);
+            super.setColorFilter(new BlendModeColorFilter(getPressedColor(mColor), BlendMode.SRC_ATOP));
         } else {
-            super.setColorFilter(mColor, PorterDuff.Mode.SRC_ATOP);
+            super.setColorFilter(new BlendModeColorFilter(mColor, BlendMode.SRC_ATOP));
         }
 
         return super.onStateChange(states);
