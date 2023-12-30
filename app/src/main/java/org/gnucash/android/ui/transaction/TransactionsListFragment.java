@@ -68,6 +68,7 @@ import org.gnucash.android.ui.common.UxArgument;
 import org.gnucash.android.ui.homescreen.WidgetConfigurationActivity;
 import org.gnucash.android.ui.settings.PreferenceActivity;
 import org.gnucash.android.ui.transaction.dialog.BulkMoveDialogFragment;
+import org.gnucash.android.ui.transaction.dialog.TransactionsDeleteConfirmationDialogFragment;
 import org.gnucash.android.ui.util.CursorRecyclerAdapter;
 import org.gnucash.android.ui.util.widget.EmptyRecyclerView;
 import org.gnucash.android.util.BackupManager;
@@ -86,7 +87,7 @@ public class TransactionsListFragment extends Fragment implements
     /**
      * Logging tag
      */
-    protected static final String LOG_TAG = "TransactionListFragment";
+    protected static final String LOG_TAG = TransactionsListFragment.class.getName();
 
     private FragmentTransactionsListBinding mBinding;
 
@@ -404,14 +405,32 @@ public class TransactionsListFragment extends Fragment implements
                 });
             }
 
+            private boolean handleMenuDeleteTransaction(final long transactionId) {
+                TransactionsDeleteConfirmationDialogFragment dialog = TransactionsDeleteConfirmationDialogFragment.newInstance(R.string.msg_delete_transaction_confirmation, transactionId);
+
+                getParentFragmentManager().setFragmentResultListener(
+                        dialog.getRequestKey(transactionId), TransactionsListFragment.this, (requestKey, bundle) -> {
+                            Log.d(LOG_TAG, "onFragmentResult " + requestKey + ", " + bundle);
+                            refresh();
+                        });
+                String title = "delete_transaction";
+                dialog.show(getParentFragmentManager(), title);
+
+                return true;
+            }
+
             @Override
             public boolean onMenuItemClick(MenuItem item) {
                 if (item.getItemId() == R.id.context_menu_delete) {
                     BackupManager.backupActiveBook();
-                    mTransactionsDbAdapter.deleteRecord(transactionId);
-                    WidgetConfigurationActivity.updateAllWidgets(getActivity());
-                    refresh();
-                    return true;
+                    if (transactionId > 0) {
+                        return handleMenuDeleteTransaction(transactionId);
+                    } else {
+                        mTransactionsDbAdapter.deleteRecord(transactionId);
+                        WidgetConfigurationActivity.updateAllWidgets(getActivity());
+                        refresh();
+                        return true;
+                    }
                 } else if (item.getItemId() == R.id.context_menu_duplicate_transaction) {
                     Transaction transaction = mTransactionsDbAdapter.getRecord(transactionId);
                     Transaction duplicate = new Transaction(transaction, true);
@@ -425,7 +444,7 @@ public class TransactionsListFragment extends Fragment implements
 
                     Log.d(LOG_TAG, "context_menu_move_transaction_" + mAccountUID);
                     getParentFragmentManager().setFragmentResultListener(
-                            "bulk_move_transactions_" + mAccountUID, TransactionsListFragment.this, (requestKey, bundle) -> {
+                            fragment.getRequestKey(mAccountUID), TransactionsListFragment.this, (requestKey, bundle) -> {
                                 Log.d(LOG_TAG, "onFragmentResult " + requestKey + ", " + bundle);
                                 refresh();
                             });

@@ -81,7 +81,7 @@ public class ScheduledActionsListFragment extends ListFragment implements
     /**
      * Logging tag
      */
-    protected static final String LOG_TAG = "ScheduledActionFragment";
+    protected static final String LOG_TAG = ScheduledActionsListFragment.class.getName();
 
     private TransactionsDbAdapter mTransactionsDbAdapter;
     private SimpleCursorAdapter mCursorAdapter;

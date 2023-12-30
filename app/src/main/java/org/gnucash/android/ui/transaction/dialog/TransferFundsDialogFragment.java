@@ -25,7 +25,6 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
-import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.RadioButton;
 import android.widget.TextView;
@@ -37,6 +36,7 @@ import androidx.fragment.app.DialogFragment;
 import com.google.android.material.textfield.TextInputLayout;
 
 import org.gnucash.android.R;
+import org.gnucash.android.databinding.DialogTransferFundsBinding;
 import org.gnucash.android.db.adapter.CommoditiesDbAdapter;
 import org.gnucash.android.db.adapter.PricesDbAdapter;
 import org.gnucash.android.model.Commodity;
@@ -47,48 +47,35 @@ import org.gnucash.android.ui.transaction.TransactionsActivity;
 import org.gnucash.android.util.AmountParser;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.text.ParseException;
-
-import butterknife.BindView;
-import butterknife.ButterKnife;
 
 /**
  * Dialog fragment for handling currency conversions when inputting transactions.
  * <p>This is used whenever a multi-currency transaction is being created.</p>
  */
 public class TransferFundsDialogFragment extends DialogFragment {
+    public static final String LOG_TAG = TransferFundsDialogFragment.class.getName();
 
-    @BindView(R.id.from_currency)
+    DialogTransferFundsBinding mBinding;
     TextView mFromCurrencyLabel;
-    @BindView(R.id.to_currency)
     TextView mToCurrencyLabel;
-    @BindView(R.id.target_currency)
     TextView mConvertedAmountCurrencyLabel;
-    @BindView(R.id.amount_to_convert)
     TextView mStartAmountLabel;
-    @BindView(R.id.input_exchange_rate)
     EditText mExchangeRateInput;
-    @BindView(R.id.input_converted_amount)
     EditText mConvertedAmountInput;
-    @BindView(R.id.btn_fetch_exchange_rate)
     Button mFetchExchangeRateButton;
-    @BindView(R.id.radio_exchange_rate)
     RadioButton mExchangeRateRadioButton;
-    @BindView(R.id.radio_converted_amount)
     RadioButton mConvertedAmountRadioButton;
-    @BindView(R.id.label_exchange_rate_example)
     TextView mSampleExchangeRate;
-    @BindView(R.id.exchange_rate_text_input_layout)
     TextInputLayout mExchangeRateInputLayout;
-    @BindView(R.id.converted_amount_text_input_layout)
     TextInputLayout mConvertedAmountInputLayout;
 
-    @BindView(R.id.btn_save)
     Button mSaveButton;
-    @BindView(R.id.btn_cancel)
     Button mCancelButton;
+
     Money mOriginAmount;
     private Commodity mTargetCommodity;
 
@@ -106,9 +93,25 @@ public class TransferFundsDialogFragment extends DialogFragment {
 
     @Nullable
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-        View view = inflater.inflate(R.layout.dialog_transfer_funds, container, false);
-        ButterKnife.bind(this, view);
+    public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+        DialogTransferFundsBinding mBinding = DialogTransferFundsBinding.inflate(inflater, container, false);
+
+        mFromCurrencyLabel = mBinding.fromCurrency;
+        mToCurrencyLabel = mBinding.toCurrency;
+        mConvertedAmountCurrencyLabel = mBinding.targetCurrency;
+        mStartAmountLabel = mBinding.amountToConvert;
+        mExchangeRateInput = mBinding.inputExchangeRate;
+        mConvertedAmountInput = mBinding.inputConvertedAmount;
+        mFetchExchangeRateButton = mBinding.btnFetchExchangeRate;
+        mExchangeRateRadioButton = mBinding.radioExchangeRate;
+        mConvertedAmountRadioButton = mBinding.radioConvertedAmount;
+        mSampleExchangeRate = mBinding.labelExchangeRateExample;
+        mExchangeRateInputLayout = mBinding.exchangeRateTextInputLayout;
+        mConvertedAmountInputLayout = mBinding.convertedAmountTextInputLayout;
+
+        mSaveButton = mBinding.defaultButtons.btnSave;
+        mCancelButton = mBinding.defaultButtons.btnCancel;
+
 
         TransactionsActivity.displayBalance(mStartAmountLabel, mOriginAmount);
         String fromCurrencyCode = mOriginAmount.getCommodity().getCurrencyCode();
@@ -138,7 +141,7 @@ public class TransferFundsDialogFragment extends DialogFragment {
             BigDecimal denominator = new BigDecimal(pricePair.second);
             // convertedAmount = mOriginAmount * numerator / denominator
             BigDecimal convertedAmount = mOriginAmount.asBigDecimal().multiply(numerator)
-                    .divide(denominator, mTargetCommodity.getSmallestFractionDigits(), BigDecimal.ROUND_HALF_EVEN);
+                    .divide(denominator, mTargetCommodity.getSmallestFractionDigits(), RoundingMode.HALF_EVEN);
             DecimalFormat formatter = (DecimalFormat) NumberFormat.getNumberInstance();
             mConvertedAmountInput.setText(formatter.format(convertedAmount));
         }
@@ -146,52 +149,39 @@ public class TransferFundsDialogFragment extends DialogFragment {
         mExchangeRateInput.addTextChangedListener(textChangeListener);
         mConvertedAmountInput.addTextChangedListener(textChangeListener);
 
-        mConvertedAmountRadioButton.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-            @Override
-            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                mConvertedAmountInput.setEnabled(isChecked);
-                mConvertedAmountInputLayout.setErrorEnabled(isChecked);
-                mExchangeRateRadioButton.setChecked(!isChecked);
-                if (isChecked) {
-                    mConvertedAmountInput.requestFocus();
-                }
+        mConvertedAmountRadioButton.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            mConvertedAmountInput.setEnabled(isChecked);
+            mConvertedAmountInputLayout.setErrorEnabled(isChecked);
+            mExchangeRateRadioButton.setChecked(!isChecked);
+            if (isChecked) {
+                mConvertedAmountInput.requestFocus();
             }
         });
 
-        mExchangeRateRadioButton.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-            @Override
-            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                mExchangeRateInput.setEnabled(isChecked);
-                mExchangeRateInputLayout.setErrorEnabled(isChecked);
-                mFetchExchangeRateButton.setEnabled(isChecked);
-                mConvertedAmountRadioButton.setChecked(!isChecked);
-                if (isChecked) {
-                    mExchangeRateInput.requestFocus();
-                }
+        mExchangeRateRadioButton.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            mExchangeRateInput.setEnabled(isChecked);
+            mExchangeRateInputLayout.setErrorEnabled(isChecked);
+            mFetchExchangeRateButton.setEnabled(isChecked);
+            mConvertedAmountRadioButton.setChecked(!isChecked);
+            if (isChecked) {
+                mExchangeRateInput.requestFocus();
             }
         });
 
-        mFetchExchangeRateButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                //TODO: Pull the exchange rate for the currency here
-            }
+        mFetchExchangeRateButton.setOnClickListener(v -> {
+            //TODO: Pull the exchange rate for the currency here
         });
 
-        mCancelButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                dismiss();
-            }
-        });
+        mCancelButton.setOnClickListener(v -> dismiss());
 
-        mSaveButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                transferFunds();
-            }
-        });
-        return view;
+        mSaveButton.setOnClickListener(v -> transferFunds());
+        return mBinding.getRoot();
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        mBinding = null;
     }
 
     @NonNull

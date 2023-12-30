@@ -107,7 +107,7 @@ public class TransactionFormFragment extends Fragment implements
         CalendarDatePickerDialogFragment.OnDateSetListener, RadialTimePickerDialogFragment.OnTimeSetListener,
         RecurrencePickerDialogFragment.OnRecurrenceSetListener, OnTransferFundsListener {
 
-    public static final String LOG_TAG = "TransactionFormFragment";
+    public static final String LOG_TAG = TransactionFormFragment.class.getName();
 
     /**
      * Transactions database adapter

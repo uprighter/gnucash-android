@@ -21,7 +21,7 @@ import java.util.Locale;
 import java.util.Objects;
 
 public class SplitEntryViewModel extends BaseObservable {
-    public static final String LOG_TAG = "SplitEntryViewModel";
+    public static final String LOG_TAG = SplitEntryViewModel.class.getName();
 
 
     // Enabled 2-way binding.

@@ -18,9 +18,9 @@ package org.gnucash.android.ui.transaction.dialog;
 
 import android.app.AlertDialog;
 import android.app.Dialog;
-import android.content.DialogInterface;
 import android.os.Bundle;
 
+import androidx.annotation.NonNull;
 import androidx.fragment.app.DialogFragment;
 
 import org.gnucash.android.R;
@@ -29,7 +29,6 @@ import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.db.adapter.DatabaseAdapter;
 import org.gnucash.android.db.adapter.TransactionsDbAdapter;
 import org.gnucash.android.model.Transaction;
-import org.gnucash.android.ui.common.Refreshable;
 import org.gnucash.android.ui.common.UxArgument;
 import org.gnucash.android.ui.homescreen.WidgetConfigurationActivity;
 import org.gnucash.android.util.BackupManager;
@@ -54,6 +53,11 @@ public class TransactionsDeleteConfirmationDialogFragment extends DialogFragment
         return frag;
     }
 
+    public String getRequestKey(long rowId) {
+        return "delete_transaction_" + rowId;
+    }
+
+    @NonNull
     @Override
     public Dialog onCreateDialog(Bundle savedInstanceState) {
         int title = getArguments().getInt("title");
@@ -63,38 +67,32 @@ public class TransactionsDeleteConfirmationDialogFragment extends DialogFragment
                 .setIcon(android.R.drawable.ic_delete)
                 .setTitle(title).setMessage(message)
                 .setPositiveButton(R.string.alert_dialog_ok_delete,
-                        new DialogInterface.OnClickListener() {
-                            public void onClick(DialogInterface dialog, int whichButton) {
-                                TransactionsDbAdapter transactionsDbAdapter = TransactionsDbAdapter.getInstance();
-                                if (rowId == 0) {
-                                    BackupManager.backupActiveBook(); //create backup before deleting everything
-                                    List<Transaction> openingBalances = new ArrayList<Transaction>();
-                                    boolean preserveOpeningBalances = GnuCashApplication.shouldSaveOpeningBalances(false);
-                                    if (preserveOpeningBalances) {
-                                        openingBalances = AccountsDbAdapter.getInstance().getAllOpeningBalanceTransactions();
-                                    }
-
-                                    transactionsDbAdapter.deleteAllRecords();
-
-                                    if (preserveOpeningBalances) {
-                                        transactionsDbAdapter.bulkAddRecords(openingBalances, DatabaseAdapter.UpdateMethod.insert);
-                                    }
-                                } else {
-                                    transactionsDbAdapter.deleteRecord(rowId);
+                        (dialog, whichButton) -> {
+                            TransactionsDbAdapter transactionsDbAdapter = TransactionsDbAdapter.getInstance();
+                            if (rowId == 0) {
+                                BackupManager.backupActiveBook(); //create backup before deleting everything
+                                List<Transaction> openingBalances = new ArrayList<>();
+                                boolean preserveOpeningBalances = GnuCashApplication.shouldSaveOpeningBalances(false);
+                                if (preserveOpeningBalances) {
+                                    openingBalances = AccountsDbAdapter.getInstance().getAllOpeningBalanceTransactions();
                                 }
-                                if (getTargetFragment() instanceof Refreshable) {
-                                    ((Refreshable) getTargetFragment()).refresh();
+
+                                transactionsDbAdapter.deleteAllRecords();
+
+                                if (preserveOpeningBalances) {
+                                    transactionsDbAdapter.bulkAddRecords(openingBalances, DatabaseAdapter.UpdateMethod.insert);
                                 }
-                                WidgetConfigurationActivity.updateAllWidgets(getActivity());
+                            } else {
+                                transactionsDbAdapter.deleteRecord(rowId);
                             }
+                            // Notify listeners.
+                            getParentFragmentManager().setFragmentResult(getRequestKey(rowId), new Bundle());
+
+                            WidgetConfigurationActivity.updateAllWidgets(getActivity());
                         }
                 )
                 .setNegativeButton(R.string.alert_dialog_cancel,
-                        new DialogInterface.OnClickListener() {
-                            public void onClick(DialogInterface dialog, int whichButton) {
-                                dismiss();
-                            }
-                        }
+                        (dialog, whichButton) -> dismiss()
                 )
                 .create();
     }

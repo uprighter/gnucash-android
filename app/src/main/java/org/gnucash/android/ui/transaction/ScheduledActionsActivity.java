@@ -40,7 +40,7 @@ import org.gnucash.android.ui.common.BaseDrawerActivity;
  */
 public class ScheduledActionsActivity extends BaseDrawerActivity {
 
-    public static final String LOG_TAG = "ScheduledActionsActivity";
+    public static final String LOG_TAG = ScheduledActionsActivity.class.getName();
 
     public static final int INDEX_SCHEDULED_TRANSACTIONS = 0;
     public static final int INDEX_SCHEDULED_EXPORTS = 1;

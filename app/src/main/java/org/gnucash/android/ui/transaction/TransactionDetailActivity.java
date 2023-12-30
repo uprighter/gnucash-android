@@ -47,7 +47,7 @@ import java.util.Objects;
  */
 public class TransactionDetailActivity extends PasscodeLockActivity {
 
-    public static final String LOG_TAG = "TransactionDetailActivity";
+    public static final String LOG_TAG = TransactionDetailActivity.class.getName();
 
     private ActivityTransactionDetailBinding mBinding;
 

@@ -33,6 +33,7 @@ import androidx.cursoradapter.widget.SimpleCursorAdapter;
 import androidx.fragment.app.DialogFragment;
 
 import org.gnucash.android.R;
+import org.gnucash.android.databinding.DialogBulkMoveBinding;
 import org.gnucash.android.db.DatabaseSchema;
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.db.adapter.TransactionsDbAdapter;
@@ -94,16 +95,16 @@ public class BulkMoveDialogFragment extends DialogFragment {
      * Creates the view and retrieves references to the dialog elements
      */
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container,
+    public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
-        View v = inflater.inflate(R.layout.dialog_bulk_move, container, false);
+        DialogBulkMoveBinding binding = DialogBulkMoveBinding.inflate(inflater, container, false);
 
-        mDestinationAccountSpinner = (Spinner) v.findViewById(R.id.accounts_list_spinner);
-        mOkButton = (Button) v.findViewById(R.id.btn_save);
+        mDestinationAccountSpinner = binding.accountsListSpinner;
+        mOkButton = binding.defaultButtons.btnSave;
         mOkButton.setText(R.string.btn_move);
 
-        mCancelButton = (Button) v.findViewById(R.id.btn_cancel);
-        return v;
+        mCancelButton = binding.defaultButtons.btnCancel;
+        return binding.getRoot();
     }
 
     @Override
@@ -139,45 +140,39 @@ public class BulkMoveDialogFragment extends DialogFragment {
         setListeners();
     }
 
+    public String getRequestKey(String srcAccountUID) {
+        return "delete_transaction_in_" + srcAccountUID;
+    }
+
     /**
      * Binds click listeners for the dialog buttons
      */
     protected void setListeners() {
-        mCancelButton.setOnClickListener(new View.OnClickListener() {
+        mCancelButton.setOnClickListener(v -> dismiss());
 
-            @Override
-            public void onClick(View v) {
+        mOkButton.setOnClickListener(v -> {
+            if (mTransactionIds == null) {
                 dismiss();
             }
-        });
 
-        mOkButton.setOnClickListener(new View.OnClickListener() {
-
-            @Override
-            public void onClick(View v) {
-                if (mTransactionIds == null) {
-                    dismiss();
-                }
-
-                long dstAccountId = mDestinationAccountSpinner.getSelectedItemId();
-                String dstAccountUID = AccountsDbAdapter.getInstance().getUID(dstAccountId);
-                TransactionsDbAdapter trxnAdapter = TransactionsDbAdapter.getInstance();
-                if (!trxnAdapter.getAccountCurrencyCode(dstAccountUID).equals(trxnAdapter.getAccountCurrencyCode(mOriginAccountUID))) {
-                    Toast.makeText(getActivity(), R.string.toast_incompatible_currency, Toast.LENGTH_LONG).show();
-                    return;
-                }
-                String srcAccountUID = ((TransactionsActivity) getActivity()).getCurrentAccountUID();
-
-                for (long trxnId : mTransactionIds) {
-                    int moved = trxnAdapter.moveTransaction(trxnAdapter.getUID(trxnId), srcAccountUID, dstAccountUID);
-                    Log.d(LOG_TAG, String.format("%d splits moved for transaction %s.", moved, trxnAdapter.getUID(trxnId)));
-                }
-
-                WidgetConfigurationActivity.updateAllWidgets(getActivity());
-                getParentFragmentManager().setFragmentResult("bulk_move_transactions_" + srcAccountUID, new Bundle());
-
-                dismiss();
+            long dstAccountId = mDestinationAccountSpinner.getSelectedItemId();
+            String dstAccountUID = AccountsDbAdapter.getInstance().getUID(dstAccountId);
+            TransactionsDbAdapter trxnAdapter = TransactionsDbAdapter.getInstance();
+            if (!trxnAdapter.getAccountCurrencyCode(dstAccountUID).equals(trxnAdapter.getAccountCurrencyCode(mOriginAccountUID))) {
+                Toast.makeText(getActivity(), R.string.toast_incompatible_currency, Toast.LENGTH_LONG).show();
+                return;
             }
+            String srcAccountUID = ((TransactionsActivity) getActivity()).getCurrentAccountUID();
+
+            for (long trxnId : mTransactionIds) {
+                int moved = trxnAdapter.moveTransaction(trxnAdapter.getUID(trxnId), srcAccountUID, dstAccountUID);
+                Log.d(LOG_TAG, String.format("%d splits moved for transaction %s.", moved, trxnAdapter.getUID(trxnId)));
+            }
+
+            WidgetConfigurationActivity.updateAllWidgets(getActivity());
+            getParentFragmentManager().setFragmentResult(getRequestKey(srcAccountUID), new Bundle());
+
+            dismiss();
         });
     }
 }

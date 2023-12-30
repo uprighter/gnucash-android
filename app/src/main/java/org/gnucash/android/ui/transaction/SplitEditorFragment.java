@@ -86,7 +86,7 @@ import java.util.Objects;
  */
 public class SplitEditorFragment extends Fragment {
 
-    public static final String LOG_TAG = "SplitEditorFragment";
+    public static final String LOG_TAG = SplitEditorFragment.class.getName();
 
     private FragmentSplitEditorBinding mBinding;
 

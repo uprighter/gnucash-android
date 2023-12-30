@@ -38,6 +38,8 @@
         android:minHeight="?android:attr/listPreferredItemHeight"
         android:layout_marginBottom="@dimen/dialog_padding" />
 
-    <include layout="@layout/default_buttons" />
+    <include
+        android:id="@+id/default_buttons"
+        layout="@layout/default_buttons" />
 
 </LinearLayout>
