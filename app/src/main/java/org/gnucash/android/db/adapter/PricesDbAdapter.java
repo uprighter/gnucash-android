@@ -94,8 +94,6 @@ public class PricesDbAdapter extends DatabaseAdapter<Price> {
         if (commodityUID.equals(currencyUID)) {
             return new Pair<>(1L, 1L);
         }
-        // the commodity and currency can be swapped
-        // only get the latest price
         try (Cursor cursor = mDb.query(PriceEntry.TABLE_NAME, null,
                 // the commodity and currency can be swapped
                 "( " + PriceEntry.COLUMN_COMMODITY_UID + " = ? AND " + PriceEntry.COLUMN_CURRENCY_UID + " = ? ) OR ( "

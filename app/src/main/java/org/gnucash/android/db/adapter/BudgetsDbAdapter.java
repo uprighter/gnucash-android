@@ -117,7 +117,6 @@ public class BudgetsDbAdapter extends DatabaseAdapter<Budget> {
         String recurrenceUID = cursor.getString(cursor.getColumnIndexOrThrow(BudgetEntry.COLUMN_RECURRENCE_UID));
         long numPeriods = cursor.getLong(cursor.getColumnIndexOrThrow(BudgetEntry.COLUMN_NUM_PERIODS));
 
-
         Budget budget = new Budget(name);
         budget.setDescription(description);
         budget.setRecurrence(mRecurrenceDbAdapter.getRecord(recurrenceUID));
@@ -133,8 +132,8 @@ public class BudgetsDbAdapter extends DatabaseAdapter<Budget> {
         stmt.clearBindings();
         stmt.bindString(1, budget.getName());
         assert budget.getDescription() != null;
-            stmt.bindString(2, budget.getDescription());
-            assert budget.getRecurrence() != null;
+        stmt.bindString(2, budget.getDescription());
+        assert budget.getRecurrence() != null;
         stmt.bindString(3, budget.getRecurrence().getUID());
         stmt.bindLong(4, budget.getNumberOfPeriods());
         stmt.bindString(5, budget.getUID());
