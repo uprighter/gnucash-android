@@ -208,7 +208,6 @@ public class BookManagerFragment extends ListFragment implements
 
         private boolean handleMenuDeleteBook(final String bookUID) {
             DeleteBookConfirmationDialog dialog = DeleteBookConfirmationDialog.newInstance(bookUID);
-            dialog.show(requireActivity().getSupportFragmentManager(), "delete_book");
 
             getParentFragmentManager().setFragmentResultListener(
                     dialog.getRequestKey(bookUID), BookManagerFragment.this, (requestKey, bundle) -> {
@@ -217,7 +216,7 @@ public class BookManagerFragment extends ListFragment implements
                             refresh();
                         }
                     });
-            dialog.show(getParentFragmentManager(), "delete_confirmation_dialog");
+            dialog.show(getParentFragmentManager(), "delete_book");
 
             return true;
         }

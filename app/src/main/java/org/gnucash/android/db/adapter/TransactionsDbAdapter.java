@@ -525,8 +525,8 @@ public class TransactionsDbAdapter extends DatabaseAdapter<Transaction> {
      * @param transactionUID GUID of the transaction
      * @return Number of splits belonging to the transaction
      */
-    public long getSplitCount(String transactionUID) {
-        if (transactionUID == null) {
+    public long getSplitCount(@NonNull String transactionUID) {
+        if (transactionUID.equals("")) {
             return 0;
         }
         String sql = "SELECT COUNT(*) FROM " + SplitEntry.TABLE_NAME

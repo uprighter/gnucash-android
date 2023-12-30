@@ -333,6 +333,7 @@ public class AccountsListFragment extends Fragment implements
     @Override
     public void onDestroy() {
         super.onDestroy();
+        Log.d(LOG_TAG, String.format("onDestroy: %d items.", mAccountRecyclerAdapter.getItemCount()));
         mBinding = null;
         if (mAccountRecyclerAdapter != null) {
             mAccountRecyclerAdapter.swapCursor(null);

@@ -42,7 +42,7 @@ import java.util.List;
  */
 public class BooksDbAdapter extends DatabaseAdapter<Book> {
 
-    public static final String DEFAULT_BOOK_NAME = "Book1";
+    public static final String DEFAULT_BOOK_NAME = "Book";
 
     /**
      * Opens the database adapter with an existing database
@@ -97,15 +97,16 @@ public class BooksDbAdapter extends DatabaseAdapter<Book> {
         stmt.bindString(1, displayName);
         stmt.bindString(2, book.getRootAccountUID());
         stmt.bindString(3, book.getRootTemplateUID());
-        assert book.getSourceUri() != null;
-        stmt.bindString(4, book.getSourceUri().toString());
+        if (book.getSourceUri() != null) {
+            stmt.bindString(4, book.getSourceUri().toString());
+        } else {
+            Log.d(LOG_TAG, String.format("setBindings: book.getSourceUri()=%s.", book.getSourceUri()));
+        }
         stmt.bindLong(5, book.isActive() ? 1L : 0L);
         stmt.bindString(6, book.getUID());
-        assert book.getLastSync() != null;
         stmt.bindString(7, TimestampHelper.getUtcStringFromTimestamp(book.getLastSync()));
         return stmt;
     }
-
 
     /**
      * Deletes a book - removes the book record from the database and deletes the database file from the disk
@@ -134,8 +135,8 @@ public class BooksDbAdapter extends DatabaseAdapter<Book> {
      * @param bookUID Unique identifier of the book
      * @return GUID of the currently active book
      */
-    public String setActive(String bookUID) {
-        if (bookUID == null) {
+    public String setActive(@NonNull String bookUID) {
+        if (bookUID.equals("")) {
             return getActiveBookUID();
         }
 
@@ -316,7 +317,6 @@ public class BooksDbAdapter extends DatabaseAdapter<Book> {
         while (true) {
             Context context = GnuCashApplication.getAppContext();
             String name = context.getString(R.string.book_default_name, bookCount);
-            //String name = "Book" + " " + bookCount;
 
             statement.clearBindings();
             statement.bindString(1, name);
@@ -328,8 +328,5 @@ public class BooksDbAdapter extends DatabaseAdapter<Book> {
 
             bookCount++;
         }
-
     }
-
-
 }
