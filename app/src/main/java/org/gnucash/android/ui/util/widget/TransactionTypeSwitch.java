@@ -41,7 +41,7 @@ import java.util.List;
  * @author Ngewi Fet <ngewif@gmail.com>
  */
 public class TransactionTypeSwitch extends SwitchCompat {
-    public static final String LOG_TAG = "TransactionTypeSwitch";
+    public static final String LOG_TAG = TransactionTypeSwitch.class.getName();
 
     private AccountType mAccountType = AccountType.EXPENSE;
 
@@ -64,51 +64,46 @@ public class TransactionTypeSwitch extends SwitchCompat {
         this.mAccountType = accountType;
         Context context = getContext().getApplicationContext();
         switch (mAccountType) {
-            case CASH:
+            case CASH -> {
                 setTextOn(context.getString(R.string.label_spend));
                 setTextOff(context.getString(R.string.label_receive));
-                break;
-            case BANK:
+            }
+            case BANK -> {
                 setTextOn(context.getString(R.string.label_withdrawal));
                 setTextOff(context.getString(R.string.label_deposit));
-                break;
-            case CREDIT:
+            }
+            case CREDIT -> {
                 setTextOn(context.getString(R.string.label_payment));
                 setTextOff(context.getString(R.string.label_charge));
-                break;
-            case ASSET:
-            case EQUITY:
-            case LIABILITY:
+            }
+            case ASSET, EQUITY, LIABILITY -> {
                 setTextOn(context.getString(R.string.label_decrease));
                 setTextOff(context.getString(R.string.label_increase));
-                break;
-            case INCOME:
+            }
+            case INCOME -> {
                 setTextOn(context.getString(R.string.label_charge));
                 setTextOff(context.getString(R.string.label_income));
-                break;
-            case EXPENSE:
+            }
+            case EXPENSE -> {
                 setTextOn(context.getString(R.string.label_rebate));
                 setTextOff(context.getString(R.string.label_expense));
-                break;
-            case PAYABLE:
+            }
+            case PAYABLE -> {
                 setTextOn(context.getString(R.string.label_payment));
                 setTextOff(context.getString(R.string.label_bill));
-                break;
-            case RECEIVABLE:
+            }
+            case RECEIVABLE -> {
                 setTextOn(context.getString(R.string.label_payment));
                 setTextOff(context.getString(R.string.label_invoice));
-                break;
-            case STOCK:
-            case MUTUAL:
+            }
+            case STOCK, MUTUAL -> {
                 setTextOn(context.getString(R.string.label_buy));
                 setTextOff(context.getString(R.string.label_sell));
-                break;
-            case CURRENCY:
-            case ROOT:
-            default:
+            }
+            default -> {
                 setTextOn(context.getString(R.string.label_debit));
                 setTextOff(context.getString(R.string.label_credit));
-                break;
+            }
         }
         setText(isChecked() ? getTextOn() : getTextOff());
         invalidate();

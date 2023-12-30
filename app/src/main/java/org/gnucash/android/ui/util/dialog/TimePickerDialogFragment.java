@@ -20,6 +20,7 @@ import android.app.TimePickerDialog;
 import android.app.TimePickerDialog.OnTimeSetListener;
 import android.os.Bundle;
 
+import androidx.annotation.NonNull;
 import androidx.fragment.app.DialogFragment;
 
 import java.util.Calendar;
@@ -69,6 +70,7 @@ public class TimePickerDialogFragment extends DialogFragment {
     /**
      * Creates and returns an Android {@link TimePickerDialog}
      */
+    @NonNull
     @Override
     public Dialog onCreateDialog(Bundle savedInstanceState) {
         Calendar cal = mCurrentTime == null ? Calendar.getInstance() : mCurrentTime;

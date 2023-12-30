@@ -28,10 +28,12 @@ import android.database.ContentObserver;
 import android.database.Cursor;
 import android.database.DataSetObserver;
 import android.os.Handler;
+import android.os.Looper;
 import android.widget.Filter;
 import android.widget.FilterQueryProvider;
 import android.widget.Filterable;
 
+import androidx.annotation.NonNull;
 import androidx.cursoradapter.widget.CursorAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -91,7 +93,7 @@ public abstract class CursorRecyclerAdapter<VH
      * @param i      {@inheritDoc}
      */
     @Override
-    public void onBindViewHolder(VH holder, int i) {
+    public void onBindViewHolder(@NonNull VH holder, int i) {
         if (!mDataValid) {
             throw new IllegalStateException("this should only be called when the cursor is valid");
         }
@@ -281,7 +283,7 @@ public abstract class CursorRecyclerAdapter<VH
 
     private class ChangeObserver extends ContentObserver {
         public ChangeObserver() {
-            super(new Handler());
+            super(new Handler(Looper.myLooper()));
         }
 
         @Override
@@ -309,16 +311,14 @@ public abstract class CursorRecyclerAdapter<VH
             notifyItemRangeRemoved(0, getItemCount());
         }
     }
-
-    /**
-     * <p>The CursorFilter delegates most of the work to the CursorAdapter.
-     * Subclasses should override these delegate methods to run the queries
-     * and convert the results into String that can be used by auto-completion
-     * widgets.</p>
-     */
-
 }
 
+/**
+ * <p>The CursorFilter delegates most of the work to the CursorAdapter.
+ * Subclasses should override these delegate methods to run the queries
+ * and convert the results into String that can be used by auto-completion
+ * widgets.</p>
+ */
 class CursorFilter extends Filter {
 
     CursorFilterClient mClient;

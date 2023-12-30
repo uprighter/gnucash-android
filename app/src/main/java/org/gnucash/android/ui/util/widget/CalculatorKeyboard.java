@@ -43,7 +43,7 @@ import java.text.DecimalFormatSymbols;
 
 /**
  * When an activity hosts a keyboardView, this class allows several EditText's to register for it.
- *
+ * <p>
  * Known issues:
  *  - It's not possible to select text.
  *  - When in landscape, the EditText is covered by the keyboard.
@@ -60,29 +60,22 @@ public class CalculatorKeyboard {
 
     public static final int KEY_CODE_DECIMAL_SEPARATOR = 46;
     /** A link to the KeyboardView that is used to render this CalculatorKeyboard. */
-    private KeyboardView mKeyboardView;
+    private final KeyboardView mKeyboardView;
 
-    private Context mContext;
-    private boolean hapticFeedback;
+    private final Context mContext;
 
     public static final String LOCALE_DECIMAL_SEPARATOR = Character.toString(DecimalFormatSymbols.getInstance().getDecimalSeparator());
 
-    private OnKeyboardActionListener mOnKeyboardActionListener = new OnKeyboardActionListener() {
+    private final OnKeyboardActionListener mOnKeyboardActionListener = new OnKeyboardActionListener() {
         @Override
         public void onKey(int primaryCode, int[] keyCodes) {
             View focusCurrent = ((Activity) mContext).getWindow().getCurrentFocus();
             assert focusCurrent != null;
 
-            /*
-            if (focusCurrent == null || focusCurrent.getClass() != EditText.class)
-                return;
-            */
-
-            if (!(focusCurrent instanceof CalculatorEditText)) {
+            if (!(focusCurrent instanceof CalculatorEditText calculatorEditText)) {
                 return;
             }
 
-            CalculatorEditText calculatorEditText = (CalculatorEditText) focusCurrent;
             Editable editable = calculatorEditText.getText();
             int start = calculatorEditText.getSelectionStart();
             int end = calculatorEditText.getSelectionEnd();
@@ -93,41 +86,22 @@ public class CalculatorKeyboard {
                 editable.delete(start, end);
 
             switch (primaryCode) {
-                case KEY_CODE_DECIMAL_SEPARATOR:
-                    editable.insert(start, LOCALE_DECIMAL_SEPARATOR);
-                    break;
-                case 42:
-                case 43:
-                case 45:
-                case 47:
-                case 48:
-                case 49:
-                case 50:
-                case 51:
-                case 52:
-                case 53:
-                case 54:
-                case 55:
-                case 56:
-                case 57:
+                case KEY_CODE_DECIMAL_SEPARATOR -> editable.insert(start, LOCALE_DECIMAL_SEPARATOR);
+                case 42, 43, 45, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57 ->
                     //editable.replace(start, end, Character.toString((char) primaryCode));
                     // XXX: could be android:keyOutputText attribute used instead of this?
-                    editable.insert(start, Character.toString((char) primaryCode));
-                    break;
-                case -5:
+                        editable.insert(start, Character.toString((char) primaryCode));
+                case -5 -> {
                     int deleteStart = start > 0 ? start - 1 : 0;
                     editable.delete(deleteStart, end);
-                    break;
-                case 1003: // C[lear]
-                    editable.clear();
-                    break;
-                case 1001:
-                    calculatorEditText.evaluate();
-                    break;
-                case 1002:
+                }
+                case 1003 -> // C[lear]
+                        editable.clear();
+                case 1001 -> calculatorEditText.evaluate();
+                case 1002 -> {
                     calculatorEditText.focusSearch(View.FOCUS_DOWN).requestFocus();
                     hideCustomKeyboard();
-                    break;
+                }
             }
         }
 

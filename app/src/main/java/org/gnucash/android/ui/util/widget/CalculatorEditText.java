@@ -18,14 +18,11 @@ package org.gnucash.android.ui.util.widget;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.inputmethodservice.KeyboardView;
-import android.os.Build;
 import android.text.Editable;
 import android.text.InputType;
 import android.text.TextWatcher;
 import android.util.AttributeSet;
 import android.util.Log;
-import android.view.MotionEvent;
-import android.view.View;
 
 import androidx.annotation.Nullable;
 import androidx.annotation.XmlRes;
@@ -56,6 +53,9 @@ import java.util.Locale;
  * @author Ngewi Fet <ngewif@gmail.com>
  */
 public class CalculatorEditText extends AppCompatEditText {
+
+    public static final String LOG_TAG = CalculatorEditText.class.getName();
+
     private CalculatorKeyboard mCalculatorKeyboard;
 
     private Commodity mCommodity = Commodity.DEFAULT_COMMODITY;
@@ -93,15 +93,12 @@ public class CalculatorEditText extends AppCompatEditText {
      */
     private void init(Context context, AttributeSet attrs) {
         this.mContext = context;
-        TypedArray a = context.getTheme().obtainStyledAttributes(
+
+        try (TypedArray a = context.getTheme().obtainStyledAttributes(
                 attrs,
                 R.styleable.CalculatorEditText,
-                0, 0);
-
-        try {
+                0, 0)) {
             mCalculatorKeysLayout = a.getResourceId(R.styleable.CalculatorEditText_keyboardKeysLayout, R.xml.calculator_keyboard);
-        } finally {
-            a.recycle();
         }
 
         addTextChangedListener(new TextWatcher() {
@@ -125,47 +122,32 @@ public class CalculatorEditText extends AppCompatEditText {
     public void bindListeners(CalculatorKeyboard calculatorKeyboard) {
         mCalculatorKeyboard = calculatorKeyboard;
         mContext = calculatorKeyboard.getContext();
-        setOnFocusChangeListener(new View.OnFocusChangeListener() {
-            @Override
-            public void onFocusChange(View v, boolean hasFocus) {
-                if (hasFocus) {
-                    setSelection(getText().length());
-                    mCalculatorKeyboard.showCustomKeyboard(v);
-                } else {
-                    mCalculatorKeyboard.hideCustomKeyboard();
-                    evaluate();
-                }
+        setOnFocusChangeListener((v, hasFocus) -> {
+            if (hasFocus) {
+                setSelection(getText().length());
+                mCalculatorKeyboard.showCustomKeyboard(v);
+            } else {
+                mCalculatorKeyboard.hideCustomKeyboard();
+                evaluate();
             }
         });
 
-        setOnClickListener(new OnClickListener() {
-            // NOTE By setting the on click listener we can show the custom keyboard again,
-            // by tapping on an edit box that already had focus (but that had the keyboard hidden).
-            @Override
-            public void onClick(View v) {
-                mCalculatorKeyboard.showCustomKeyboard(v);
-            }
-        });
+        // NOTE By setting the on click listener we can show the custom keyboard again,
+// by tapping on an edit box that already had focus (but that had the keyboard hidden).
+        setOnClickListener(v -> mCalculatorKeyboard.showCustomKeyboard(v));
 
         // Disable spell check (hex strings look like words to Android)
         setInputType(getInputType() | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
 
         // Disable system keyboard appearing on long-press, but for some reason, this prevents the text selection from working.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            setShowSoftInputOnFocus(false);
-        } else {
-            setRawInputType(InputType.TYPE_CLASS_NUMBER);
-        }
+        setShowSoftInputOnFocus(false);
 
         // Although this handler doesn't make sense, if removed, the standard keyboard
         // shows up in addition to the calculator one when the EditText gets a touch event.
-        setOnTouchListener(new OnTouchListener() {
-            @Override
-            public boolean onTouch(View v, MotionEvent event) {
-                // XXX: Use dispatchTouchEvent()?
-                onTouchEvent(event);
-                return false;
-            }
+        setOnTouchListener((v, event) -> {
+            // XXX: Use dispatchTouchEvent()?
+            onTouchEvent(event);
+            return false;
         });
 
         ((FormActivity) mContext).setOnBackListener(mCalculatorKeyboard);
@@ -228,7 +210,7 @@ public class CalculatorEditText extends AppCompatEditText {
     /**
      * Sets the calculator keyboard to use for this EditText
      *
-     * @param keyboard Properly intialized calculator keyobard
+     * @param keyboard Properly initialized calculator keyboard
      */
     public void setCalculatorKeyboard(CalculatorKeyboard keyboard) {
         this.mCalculatorKeyboard = keyboard;
@@ -271,17 +253,17 @@ public class CalculatorEditText extends AppCompatEditText {
         } catch (RuntimeException e) {
             setError(getContext().getString(R.string.label_error_invalid_expression));
             String msg = "Invalid expression: " + amountString;
-            Log.e(this.getClass().getSimpleName(), msg);
+            Log.e(LOG_TAG, msg);
             FirebaseCrashlytics.getInstance().log(msg);
             return "";
         }
 
         if (expression != null && expression.validate().isValid()) {
-            BigDecimal result = new BigDecimal(expression.evaluate());
+            BigDecimal result = BigDecimal.valueOf(expression.evaluate());
             setValue(result);
         } else {
             setError(getContext().getString(R.string.label_error_invalid_expression));
-            Log.w(VIEW_LOG_TAG, "Expression is null or invalid: " + expression);
+            Log.w(LOG_TAG, "Expression is null or invalid: " + expression);
         }
         return getText().toString();
     }
@@ -323,14 +305,14 @@ public class CalculatorEditText extends AppCompatEditText {
      */
     public @Nullable BigDecimal getValue() {
         evaluate();
-        if (getText().length() == 0 ) {
+        if (getText().length() == 0) {
             return null;
         }
         try { //catch any exceptions in the conversion e.g. if a string with only "-" is entered
             return AmountParser.parse(getText().toString());
         } catch (ParseException e) {
             String msg = "Error parsing amount string " + getText() + " from CalculatorEditText";
-            Log.i(getClass().getSimpleName(), msg, e);
+            Log.i(LOG_TAG, msg, e);
             return null;
         }
     }

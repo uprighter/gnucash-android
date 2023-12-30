@@ -64,7 +64,7 @@ public class CheckableLinearLayout extends LinearLayout implements Checkable {
 
         //this prevents us from opening transactions since simply clicking on the item checks the checkable and
         //activates action mode.
-//        mCheckable = findCheckableView(this);
+        mCheckable = findCheckableView(this);
     }
 
     /**

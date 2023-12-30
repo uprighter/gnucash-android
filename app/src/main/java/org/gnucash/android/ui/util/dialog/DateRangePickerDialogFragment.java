@@ -30,14 +30,12 @@ import androidx.fragment.app.DialogFragment;
 import com.squareup.timessquare.CalendarPickerView;
 
 import org.gnucash.android.R;
+import org.gnucash.android.databinding.DialogDateRangePickerBinding;
 import org.joda.time.LocalDate;
 
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
-
-import butterknife.BindView;
-import butterknife.ButterKnife;
 
 /**
  * Dialog for picking date ranges in terms of months.
@@ -47,11 +45,9 @@ import butterknife.ButterKnife;
  */
 public class DateRangePickerDialogFragment extends DialogFragment {
 
-    @BindView(R.id.calendar_view)
+    DialogDateRangePickerBinding mBinding;
     CalendarPickerView mCalendarPickerView;
-    @BindView(R.id.btn_save)
     Button mDoneButton;
-    @BindView(R.id.btn_cancel)
     Button mCancelButton;
 
     private Date mStartRange = LocalDate.now().minusMonths(1).toDate();
@@ -76,10 +72,11 @@ public class DateRangePickerDialogFragment extends DialogFragment {
 
     @Nullable
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-        View view = inflater.inflate(R.layout.dialog_date_range_picker, container, false);
-        ButterKnife.bind(this, view);
-
+    public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+        mBinding = DialogDateRangePickerBinding.inflate(inflater, container, false);
+        mCalendarPickerView = mBinding.calendarView;
+        mDoneButton = mBinding.defaultButtons.btnSave;
+        mCancelButton = mBinding.defaultButtons.btnCancel;
 
         Calendar nextYear = Calendar.getInstance();
         nextYear.add(Calendar.YEAR, 1);
@@ -90,28 +87,20 @@ public class DateRangePickerDialogFragment extends DialogFragment {
                 .withSelectedDate(today);
 
         mDoneButton.setText(R.string.done_label);
-        mDoneButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                List<Date> selectedDates = mCalendarPickerView.getSelectedDates();
-                Date startDate = selectedDates.get(0);
-                // If only one day is selected (no interval) start and end should be the same (the selected one)
-                Date endDate = selectedDates.size() > 1 ? selectedDates.get(selectedDates.size() - 1) : new Date(startDate.getTime());
-                // CaledarPicker returns the start of the selected day but we want all transactions of that day to be included.
-                // Therefore we have to add 24 hours to the endDate.
-                endDate.setTime(endDate.getTime() + ONE_DAY_IN_MILLIS);
-                mDateRangeSetListener.onDateRangeSet(startDate, endDate);
-                dismiss();
-            }
+        mDoneButton.setOnClickListener(v -> {
+            List<Date> selectedDates = mCalendarPickerView.getSelectedDates();
+            Date startDate = selectedDates.get(0);
+            // If only one day is selected (no interval) start and end should be the same (the selected one)
+            Date endDate = selectedDates.size() > 1 ? selectedDates.get(selectedDates.size() - 1) : new Date(startDate.getTime());
+            // CalendarPicker returns the start of the selected day but we want all transactions of that day to be included.
+            // Therefore we have to add 24 hours to the endDate.
+            endDate.setTime(endDate.getTime() + ONE_DAY_IN_MILLIS);
+            mDateRangeSetListener.onDateRangeSet(startDate, endDate);
+            dismiss();
         });
 
-        mCancelButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                dismiss();
-            }
-        });
-        return view;
+        mCancelButton.setOnClickListener(v -> dismiss());
+        return mBinding.getRoot();
     }
 
     @NonNull
@@ -124,5 +113,11 @@ public class DateRangePickerDialogFragment extends DialogFragment {
 
     public interface OnDateRangeSetListener {
         void onDateRangeSet(Date startDate, Date endDate);
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        mBinding = null;
     }
 }

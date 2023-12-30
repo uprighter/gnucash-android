@@ -59,32 +59,14 @@ public class RecurrenceParser {
         if (eventRecurrence == null)
             return null;
 
-        PeriodType periodType;
-        switch (eventRecurrence.freq) {
-            case EventRecurrence.HOURLY:
-                periodType = PeriodType.HOUR;
-                break;
-
-            case EventRecurrence.DAILY:
-                periodType = PeriodType.DAY;
-                break;
-
-            case EventRecurrence.WEEKLY:
-                periodType = PeriodType.WEEK;
-                break;
-
-            case EventRecurrence.MONTHLY:
-                periodType = PeriodType.MONTH;
-                break;
-
-            case EventRecurrence.YEARLY:
-                periodType = PeriodType.YEAR;
-                break;
-
-            default:
-                periodType = PeriodType.MONTH;
-                break;
-        }
+        PeriodType periodType = switch (eventRecurrence.freq) {
+            case EventRecurrence.HOURLY -> PeriodType.HOUR;
+            case EventRecurrence.DAILY -> PeriodType.DAY;
+            case EventRecurrence.WEEKLY -> PeriodType.WEEK;
+            case EventRecurrence.MONTHLY -> PeriodType.MONTH;
+            case EventRecurrence.YEARLY -> PeriodType.YEAR;
+            default -> PeriodType.MONTH;
+        };
 
         int interval = eventRecurrence.interval == 0 ? 1 : eventRecurrence.interval; //bug from betterpickers library sometimes returns 0 as the interval
         Recurrence recurrence = new Recurrence(periodType);
