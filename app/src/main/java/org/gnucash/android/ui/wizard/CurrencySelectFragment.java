@@ -16,13 +16,14 @@
 
 package org.gnucash.android.ui.wizard;
 
-import android.app.Activity;
+import android.content.Context;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ListView;
 
+import androidx.annotation.NonNull;
 import androidx.fragment.app.ListFragment;
 
 import com.tech.freak.wizardpager.ui.PageFragmentCallbacks;
@@ -71,8 +72,8 @@ public class CurrencySelectFragment extends ListFragment {
     }
 
     @Override
-    public void onActivityCreated(Bundle savedInstanceState) {
-        super.onActivityCreated(savedInstanceState);
+    public void onViewCreated(@NonNull View view, Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
 
         CommoditiesCursorAdapter commoditiesCursorAdapter = new CommoditiesCursorAdapter(getActivity(), R.layout.list_item_commodity);
         setListAdapter(commoditiesCursorAdapter);
@@ -83,13 +84,13 @@ public class CurrencySelectFragment extends ListFragment {
     }
 
     @Override
-    public void onAttach(Activity activity) {
-        super.onAttach(activity);
-        if (!(activity instanceof PageFragmentCallbacks)) {
+    public void onAttach(@NonNull Context context) {
+        super.onAttach(context);
+        if (!(context instanceof PageFragmentCallbacks)) {
             throw new ClassCastException("Activity must implement PageFragmentCallbacks");
         }
 
-        mCallbacks = (PageFragmentCallbacks) activity;
+        mCallbacks = (PageFragmentCallbacks) context;
     }
 
     @Override
@@ -99,7 +100,7 @@ public class CurrencySelectFragment extends ListFragment {
     }
 
     @Override
-    public void onListItemClick(ListView l, View v, int position, long id) {
+    public void onListItemClick(@NonNull ListView l, @NonNull View v, int position, long id) {
         super.onListItemClick(l, v, position, id);
 
         String currencyCode = mCommoditiesDbAdapter.getCurrencyCode(mCommoditiesDbAdapter.getUID(id));

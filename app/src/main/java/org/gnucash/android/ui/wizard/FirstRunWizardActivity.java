@@ -22,7 +22,6 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
-import android.preference.PreferenceManager;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.View;
@@ -31,12 +30,14 @@ import android.widget.Button;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.AppCompatButton;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentStatePagerAdapter;
+import androidx.preference.PreferenceManager;
 import androidx.viewpager.widget.ViewPager;
 
 import com.tech.freak.wizardpager.model.AbstractWizardModel;
@@ -49,15 +50,12 @@ import com.tech.freak.wizardpager.ui.StepPagerStrip;
 
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
+import org.gnucash.android.databinding.ActivityFirstRunWizardBinding;
 import org.gnucash.android.db.adapter.BooksDbAdapter;
 import org.gnucash.android.ui.account.AccountsActivity;
-import org.gnucash.android.ui.util.TaskDelegate;
 
 import java.util.ArrayList;
 import java.util.List;
-
-import butterknife.BindView;
-import butterknife.ButterKnife;
 
 /**
  * Activity for managing the wizard displayed upon first run of the application
@@ -66,8 +64,11 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
         PageFragmentCallbacks, ReviewFragment.Callbacks, ModelCallbacks {
     public static final String LOG_TAG = FirstRunWizardActivity.class.getName();
 
-    @BindView(R.id.pager)
     ViewPager mPager;
+    AppCompatButton mNextButton;
+    Button mPrevButton;
+    StepPagerStrip mStepPagerStrip;
+
     private MyPagerAdapter mPagerAdapter;
 
     private boolean mEditingAfterReview;
@@ -76,12 +77,6 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
 
     private boolean mConsumePageSelectedEvent;
 
-    @BindView(R.id.btn_save)
-    AppCompatButton mNextButton;
-    @BindView(R.id.btn_cancel)
-    Button mPrevButton;
-    @BindView(R.id.strip)
-    StepPagerStrip mStepPagerStrip;
 
     private List<Page> mCurrentPageSequence;
     private String mAccountOptions;
@@ -102,22 +97,24 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
         mWizardModel = createWizardModel(savedInstanceState);
 
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_first_run_wizard);
-        ButterKnife.bind(this);
+
+        ActivityFirstRunWizardBinding binding = ActivityFirstRunWizardBinding.inflate(getLayoutInflater());
+        setContentView(binding.getRoot());
+        mPager = binding.pager;
+        mNextButton = (AppCompatButton)binding.defaultButtons.btnSave;
+        mPrevButton = binding.defaultButtons.btnCancel;
+        mStepPagerStrip = binding.strip;
 
         setTitle(getString(R.string.title_setup_gnucash));
 
         mPagerAdapter = new MyPagerAdapter(getSupportFragmentManager());
         mPager.setAdapter(mPagerAdapter);
         mStepPagerStrip
-                .setOnPageSelectedListener(new StepPagerStrip.OnPageSelectedListener() {
-                    @Override
-                    public void onPageStripSelected(int position) {
-                        position = Math.min(mPagerAdapter.getCount() - 1,
-                                position);
-                        if (mPager.getCurrentItem() != position) {
-                            mPager.setCurrentItem(position);
-                        }
+                .setOnPageSelectedListener(position -> {
+                    position = Math.min(mPagerAdapter.getCount() - 1,
+                            position);
+                    if (mPager.getCurrentItem() != position) {
+                        mPager.setCurrentItem(position);
                     }
                 });
 
@@ -137,49 +134,42 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
             }
         });
 
-        mNextButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                if (mPager.getCurrentItem() == mCurrentPageSequence.size()) {
-                    ArrayList<ReviewItem> reviewItems = new ArrayList<>();
-                    for (Page page : mCurrentPageSequence) {
-                        page.getReviewItems(reviewItems);
+        mNextButton.setOnClickListener(view -> {
+            if (mPager.getCurrentItem() == mCurrentPageSequence.size()) {
+                ArrayList<ReviewItem> reviewItems = new ArrayList<>();
+                for (Page page : mCurrentPageSequence) {
+                    page.getReviewItems(reviewItems);
+                }
+
+                mCurrencyCode = GnuCashApplication.getDefaultCurrencyCode();
+                mAccountOptions = getString(R.string.wizard_option_let_me_handle_it); //default value, do nothing
+                String feedbackOption = getString(R.string.wizard_option_disable_crash_reports);
+                for (ReviewItem reviewItem : reviewItems) {
+                    String title = reviewItem.getTitle();
+                    if (title.equals(getString(R.string.wizard_title_default_currency))) {
+                        mCurrencyCode = reviewItem.getDisplayValue();
+                    } else if (title.equals(getString(R.string.wizard_title_select_currency))) {
+                        mCurrencyCode = reviewItem.getDisplayValue();
+                    } else if (title.equals(getString(R.string.wizard_title_account_setup))) {
+                        mAccountOptions = reviewItem.getDisplayValue();
+                    } else if (title.equals(getString(R.string.wizard_title_feedback_options))) {
+                        feedbackOption = reviewItem.getDisplayValue();
                     }
+                }
 
-                    mCurrencyCode = GnuCashApplication.getDefaultCurrencyCode();
-                    mAccountOptions = getString(R.string.wizard_option_let_me_handle_it); //default value, do nothing
-                    String feedbackOption = getString(R.string.wizard_option_disable_crash_reports);
-                    for (ReviewItem reviewItem : reviewItems) {
-                        String title = reviewItem.getTitle();
-                        if (title.equals(getString(R.string.wizard_title_default_currency))) {
-                            mCurrencyCode = reviewItem.getDisplayValue();
-                        } else if (title.equals(getString(R.string.wizard_title_select_currency))) {
-                            mCurrencyCode = reviewItem.getDisplayValue();
-                        } else if (title.equals(getString(R.string.wizard_title_account_setup))) {
-                            mAccountOptions = reviewItem.getDisplayValue();
-                        } else if (title.equals(getString(R.string.wizard_title_feedback_options))) {
-                            feedbackOption = reviewItem.getDisplayValue();
-                        }
-                    }
+                GnuCashApplication.setDefaultCurrencyCode(mCurrencyCode);
+                SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(FirstRunWizardActivity.this);
+                SharedPreferences.Editor preferenceEditor = preferences.edit();
 
-                    GnuCashApplication.setDefaultCurrencyCode(mCurrencyCode);
-                    SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(FirstRunWizardActivity.this);
-                    SharedPreferences.Editor preferenceEditor = preferences.edit();
+                preferenceEditor.putBoolean(getString(R.string.key_enable_crashlytics), feedbackOption.equals(getString(R.string.wizard_option_auto_send_crash_reports)));
+                preferenceEditor.apply();
 
-                    if (feedbackOption.equals(getString(R.string.wizard_option_auto_send_crash_reports))) {
-                        preferenceEditor.putBoolean(getString(R.string.key_enable_crashlytics), true);
-                    } else {
-                        preferenceEditor.putBoolean(getString(R.string.key_enable_crashlytics), false);
-                    }
-                    preferenceEditor.apply();
-
-                    createAccountsAndFinish();
+                createAccountsAndFinish();
+            } else {
+                if (mEditingAfterReview) {
+                    mPager.setCurrentItem(mPagerAdapter.getCount() - 1);
                 } else {
-                    if (mEditingAfterReview) {
-                        mPager.setCurrentItem(mPagerAdapter.getCount() - 1);
-                    } else {
-                        mPager.setCurrentItem(mPager.getCurrentItem() + 1);
-                    }
+                    mPager.setCurrentItem(mPager.getCurrentItem() + 1);
                 }
             }
         });
@@ -191,12 +181,7 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
         mPrevButton.setTextAppearance(this, v.resourceId);
         mNextButton.setTextAppearance(this, v.resourceId);
 
-        mPrevButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                mPager.setCurrentItem(mPager.getCurrentItem() - 1);
-            }
-        });
+        mPrevButton.setOnClickListener(view -> mPager.setCurrentItem(mPager.getCurrentItem() - 1));
 
         onPageTreeChanged();
         updateBottomBar();
@@ -277,17 +262,10 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        switch (requestCode) {
-            case AccountsActivity.REQUEST_PICK_ACCOUNTS_FILE:
-                if (resultCode == Activity.RESULT_OK && data != null) {
-                    AccountsActivity.importXmlFileFromIntent(this, data.getData(), new TaskDelegate() {
-                        @Override
-                        public void onTaskComplete() {
-                            finish();
-                        }
-                    });
-                }
-                break;
+        if (requestCode == AccountsActivity.REQUEST_PICK_ACCOUNTS_FILE) {
+            if (resultCode == Activity.RESULT_OK && data != null) {
+                AccountsActivity.importXmlFileFromIntent(this, data.getData(), this::finish);
+            }
         }
     }
 
@@ -298,7 +276,7 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
     }
 
     @Override
-    protected void onSaveInstanceState(Bundle outState) {
+    protected void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
         outState.putBundle("model", mWizardModel.save());
     }
@@ -363,6 +341,7 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
             super(fm);
         }
 
+        @NonNull
         @Override
         public Fragment getItem(int i) {
             if (i >= mCurrentPageSequence.size()) {
@@ -373,7 +352,7 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
         }
 
         @Override
-        public int getItemPosition(Object object) {
+        public int getItemPosition(@NonNull Object object) {
             // TODO: be smarter about this
             if (object == mPrimaryItem) {
                 // Re-use the current fragment (its position never changes)
@@ -384,8 +363,8 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
         }
 
         @Override
-        public void setPrimaryItem(ViewGroup container, int position,
-                                   Object object) {
+        public void setPrimaryItem(@NonNull ViewGroup container, int position,
+                                   @NonNull Object object) {
             super.setPrimaryItem(container, position, object);
             mPrimaryItem = (Fragment) object;
         }
