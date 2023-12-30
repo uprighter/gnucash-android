@@ -108,7 +108,7 @@ public class AccountsListFragment extends Fragment implements
     /**
      * Logging tag
      */
-    protected static final String LOG_TAG = "AccountsListFragment";
+    protected static final String LOG_TAG = AccountsListFragment.class.getName();
 
     /**
      * Tag to save {@link AccountsListFragment#mDisplayMode} to fragment state
@@ -333,7 +333,7 @@ public class AccountsListFragment extends Fragment implements
     @Override
     public void onDestroy() {
         super.onDestroy();
-        Log.d(LOG_TAG, String.format("onDestroy: %d items.", mAccountRecyclerAdapter.getItemCount()));
+        Log.d(LOG_TAG, String.format("onDestroy: %d items in mAccountRecyclerAdapter.", mAccountRecyclerAdapter.getItemCount()));
         mBinding = null;
         if (mAccountRecyclerAdapter != null) {
             mAccountRecyclerAdapter.swapCursor(null);
@@ -371,7 +371,7 @@ public class AccountsListFragment extends Fragment implements
     @SuppressLint("NotifyDataSetChanged")
     @Override
     public void onLoadFinished(@NonNull Loader<Cursor> loaderCursor, Cursor cursor) {
-        Log.d(LOG_TAG, "Accounts loader finished. Swapping in cursor");
+        Log.d(LOG_TAG, "Accounts loader finished. Swapping in cursor: " + cursor);
         mAccountRecyclerAdapter.swapCursor(cursor);
         mAccountRecyclerAdapter.notifyDataSetChanged();
     }
@@ -495,7 +495,7 @@ public class AccountsListFragment extends Fragment implements
         public AccountViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             CardviewAccountBinding binding = CardviewAccountBinding.inflate(
                     LayoutInflater.from(parent.getContext()), parent, false);
-            Log.d(LOG_TAG, "onCreateViewHolder, binding: " + binding);
+//            Log.d(LOG_TAG, "onCreateViewHolder, binding: " + binding);
             return new AccountViewHolder(binding);
 
         }
@@ -503,8 +503,20 @@ public class AccountsListFragment extends Fragment implements
         @Override
         public void onBindViewHolderCursor(final AccountViewHolder holder, final Cursor cursor) {
             final String accountUID = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseSchema.AccountEntry.COLUMN_UID));
-            mAccountsDbAdapter = AccountsDbAdapter.getInstance();
-            holder.accountId = mAccountsDbAdapter.getID(accountUID);
+
+            try {
+                // Note: if book is switched in "Manage Books" activity, mAccountsDbAdapter will be
+                // reset and the getID call would throw IllegalArgumentException. In that case,
+                // refresh to reload.
+                // It's weird that this bug is not triggered when books is switched in left
+                // drop-down menu.
+                mAccountsDbAdapter = AccountsDbAdapter.getInstance();
+                holder.accountId = mAccountsDbAdapter.getID(accountUID);
+            } catch (IllegalArgumentException e) {
+                Log.e(LOG_TAG, String.format("onBindViewHolderCursor %s, error: %s. Reset loader.", mAccountsDbAdapter, e.getMessage()));
+                refresh();
+                return;
+            }
 
             holder.accountName.setText(cursor.getString(cursor.getColumnIndexOrThrow(DatabaseSchema.AccountEntry.COLUMN_NAME)));
             int subAccountCount = mAccountsDbAdapter.getSubAccountCount(accountUID);
@@ -533,7 +545,6 @@ public class AccountsListFragment extends Fragment implements
                     createTransactionIntent.putExtra(UxArgument.SELECTED_ACCOUNT_UID, accountUID);
                     createTransactionIntent.putExtra(UxArgument.FORM_TYPE, FormActivity.FormType.TRANSACTION.name());
                     launcher.launch(createTransactionIntent);
-
                 });
             }
 
@@ -549,7 +560,6 @@ public class AccountsListFragment extends Fragment implements
             } else {
                 holder.budgetIndicator.setVisibility(View.GONE);
             }
-
 
             if (mAccountsDbAdapter.isFavoriteAccount(accountUID)) {
                 holder.favoriteStatus.setImageResource(R.drawable.ic_star_black_24dp);
@@ -576,7 +586,6 @@ public class AccountsListFragment extends Fragment implements
 
 
         class AccountViewHolder extends RecyclerView.ViewHolder implements PopupMenu.OnMenuItemClickListener {
-
             TextView accountName;
             TextView description;
             TextView accountBalance;
@@ -609,7 +618,6 @@ public class AccountsListFragment extends Fragment implements
                     popup.show();
                 });
             }
-
 
             @Override
             public boolean onMenuItemClick(MenuItem item) {
