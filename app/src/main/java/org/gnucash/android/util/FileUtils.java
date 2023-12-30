@@ -49,21 +49,19 @@ public final class FileUtils {
     public static void moveFile(String src, String dst) throws IOException {
         File srcFile = new File(src);
         File dstFile = new File(dst);
-        FileChannel inChannel = new FileInputStream(srcFile).getChannel();
-        FileChannel outChannel = new FileOutputStream(dstFile).getChannel();
-        try {
+        try (FileInputStream inputStream = new FileInputStream(srcFile);
+             FileOutputStream outputStream = new FileOutputStream(dstFile)
+        ) {
+            FileChannel inChannel = inputStream.getChannel();
+            FileChannel outChannel = outputStream.getChannel();
             inChannel.transferTo(0, inChannel.size(), outChannel);
-        } finally {
-            if (inChannel != null)
-                inChannel.close();
-            outChannel.close();
         }
         srcFile.delete();
     }
 
     /**
-     * Move file from a location on disk to an outputstream.
-     * The outputstream could be for a URI in the Storage Access Framework
+     * Move file from a location on disk to an OutputStream.
+     * The OutputStream could be for a URI in the Storage Access Framework
      *
      * @param src          Input file (usually newly exported file)
      * @param outputStream Output stream to write to

@@ -69,7 +69,7 @@ public class QualifiedAccountNameCursorAdapter extends SimpleCursorAdapter {
     @Override
     public void bindView(View view, Context context, Cursor cursor) {
         super.bindView(view, context, cursor);
-        TextView textView = (TextView) view.findViewById(android.R.id.text1);
+        TextView textView = view.findViewById(android.R.id.text1);
         textView.setEllipsize(TextUtils.TruncateAt.MIDDLE);
 
         int columnIndex = cursor.getColumnIndex(DatabaseSchema.AccountEntry.COLUMN_FAVORITE);

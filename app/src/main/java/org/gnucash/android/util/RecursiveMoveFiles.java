@@ -48,21 +48,19 @@ public class RecursiveMoveFiles implements Runnable {
      * Copy file from one location to another.
      * Does not support copying of directories
      *
-     * @param src Source file
-     * @param dst Destination of the file
+     * @param srcFile Source file
+     * @param dstFile Destination of the file
      * @return {@code true} if the file was successfully copied, {@code false} otherwise
-     * @throws IOException
+     * @throws IOException throws IOException
      */
-    private boolean copy(File src, File dst) throws IOException {
-        FileChannel inChannel = new FileInputStream(src).getChannel();
-        FileChannel outChannel = new FileOutputStream(dst).getChannel();
-        try {
+    private boolean copy(File srcFile, File dstFile) throws IOException {
+        try (FileInputStream inputStream = new FileInputStream(srcFile);
+             FileOutputStream outputStream = new FileOutputStream(dstFile)
+        ) {
+            FileChannel inChannel = inputStream.getChannel();
+            FileChannel outChannel = outputStream.getChannel();
             long bytesCopied = inChannel.transferTo(0, inChannel.size(), outChannel);
-            return bytesCopied >= src.length();
-        } finally {
-            if (inChannel != null)
-                inChannel.close();
-            outChannel.close();
+            return bytesCopied >= srcFile.length();
         }
     }
 
