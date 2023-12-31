@@ -192,7 +192,7 @@ public class MigrationHelper {
     /**
      * Runnable which moves all exported files (exports and backups) from the old SD card location which
      * was generic to the new folder structure which uses the application ID as folder name.
-     * <p>The new folder structure also futher enables parallel installation of multiple flavours of
+     * <p>The new folder structure also further enables parallel installation of multiple flavours of
      * the program (like development and production) on the same device.</p>
      */
     static final Runnable moveExportedFilesToNewDefaultLocation = () -> {
@@ -417,7 +417,7 @@ public class MigrationHelper {
                     + "recurrence_period integer default 0, "
                     + "UNIQUE (" + TransactionEntry.COLUMN_UID + ") "
                     + ");");
-            // initialize new transaction table wiht data from old table
+            // initialize new transaction table with data from old table
             db.execSQL("INSERT INTO " + TransactionEntry.TABLE_NAME + " ( "
                     + TransactionEntry._ID + " , "
                     + TransactionEntry.COLUMN_UID + " , "
@@ -1243,7 +1243,7 @@ public class MigrationHelper {
      * </ul>
      * </p>
      *
-     * @param db SQlite database to be upgraded
+     * @param db SQLite database to be upgraded
      * @return New database version, 13 if migration succeeds, 11 otherwise
      */
     static int upgradeDbToVersion13(SQLiteDatabase db) {
