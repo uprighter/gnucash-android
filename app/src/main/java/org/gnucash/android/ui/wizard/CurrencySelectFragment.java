@@ -29,10 +29,9 @@ import androidx.fragment.app.ListFragment;
 import com.tech.freak.wizardpager.ui.PageFragmentCallbacks;
 
 import org.gnucash.android.R;
+import org.gnucash.android.databinding.FragmentWizardCurrencySelectPageBinding;
 import org.gnucash.android.db.adapter.CommoditiesDbAdapter;
 import org.gnucash.android.util.CommoditiesCursorAdapter;
-
-import butterknife.ButterKnife;
 
 /**
  * Displays a list of all currencies in the database and allows selection of one
@@ -45,6 +44,7 @@ import butterknife.ButterKnife;
  */
 public class CurrencySelectFragment extends ListFragment {
 
+    private FragmentWizardCurrencySelectPageBinding mBinding;
     private CurrencySelectPage mPage;
     private PageFragmentCallbacks mCallbacks;
 
@@ -60,9 +60,8 @@ public class CurrencySelectFragment extends ListFragment {
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-        View view = inflater.inflate(R.layout.fragment_wizard_currency_select_page, container, false);
-        ButterKnife.bind(this, view);
-        return view;
+        mBinding = FragmentWizardCurrencySelectPageBinding.inflate(inflater, container, false);
+        return mBinding.getRoot();
     }
 
     @Override
@@ -97,6 +96,12 @@ public class CurrencySelectFragment extends ListFragment {
     public void onDetach() {
         super.onDetach();
         mCallbacks = null;
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        mBinding = null;
     }
 
     @Override

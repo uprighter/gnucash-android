@@ -35,8 +35,6 @@ import org.gnucash.android.app.GnuCashApplication;
 import org.gnucash.android.db.adapter.BooksDbAdapter;
 import org.gnucash.android.ui.passcode.PasscodeLockActivity;
 
-import butterknife.ButterKnife;
-
 /**
  * Activity for unified preferences
  */
@@ -49,8 +47,6 @@ public class PreferenceActivity extends PasscodeLockActivity implements
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_settings);
-
-        ButterKnife.bind(this);
 
         String action = getIntent().getAction();
         if (action != null && action.equals(ACTION_MANAGE_BOOKS)) {
