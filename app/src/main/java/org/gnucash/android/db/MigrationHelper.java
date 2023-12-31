@@ -72,6 +72,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.channels.FileChannel;
 import java.sql.Timestamp;
 import java.util.ArrayList;
@@ -176,7 +177,9 @@ public class MigrationHelper {
     static void moveFile(File src, File dst) throws IOException {
         Log.d(LOG_TAG, String.format(Locale.US, "Moving %s from %s to %s",
                 src.getName(), src.getParent(), dst.getParent()));
-        try (FileChannel inChannel = new FileInputStream(src).getChannel(); FileChannel outChannel = new FileOutputStream(dst).getChannel()) {
+        try (FileInputStream inputStream = new FileInputStream(src); FileOutputStream outputStream = new FileOutputStream(dst)) {
+            FileChannel inChannel = inputStream.getChannel();
+            FileChannel outChannel = outputStream.getChannel();
             long bytesCopied = inChannel.transferTo(0, inChannel.size(), outChannel);
             if (bytesCopied >= src.length()) {
                 boolean result = src.delete();
@@ -256,7 +259,9 @@ public class MigrationHelper {
      * @return Version number: 2 if upgrade successful, 1 otherwise
      */
     public static int upgradeDbToVersion2(SQLiteDatabase db) {
-        int oldVersion;
+        int oldVersion = 1;
+        int newVersion = 2;
+        Log.i(LOG_TAG, String.format("upgradeDbToVersion from %d to %d.", oldVersion, newVersion));
         String addColumnSql = "ALTER TABLE " + TransactionEntry.TABLE_NAME +
                 " ADD COLUMN double_account_uid varchar(255)";
 
@@ -275,8 +280,7 @@ public class MigrationHelper {
         cv.put(SplitEntry.COLUMN_TYPE, AccountType.CASH.toString());
         db.update(AccountEntry.TABLE_NAME, cv, null, null);
 
-        oldVersion = 2;
-        return oldVersion;
+        return newVersion;
     }
 
     /**
@@ -286,13 +290,14 @@ public class MigrationHelper {
      * @return Version number: 3 if upgrade successful, 2 otherwise
      */
     static int upgradeDbToVersion3(SQLiteDatabase db) {
-        int oldVersion;
+        int oldVersion = 2;
+        int newVersion = 3;
+        Log.i(LOG_TAG, String.format("upgradeDbToVersion from %d to %d.", oldVersion, newVersion));
         String addPlaceHolderAccountFlagSql = "ALTER TABLE " + AccountEntry.TABLE_NAME +
                 " ADD COLUMN " + AccountEntry.COLUMN_PLACEHOLDER + " tinyint default 0";
 
         db.execSQL(addPlaceHolderAccountFlagSql);
-        oldVersion = 3;
-        return oldVersion;
+        return newVersion;
     }
 
     /**
@@ -302,7 +307,9 @@ public class MigrationHelper {
      * @return Version number: 4 if upgrade successful, 3 otherwise
      */
     static int upgradeDbToVersion4(SQLiteDatabase db) {
-        int oldVersion;
+        int oldVersion = 3;
+        int newVersion = 4;
+        Log.i(LOG_TAG, String.format("upgradeDbToVersion from %d to %d.", oldVersion, newVersion));
         String addRecurrencePeriod = "ALTER TABLE " + TransactionEntry.TABLE_NAME +
                 " ADD COLUMN recurrence_period integer default 0";
 
@@ -316,8 +323,7 @@ public class MigrationHelper {
         db.execSQL(addDefaultTransferAccount);
         db.execSQL(addAccountColor);
 
-        oldVersion = 4;
-        return oldVersion;
+        return newVersion;
     }
 
     /**
@@ -328,13 +334,14 @@ public class MigrationHelper {
      * @return Version number: 5 if upgrade successful, 4 otherwise
      */
     static int upgradeDbToVersion5(SQLiteDatabase db) {
-        int oldVersion;
+        int oldVersion = 4;
+        int newVersion = 5;
+        Log.i(LOG_TAG, String.format("upgradeDbToVersion from %d to %d.", oldVersion, newVersion));
         String addAccountFavorite = " ALTER TABLE " + AccountEntry.TABLE_NAME
                 + " ADD COLUMN " + AccountEntry.COLUMN_FAVORITE + " tinyint default 0";
         db.execSQL(addAccountFavorite);
 
-        oldVersion = 5;
-        return oldVersion;
+        return newVersion;
     }
 
     /**
@@ -346,6 +353,8 @@ public class MigrationHelper {
      */
     static int upgradeDbToVersion6(SQLiteDatabase db) {
         int oldVersion = 5;
+        int newVersion = 6;
+        Log.i(LOG_TAG, String.format("upgradeDbToVersion from %d to %d.", oldVersion, newVersion));
         String addFullAccountNameQuery = " ALTER TABLE " + AccountEntry.TABLE_NAME
                 + " ADD COLUMN " + AccountEntry.COLUMN_FULL_NAME + " varchar(255) ";
         db.execSQL(addFullAccountNameQuery);
@@ -373,8 +382,7 @@ public class MigrationHelper {
             cursor.close();
         }
 
-        oldVersion = 6;
-        return oldVersion;
+        return newVersion;
     }
 
 
@@ -391,6 +399,8 @@ public class MigrationHelper {
      */
     static int upgradeDbToVersion7(SQLiteDatabase db) {
         int oldVersion = 6;
+        int newVersion = 7;
+        Log.i(LOG_TAG, String.format("upgradeDbToVersion from %d to %d.", oldVersion, newVersion));
         db.beginTransaction();
         try {
             // backup transaction table
@@ -476,11 +486,10 @@ public class MigrationHelper {
             // drop backup transaction table
             db.execSQL("DROP TABLE " + TransactionEntry.TABLE_NAME + "_bak");
             db.setTransactionSuccessful();
-            oldVersion = 7;
         } finally {
             db.endTransaction();
         }
-        return oldVersion;
+        return newVersion;
     }
 
     /**
@@ -499,8 +508,9 @@ public class MigrationHelper {
      * @return New database version (8) if upgrade successful, old version (7) if unsuccessful
      */
     static int upgradeDbToVersion8(SQLiteDatabase db) {
-        Log.i(DatabaseHelper.LOG_TAG, "Upgrading database to version 8");
         int oldVersion = 7;
+        int newVersion = 8;
+        Log.i(LOG_TAG, String.format("upgradeDbToVersion from %d to %d.", oldVersion, newVersion));
         new File(Exporter.LEGACY_BASE_FOLDER_PATH + "/backups/").mkdirs();
         new File(Exporter.LEGACY_BASE_FOLDER_PATH + "/exports/").mkdirs();
         //start moving the files in background thread before we do the database stuff
@@ -508,7 +518,6 @@ public class MigrationHelper {
 
         db.beginTransaction();
         try {
-
             Log.i(DatabaseHelper.LOG_TAG, "Creating scheduled actions table");
             db.execSQL("CREATE TABLE " + ScheduledActionEntry.TABLE_NAME + " ("
                     + ScheduledActionEntry._ID + " integer primary key autoincrement, "
@@ -747,7 +756,8 @@ public class MigrationHelper {
                 //cancel existing pending intent
                 Context context = GnuCashApplication.getAppContext();
                 PendingIntent recurringPendingIntent = PendingIntent.getBroadcast(context,
-                        (int) transactionId, intent, PendingIntent.FLAG_CANCEL_CURRENT | PendingIntent.FLAG_MUTABLE);
+                        (int) transactionId, intent,
+                        PendingIntent.FLAG_NO_CREATE | PendingIntent.FLAG_CANCEL_CURRENT | PendingIntent.FLAG_MUTABLE);
                 AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
                 alarmManager.cancel(recurringPendingIntent);
             }
@@ -779,15 +789,14 @@ public class MigrationHelper {
             try {
                 while (cursor.moveToNext()) {
                     double imbalance = cursor.getDouble(cursor.getColumnIndexOrThrow("trans_acct_balance"));
-                    BigDecimal decimalImbalance = BigDecimal.valueOf(imbalance).setScale(2, BigDecimal.ROUND_HALF_UP);
+                    BigDecimal decimalImbalance = BigDecimal.valueOf(imbalance).setScale(2, RoundingMode.HALF_UP);
                     if (decimalImbalance.compareTo(BigDecimal.ZERO) != 0) {
                         String currencyCode = cursor.getString(cursor.getColumnIndexOrThrow("trans_currency"));
                         String imbalanceAccountName = GnuCashApplication.getAppContext().getString(R.string.imbalance_account_name) + "-" + currencyCode;
                         String imbalanceAccountUID;
-                        Cursor c = db.query(AccountEntry.TABLE_NAME, new String[]{AccountEntry.COLUMN_UID},
+                        try (Cursor c = db.query(AccountEntry.TABLE_NAME, new String[]{AccountEntry.COLUMN_UID},
                                 AccountEntry.COLUMN_FULL_NAME + "= ?", new String[]{imbalanceAccountName},
-                                null, null, null);
-                        try {
+                                null, null, null)) {
                             if (c.moveToFirst()) {
                                 imbalanceAccountUID = c.getString(c.getColumnIndexOrThrow(AccountEntry.COLUMN_UID));
                             } else {
@@ -807,8 +816,6 @@ public class MigrationHelper {
                                 contentValues.putNull(AccountEntry.COLUMN_DEFAULT_TRANSFER_ACCOUNT_UID);
                                 db.insert(AccountEntry.TABLE_NAME, null, contentValues);
                             }
-                        } finally {
-                            c.close();
                         }
                         String TransactionUID = cursor.getString(cursor.getColumnIndexOrThrow("trans_uid"));
                         contentValues.clear();
@@ -836,14 +843,13 @@ public class MigrationHelper {
             db.execSQL("DROP TABLE " + TransactionEntry.TABLE_NAME + "_bak");
 
             db.setTransactionSuccessful();
-            oldVersion = 8;
         } finally {
             db.endTransaction();
         }
 
         GnuCashApplication.startScheduledActionExecutionService(GnuCashApplication.getAppContext());
 
-        return oldVersion;
+        return newVersion;
     }
 
     /**
@@ -862,8 +868,9 @@ public class MigrationHelper {
      * @throws RuntimeException if the default commodities could not be imported
      */
     static int upgradeDbToVersion9(SQLiteDatabase db) {
-        Log.i(DatabaseHelper.LOG_TAG, "Upgrading database to version 9");
         int oldVersion = 8;
+        int newVersion = 9;
+        Log.i(LOG_TAG, String.format("upgradeDbToVersion from %d to %d.", oldVersion, newVersion));
 
         db.beginTransaction();
         try {
@@ -1077,11 +1084,10 @@ public class MigrationHelper {
             db.execSQL("DROP TABLE " + SplitEntry.TABLE_NAME + "_bak");
 
             db.setTransactionSuccessful();
-            oldVersion = 9;
         } finally {
             db.endTransaction();
         }
-        return oldVersion;
+        return newVersion;
     }
 
     /**
@@ -1093,8 +1099,9 @@ public class MigrationHelper {
      * @return 10 if upgrade was successful, 9 otherwise
      */
     static int upgradeDbToVersion10(SQLiteDatabase db) {
-        Log.i(DatabaseHelper.LOG_TAG, "Upgrading database to version 9");
         int oldVersion = 9;
+        int newVersion = 10;
+        Log.i(LOG_TAG, String.format("upgradeDbToVersion from %d to %d.", oldVersion, newVersion));
 
         db.beginTransaction();
         try {
@@ -1130,11 +1137,10 @@ public class MigrationHelper {
             cursor.close();
 
             db.setTransactionSuccessful();
-            oldVersion = 10;
         } finally {
             db.endTransaction();
         }
-        return oldVersion;
+        return newVersion;
     }
 
     /**
@@ -1147,8 +1153,9 @@ public class MigrationHelper {
      * @return 11 if upgrade was successful, 10 otherwise
      */
     static int upgradeDbToVersion11(SQLiteDatabase db) {
-        Log.i(DatabaseHelper.LOG_TAG, "Upgrading database to version 9");
         int oldVersion = 10;
+        int newVersion = 11;
+        Log.i(LOG_TAG, String.format("upgradeDbToVersion from %d to %d.", oldVersion, newVersion));
 
         db.beginTransaction();
         try {
@@ -1182,11 +1189,10 @@ public class MigrationHelper {
             }
 
             db.setTransactionSuccessful();
-            oldVersion = 11;
         } finally {
             db.endTransaction();
         }
-        return oldVersion;
+        return newVersion;
     }
 
     public static Timestamp subtractTimeZoneOffset(Timestamp timestamp, TimeZone timeZone) {
@@ -1206,25 +1212,21 @@ public class MigrationHelper {
      * @return 12 if upgrade was successful, 11 otherwise
      */
     static int upgradeDbToVersion12(SQLiteDatabase db) {
-        Log.i(MigrationHelper.LOG_TAG, "Upgrading database to version 12");
-
         int oldVersion = 11;
+        int newVersion = 12;
+        Log.i(LOG_TAG, String.format("upgradeDbToVersion from %d to %d.", oldVersion, newVersion));
 
         try {
-
             final Timestamp currentLastExportTime = PreferencesHelper.getLastExportTime();
 
             final Timestamp updatedLastExportTime = subtractTimeZoneOffset(
                     currentLastExportTime, TimeZone.getDefault());
             PreferencesHelper.setLastExportTime(updatedLastExportTime);
-
-            oldVersion = 12;
-
         } catch (Exception ignored) {
             // Do nothing: here oldVersion = 11.
         }
 
-        return oldVersion;
+        return newVersion;
     }
 
     /**
@@ -1245,8 +1247,9 @@ public class MigrationHelper {
      * @return New database version, 13 if migration succeeds, 11 otherwise
      */
     static int upgradeDbToVersion13(SQLiteDatabase db) {
-        Log.i(DatabaseHelper.LOG_TAG, "Upgrading database to version 13");
         int oldVersion = 12;
+        int newVersion = 13;
+        Log.i(LOG_TAG, String.format("upgradeDbToVersion from %d to %d.", oldVersion, newVersion));
 
         db.beginTransaction();
         try {
@@ -1475,7 +1478,7 @@ public class MigrationHelper {
         rescheduleServiceAlarm();
 
 
-        return oldVersion;
+        return newVersion;
     }
 
     /**
@@ -1558,36 +1561,34 @@ public class MigrationHelper {
      * @return New database version
      */
     public static int upgradeDbToVersion14(SQLiteDatabase db) {
-        Log.i(DatabaseHelper.LOG_TAG, "Upgrading database to version 14");
-        int oldDbVersion = 13;
+        int oldVersion = 13;
+        int newVersion = 14;
+        Log.i(LOG_TAG, String.format("upgradeDbToVersion from %d to %d.", oldVersion, newVersion));
         File backupFolder = new File(Exporter.BASE_FOLDER_PATH);
         backupFolder.mkdir();
 
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                File srcDir = new File(Exporter.LEGACY_BASE_FOLDER_PATH);
-                File dstDir = new File(Exporter.BASE_FOLDER_PATH);
-                try {
-                    moveDirectory(srcDir, dstDir);
-                    File readmeFile = new File(Exporter.LEGACY_BASE_FOLDER_PATH, "README.txt");
-                    FileWriter writer = null;
-                    writer = new FileWriter(readmeFile);
+        new Thread(() -> {
+            File srcDir = new File(Exporter.LEGACY_BASE_FOLDER_PATH);
+            File dstDir = new File(Exporter.BASE_FOLDER_PATH);
+            try {
+                moveDirectory(srcDir, dstDir);
+                File readmeFile = new File(Exporter.LEGACY_BASE_FOLDER_PATH, "README.txt");
+                try(FileWriter writer = new FileWriter(readmeFile)) {
                     writer.write("Backup files have been moved to " + dstDir.getPath() +
                             "\nYou can now delete this folder");
                     writer.flush();
-                } catch (IOException | IllegalArgumentException ex) {
-                    ex.printStackTrace();
-                    String msg = String.format("Error moving files from %s to %s", srcDir.getPath(), dstDir.getPath());
-                    Log.e(LOG_TAG, msg);
-                    FirebaseCrashlytics.getInstance().log(msg);
-                    FirebaseCrashlytics.getInstance().recordException(ex);
                 }
-
+            } catch (IOException | IllegalArgumentException ex) {
+                ex.printStackTrace();
+                String msg = String.format("Error moving files from %s to %s", srcDir.getPath(), dstDir.getPath());
+                Log.e(LOG_TAG, msg);
+                FirebaseCrashlytics.getInstance().log(msg);
+                FirebaseCrashlytics.getInstance().recordException(ex);
             }
+
         }).start();
 
-        return 14;
+        return newVersion;
     }
 
     /**
@@ -1603,8 +1604,9 @@ public class MigrationHelper {
      * @return New database version, 14 if migration succeeds, 13 otherwise
      */
     static int upgradeDbToVersion15(SQLiteDatabase db) {
-        Log.i(DatabaseHelper.LOG_TAG, "Upgrading database to version 15");
-        int dbVersion = 14;
+        int oldVersion = 14;
+        int newVersion = 15;
+        Log.i(LOG_TAG, String.format("upgradeDbToVersion from %d to %d.", oldVersion, newVersion));
 
         db.beginTransaction();
         try {
@@ -1618,7 +1620,6 @@ public class MigrationHelper {
                             + "             FROM " + AccountEntry.TABLE_NAME + ")",
                     null);
             db.setTransactionSuccessful();
-            dbVersion = 15;
         } finally {
             db.endTransaction();
         }
@@ -1626,13 +1627,13 @@ public class MigrationHelper {
         //remove previously saved export destination index because the number of destinations has changed
         //an invalid value would lead to crash on start
         Context context = GnuCashApplication.getAppContext();
-        android.preference.PreferenceManager.getDefaultSharedPreferences(context)
+        PreferenceManager.getDefaultSharedPreferences(context)
                 .edit()
                 .remove(context.getString(R.string.key_last_export_destination))
                 .apply();
 
         //the default interval has been changed from daily to hourly with this release. So reschedule alarm
         rescheduleServiceAlarm();
-        return dbVersion;
+        return newVersion;
     }
 }
