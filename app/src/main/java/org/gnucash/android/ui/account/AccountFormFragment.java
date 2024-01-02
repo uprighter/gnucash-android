@@ -261,14 +261,14 @@ public class AccountFormFragment extends Fragment {
         mNameEditText = mBinding.inputAccountName;
         mTextInputLayout = mBinding.nameTextInputLayout;
         mCurrencySpinner = mBinding.inputCurrencySpinner;
-         mParentAccountSpinner = mBinding.inputParentAccount;
-         mParentCheckBox = mBinding.checkboxParentAccount;
-         mAccountTypeSpinner = mBinding.inputAccountTypeSpinner;
-         mDefaultTransferAccountCheckBox = mBinding.checkboxDefaultTransferAccount;
-         mDefaultTransferAccountSpinner = mBinding.inputDefaultTransferAccount;
-         mDescriptionEditText = mBinding.inputAccountDescription;
-         mPlaceholderCheckBox = mBinding.checkboxPlaceholderAccount;
-         mColorSquare = mBinding.inputColorPicker;
+        mParentAccountSpinner = mBinding.inputParentAccount;
+        mParentCheckBox = mBinding.checkboxParentAccount;
+        mAccountTypeSpinner = mBinding.inputAccountTypeSpinner;
+        mDefaultTransferAccountCheckBox = mBinding.checkboxDefaultTransferAccount;
+        mDefaultTransferAccountSpinner = mBinding.inputDefaultTransferAccount;
+        mDescriptionEditText = mBinding.inputAccountDescription;
+        mPlaceholderCheckBox = mBinding.checkboxPlaceholderAccount;
+        mColorSquare = mBinding.inputColorPicker;
 
         mNameEditText.addTextChangedListener(new TextWatcher() {
             @Override
@@ -367,8 +367,9 @@ public class AccountFormFragment extends Fragment {
      * @param account Account whose fields are used to populate the form
      */
     private void initializeViewsWithAccount(Account account) {
-        if (account == null)
+        if (account == null) {
             throw new IllegalArgumentException("Account cannot be null");
+        }
 
         loadParentAccountList(account.getAccountType());
         mParentAccountUID = account.getParentUID();
@@ -433,7 +434,6 @@ public class AccountFormFragment extends Fragment {
             loadParentAccountList(parentAccountType);
             setParentAccountSelection(mAccountsDbAdapter.getID(mParentAccountUID));
         }
-
     }
 
     /**
@@ -562,12 +562,12 @@ public class AccountFormFragment extends Fragment {
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         if (item.getItemId() == R.id.menu_save) {
-                saveAccount();
-                return true;
-            } else if (item.getItemId() == android.R.id.home) {
-                finishFragment();
-                return true;
-            }
+            saveAccount();
+            return true;
+        } else if (item.getItemId() == android.R.id.home) {
+            finishFragment();
+            return true;
+        }
 
         return super.onOptionsItemSelected(item);
     }
@@ -731,10 +731,10 @@ public class AccountFormFragment extends Fragment {
      */
     private void saveAccount() {
         Log.i("AccountFormFragment", "Saving account");
-        if (mAccountsDbAdapter == null)
+        if (mAccountsDbAdapter == null) {
             mAccountsDbAdapter = AccountsDbAdapter.getInstance();
+        }
         // accounts to update, in case we're updating full names of a sub account tree
-        ArrayList<Account> accountsToUpdate = new ArrayList<>();
         boolean nameChanged = false;
         if (mAccount == null) {
             String name = getEnteredName();
@@ -766,7 +766,6 @@ public class AccountFormFragment extends Fragment {
         if (mParentCheckBox.isChecked()) {
             newParentAccountId = mParentAccountSpinner.getSelectedItemId();
             newParentAccountUID = mAccountsDbAdapter.getUID(newParentAccountId);
-            mAccount.setParentUID(newParentAccountUID);
         } else {
             //need to do this explicitly in case user removes parent account
             newParentAccountUID = mRootAccountUID;
@@ -784,6 +783,9 @@ public class AccountFormFragment extends Fragment {
         }
 
         long parentAccountId = mParentAccountUID == null ? -1 : mAccountsDbAdapter.getID(mParentAccountUID);
+
+        ArrayList<Account> accountsToUpdate = new ArrayList<>();
+
         // update full names
         if (nameChanged || mDescendantAccountUIDs == null || newParentAccountId != parentAccountId) {
             // current account name changed or new Account or parent account changed
@@ -805,7 +807,9 @@ public class AccountFormFragment extends Fragment {
                     ));
                 }
                 HashMap<String, Account> mapAccount = new HashMap<>();
-                for (Account acct : accountsToUpdate) mapAccount.put(acct.getUID(), acct);
+                for (Account acct : accountsToUpdate) {
+                    mapAccount.put(acct.getUID(), acct);
+                }
                 for (String uid : mDescendantAccountUIDs) {
                     // mAccountsDbAdapter.getDescendantAccountUIDs() will ensure a parent-child order
                     Account acct = mapAccount.get(uid);

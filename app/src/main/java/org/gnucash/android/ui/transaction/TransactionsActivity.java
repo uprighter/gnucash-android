@@ -449,8 +449,9 @@ public class TransactionsActivity extends BaseDrawerActivity implements
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (resultCode == RESULT_CANCELED)
+        if (resultCode == RESULT_CANCELED) {
             return;
+        }
 
         refresh();
         setupActionBarNavigation();
@@ -460,7 +461,9 @@ public class TransactionsActivity extends BaseDrawerActivity implements
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        mAccountsCursor.close();
+        if (mAccountsCursor != null) {
+            mAccountsCursor.close();
+        }
     }
 
     /**

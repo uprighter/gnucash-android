@@ -206,7 +206,7 @@ public class DeleteAccountDialogFragment extends DialogFragment {
 
             if ((mSubAccountCount > 0) && mMoveAccountsRadioButton.isChecked()) {
                 long targetAccountId = mAccountsDestinationAccountSpinner.getSelectedItemId();
-                AccountsDbAdapter.getInstance().reassignDescendantAccounts(mOriginAccountUID, accountsDbAdapter.getUID(targetAccountId));
+                accountsDbAdapter.reassignDescendantAccounts(mOriginAccountUID, accountsDbAdapter.getUID(targetAccountId));
             }
 
             if (GnuCashApplication.isDoubleEntryEnabled()) { //reassign splits to imbalance

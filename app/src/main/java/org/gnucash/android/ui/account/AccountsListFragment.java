@@ -61,6 +61,7 @@ import org.gnucash.android.db.DatabaseCursorLoader;
 import org.gnucash.android.db.DatabaseSchema;
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.db.adapter.BudgetsDbAdapter;
+import org.gnucash.android.db.adapter.DatabaseAdapter;
 import org.gnucash.android.model.Account;
 import org.gnucash.android.model.Budget;
 import org.gnucash.android.model.Money;
@@ -250,7 +251,7 @@ public class AccountsListFragment extends Fragment implements
     public void tryDeleteAccount(long rowId) {
         Account acc = mAccountsDbAdapter.getRecord(rowId);
         if (acc.getTransactionCount() > 0 || mAccountsDbAdapter.getSubAccountCount(acc.getUID()) > 0) {
-            showConfirmationDialog(rowId);
+            showDeleteConfirmationDialog(rowId);
         } else {
             BackupManager.backupActiveBook();
             // Avoid calling AccountsDbAdapter.deleteRecord(long). See #654
@@ -261,11 +262,30 @@ public class AccountsListFragment extends Fragment implements
     }
 
     /**
+     * Duplicate the account with record ID <code>rowId</code> and all its sub-accounts.
+     * It shows the confirmation dialog if the account has sub-accounts,
+     * else duplicates the account immediately.
+     *
+     * @param rowId The record ID of the account
+     */
+    public void duplicateAccounts(long rowId) {
+        Account acc = mAccountsDbAdapter.getRecord(rowId);
+        if (mAccountsDbAdapter.getSubAccountCount(acc.getUID()) > 0) {
+//            showDeleteConfirmationDialog(rowId);
+        } else {
+            BackupManager.backupActiveBook();
+            Account duplicate = new Account(acc, acc.getName() + " Copy");
+            mAccountsDbAdapter.addRecord(duplicate, DatabaseAdapter.UpdateMethod.insert);
+            refresh();
+        }
+    }
+
+    /**
      * Shows the delete confirmation dialog
      *
      * @param id Record ID of account to be deleted after confirmation
      */
-    public void showConfirmationDialog(long id) {
+    public void showDeleteConfirmationDialog(long id) {
         String accountUID = mAccountsDbAdapter.getUID(id);
         DeleteAccountDialogFragment alertFragment =
                 DeleteAccountDialogFragment.newInstance(accountUID);
@@ -281,9 +301,9 @@ public class AccountsListFragment extends Fragment implements
 
     @Override
     public void onCreateOptionsMenu(@NonNull Menu menu, @NonNull MenuInflater inflater) {
-        if (mParentAccountUID != null)
+        if (mParentAccountUID != null) {
             inflater.inflate(R.menu.sub_account_actions, menu);
-        else {
+        } else {
             inflater.inflate(R.menu.account_actions, menu);
             // Associate searchable configuration with the SearchView
 
@@ -625,7 +645,9 @@ public class AccountsListFragment extends Fragment implements
                 if (item.getItemId() == R.id.context_menu_edit_accounts) {
                     openCreateOrEditActivity(accountId);
                     return true;
-
+                } else if (item.getItemId() == R.id.context_menu_duplicate_accounts) {
+                    duplicateAccounts(accountId);
+                    return true;
                 } else if (item.getItemId() == R.id.context_menu_delete) {
                     tryDeleteAccount(accountId);
                     return true;

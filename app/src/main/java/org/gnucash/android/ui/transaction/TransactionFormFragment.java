@@ -934,8 +934,9 @@ public class TransactionFormFragment extends Fragment implements
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        if (mCursor != null)
+        if (mCursor != null) {
             mCursor.close();
+        }
     }
 
     @Override

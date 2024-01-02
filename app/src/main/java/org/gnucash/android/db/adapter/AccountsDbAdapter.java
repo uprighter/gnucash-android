@@ -887,7 +887,7 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
         ArrayList<String> accountsList = new ArrayList<>();
         ArrayList<String> accountsListLevel = new ArrayList<>();
         accountsListLevel.add(accountUID);
-        for (; ; ) {
+        while (accountsListLevel.size() > 0) {
             Cursor cursor = mDb.query(AccountEntry.TABLE_NAME,
                     new String[]{AccountEntry.COLUMN_UID},
                     AccountEntry.COLUMN_PARENT_ACCOUNT_UID + " IN ( '" + TextUtils.join("' , '", accountsListLevel) + "' )" +
@@ -906,8 +906,6 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
             }
             if (accountsListLevel.size() > 0) {
                 accountsList.addAll(accountsListLevel);
-            } else {
-                break;
             }
         }
         return accountsList;

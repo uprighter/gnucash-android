@@ -373,7 +373,7 @@ public class TransactionsListFragment extends Fragment implements
 
             public ViewHolder(ViewBinding viewBinding) {
                 super(viewBinding.getRoot());
-                Log.d(LOG_TAG, "ViewHolder, viewBinding: " + viewBinding);
+//                Log.d(LOG_TAG, "ViewHolder, viewBinding: " + viewBinding);
 
                 if (mUseCompactView) {
                     CardviewCompactTransactionBinding cardviewBinding = (CardviewCompactTransactionBinding) viewBinding;
