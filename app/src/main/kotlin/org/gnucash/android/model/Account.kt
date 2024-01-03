@@ -139,10 +139,20 @@ class Account : BaseModel {
      * The export flag and the template flag are not copied from the old transaction to the new.
      *
      * @param that    Account to be cloned
-     * @param newName New name
+     * @param newName New name; copy from that if null
+     * @param parentUID parent account uid; copy from that if null
      */
-    constructor(that: Account, newName: String) {
-        setName(newName)
+    constructor(that: Account, newName: String? = null, parentUID: String? = null) {
+        if (newName != null) {
+            setName(newName)
+        } else {
+            this.name = that.name
+        }
+        if (parentUID != null) {
+            setParentUID(parentUID)
+        } else {
+            setParentUID(that.getParentUID())
+        }
         this.fullName = this.name
         this.color = that.color
         this.commodity = that.commodity
@@ -150,7 +160,6 @@ class Account : BaseModel {
         description = that.description
         setHidden(that.isHidden())
         setPlaceHolderFlag(that._isPlaceholderAccount)
-        setParentUID(that.getParentUID())
         setDefaultTransferAccountUID(that.getDefaultTransferAccountUID())
     }
 

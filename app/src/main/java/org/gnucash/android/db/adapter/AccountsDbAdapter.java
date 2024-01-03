@@ -872,6 +872,26 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
     }
 
     /**
+     * Returns the sub-accounts for which the account with ID <code>accoundId</code> is a first level parent
+     *
+     * @param accountUID String Unique ID (GUID) of the account
+     * @return List of sub account IDs
+     */
+    public List<String> getSubAccounts(String accountUID) {
+        String queryCount = String.format("SELECT %s FROM %s WHERE %s = ?",
+                AccountEntry.COLUMN_UID, AccountEntry.TABLE_NAME, AccountEntry.COLUMN_PARENT_ACCOUNT_UID);
+
+        ArrayList<String> subAccountsList = new ArrayList<>();
+        try (Cursor cursor = mDb.rawQuery(queryCount, new String[]{accountUID})) {
+            int columnIndex = cursor.getColumnIndexOrThrow(AccountEntry.COLUMN_UID);
+            while (cursor.moveToNext()) {
+                subAccountsList.add(cursor.getString(columnIndex));
+            }
+        }
+        return subAccountsList;
+    }
+
+    /**
      * Retrieve all descendant accounts of an account
      * Note, in filtering, once an account is filtered out, all its descendants
      * will also be filtered out, even they don't meet the filter where

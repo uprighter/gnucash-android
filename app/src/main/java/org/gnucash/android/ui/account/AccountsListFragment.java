@@ -269,14 +269,24 @@ public class AccountsListFragment extends Fragment implements
      * @param rowId The record ID of the account
      */
     public void duplicateAccounts(long rowId) {
-        Account acc = mAccountsDbAdapter.getRecord(rowId);
-        if (mAccountsDbAdapter.getSubAccountCount(acc.getUID()) > 0) {
-//            showDeleteConfirmationDialog(rowId);
-        } else {
-            BackupManager.backupActiveBook();
-            Account duplicate = new Account(acc, acc.getName() + " Copy");
-            mAccountsDbAdapter.addRecord(duplicate, DatabaseAdapter.UpdateMethod.insert);
-            refresh();
+        BackupManager.backupActiveBook();
+
+        Account account = mAccountsDbAdapter.getRecord(rowId);
+        duplicateAccounts(account, account.getName() + "_2", account.getParentUID());
+
+        refresh();
+    }
+
+    public void duplicateAccounts(Account account, String newName, String parentAccountUID) {
+        Account duplicate = new Account(account, newName, parentAccountUID);
+        mAccountsDbAdapter.addRecord(duplicate, DatabaseAdapter.UpdateMethod.insert);
+        if (mAccountsDbAdapter.getSubAccountCount(account.getUID()) > 0) {
+            // Recursively duplicates its sub-accounts.
+            List<String> subAccountUIDs = mAccountsDbAdapter.getSubAccounts(account.getUID());
+            for (String subAccountUID: subAccountUIDs) {
+                Account subAccount = mAccountsDbAdapter.getRecord(subAccountUID);
+                duplicateAccounts(subAccount, subAccount.getName(), duplicate.getUID());
+            }
         }
     }
 
@@ -619,7 +629,7 @@ public class AccountsListFragment extends Fragment implements
 
             public AccountViewHolder(CardviewAccountBinding cardviewBinding) {
                 super(cardviewBinding.getRoot());
-                Log.d(LOG_TAG, "ViewHolder, CardviewAccountBinding: " + cardviewBinding);
+//                Log.d(LOG_TAG, "ViewHolder, CardviewAccountBinding: " + cardviewBinding);
 
                 accountName = cardviewBinding.listItemTwoLines.primaryText;
                 description = cardviewBinding.listItemTwoLines.secondaryText;
