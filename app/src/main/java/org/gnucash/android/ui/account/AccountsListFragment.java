@@ -43,6 +43,7 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.PopupMenu;
 import androidx.appcompat.widget.SearchView;
@@ -248,7 +249,7 @@ public class AccountsListFragment extends Fragment implements
      *
      * @param rowId The record ID of the account
      */
-    public void tryDeleteAccount(long rowId) {
+    private void tryDeleteAccount(long rowId) {
         Account acc = mAccountsDbAdapter.getRecord(rowId);
         if (acc.getTransactionCount() > 0 || mAccountsDbAdapter.getSubAccountCount(acc.getUID()) > 0) {
             showDeleteConfirmationDialog(rowId);
@@ -268,24 +269,51 @@ public class AccountsListFragment extends Fragment implements
      *
      * @param rowId The record ID of the account
      */
-    public void duplicateAccounts(long rowId) {
+    private void tryDuplicateAccounts(long rowId) {
         BackupManager.backupActiveBook();
-
         Account account = mAccountsDbAdapter.getRecord(rowId);
-        duplicateAccounts(account, account.getName() + "_2", account.getParentUID());
+        if (mAccountsDbAdapter.getSubAccountCount(account.getUID()) > 0) {
+            // Ask for confirmation if it has sub-accounts.
 
+            final String requestKey = "duplicate_account_" + rowId;
+            int titleId = R.string.msg_duplicate_all_accounts_confirmation;
+            new AlertDialog.Builder(getActivity())
+                    .setIcon(R.drawable.abc_ic_menu_copy_mtrl_am_alpha)
+                    .setTitle(titleId)
+                    .setPositiveButton(R.string.btn_save,
+                            (dialog, whichButton) -> {
+                                // Notify listeners.
+                                getParentFragmentManager().setFragmentResult(requestKey, new Bundle());
+                            }
+                    )
+                    .setNegativeButton(R.string.btn_cancel,
+                            (dialog, whichButton) -> dialog.dismiss()
+                    )
+                    .create().show();
+            getParentFragmentManager().setFragmentResultListener(
+                    requestKey, this, (_requestKey, _bundle) -> {
+                        Log.d(LOG_TAG, "duplicateAccounts " + _requestKey + ", " + _bundle);
+                        doDuplicateAccounts(account);
+                    });
+        } else {
+            doDuplicateAccounts(account);
+        }
+    }
+
+    private void doDuplicateAccounts(Account account) {
+        recursivelyDuplicateAccounts(account, account.getName() + "_2", account.getParentUID());
         refresh();
     }
 
-    public void duplicateAccounts(Account account, String newName, String parentAccountUID) {
+    private void recursivelyDuplicateAccounts(Account account, String newName, String parentAccountUID) {
         Account duplicate = new Account(account, newName, parentAccountUID);
         mAccountsDbAdapter.addRecord(duplicate, DatabaseAdapter.UpdateMethod.insert);
         if (mAccountsDbAdapter.getSubAccountCount(account.getUID()) > 0) {
             // Recursively duplicates its sub-accounts.
             List<String> subAccountUIDs = mAccountsDbAdapter.getSubAccounts(account.getUID());
-            for (String subAccountUID: subAccountUIDs) {
+            for (String subAccountUID : subAccountUIDs) {
                 Account subAccount = mAccountsDbAdapter.getRecord(subAccountUID);
-                duplicateAccounts(subAccount, subAccount.getName(), duplicate.getUID());
+                recursivelyDuplicateAccounts(subAccount, subAccount.getName(), duplicate.getUID());
             }
         }
     }
@@ -376,7 +404,7 @@ public class AccountsListFragment extends Fragment implements
      *
      * @param accountId Long record ID of account to be edited. Pass 0 to create a new account.
      */
-    public void openCreateOrEditActivity(long accountId) {
+    private void openCreateOrEditActivity(long accountId) {
         Intent editAccountIntent = new Intent(AccountsListFragment.this.getActivity(), FormActivity.class);
         editAccountIntent.setAction(Intent.ACTION_INSERT_OR_EDIT);
         editAccountIntent.putExtra(UxArgument.SELECTED_ACCOUNT_UID, mAccountsDbAdapter.getUID(accountId));
@@ -512,7 +540,6 @@ public class AccountsListFragment extends Fragment implements
             return cursor;
         }
     }
-
 
     class AccountRecyclerAdapter extends CursorRecyclerAdapter<AccountRecyclerAdapter.AccountViewHolder> {
 
@@ -656,7 +683,7 @@ public class AccountsListFragment extends Fragment implements
                     openCreateOrEditActivity(accountId);
                     return true;
                 } else if (item.getItemId() == R.id.context_menu_duplicate_accounts) {
-                    duplicateAccounts(accountId);
+                    tryDuplicateAccounts(accountId);
                     return true;
                 } else if (item.getItemId() == R.id.context_menu_delete) {
                     tryDeleteAccount(accountId);

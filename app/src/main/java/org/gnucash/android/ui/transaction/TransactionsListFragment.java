@@ -38,6 +38,7 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.PopupMenu;
 import androidx.fragment.app.Fragment;
@@ -68,11 +69,11 @@ import org.gnucash.android.ui.common.UxArgument;
 import org.gnucash.android.ui.homescreen.WidgetConfigurationActivity;
 import org.gnucash.android.ui.settings.PreferenceActivity;
 import org.gnucash.android.ui.transaction.dialog.BulkMoveDialogFragment;
-import org.gnucash.android.ui.transaction.dialog.TransactionsDeleteConfirmationDialogFragment;
 import org.gnucash.android.ui.util.CursorRecyclerAdapter;
 import org.gnucash.android.ui.util.widget.EmptyRecyclerView;
 import org.gnucash.android.util.BackupManager;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -254,6 +255,52 @@ public class TransactionsListFragment extends Fragment implements
         mTransactionRecyclerAdapter.swapCursor(null);
     }
 
+    private boolean handleMenuDeleteTransaction(final long transactionId) {
+        BackupManager.backupActiveBook(); //create backup before deleting anything.
+
+        final String fragmentResultRequestKey = "delete_transaction_" + transactionId;
+        int titleId = R.string.msg_delete_transaction_confirmation;
+        int messageId = transactionId == 0 ? R.string.msg_delete_all_transactions_confirmation : R.string.msg_delete_transaction_confirmation;
+        new AlertDialog.Builder(getActivity())
+                .setIcon(android.R.drawable.ic_delete)
+                .setTitle(titleId).setMessage(messageId)
+                .setPositiveButton(R.string.alert_dialog_ok_delete,
+                        (dialog, whichButton) -> {
+                            // Notify listeners.
+                            getParentFragmentManager().setFragmentResult(fragmentResultRequestKey, new Bundle());
+                        }
+                )
+                .setNegativeButton(R.string.alert_dialog_cancel,
+                        (dialog, whichButton) -> dialog.dismiss()
+                )
+                .create().show();
+
+        getParentFragmentManager().setFragmentResultListener(
+                fragmentResultRequestKey, TransactionsListFragment.this, (_requestKey, _bundle) -> {
+                    Log.d(LOG_TAG, "handleMenuDeleteTransaction " + _requestKey + ", " + _bundle);
+                    if (transactionId == 0) {
+                        List<Transaction> openingBalances = new ArrayList<>();
+                        boolean preserveOpeningBalances = GnuCashApplication.shouldSaveOpeningBalances(false);
+                        if (preserveOpeningBalances) {
+                            openingBalances = AccountsDbAdapter.getInstance().getAllOpeningBalanceTransactions();
+                        }
+
+                        mTransactionsDbAdapter.deleteAllRecords();
+
+                        if (preserveOpeningBalances) {
+                            mTransactionsDbAdapter.bulkAddRecords(openingBalances, DatabaseAdapter.UpdateMethod.insert);
+                        }
+                    } else {
+                        mTransactionsDbAdapter.deleteRecord(transactionId);
+                    }
+
+                    WidgetConfigurationActivity.updateAllWidgets(getActivity());
+                    refresh();
+                });
+
+        return true;
+    }
+
     /**
      * {@link DatabaseCursorLoader} for loading transactions asynchronously from the database
      *
@@ -323,7 +370,6 @@ public class TransactionsListFragment extends Fragment implements
             if (mUseCompactView) {
                 holder.secondaryText.setText(dateText);
             } else {
-
                 List<Split> splits = SplitsDbAdapter.getInstance().getSplitsForTransaction(transactionUID);
                 String text = "";
 
@@ -405,32 +451,10 @@ public class TransactionsListFragment extends Fragment implements
                 });
             }
 
-            private boolean handleMenuDeleteTransaction(final long transactionId) {
-                TransactionsDeleteConfirmationDialogFragment dialog = TransactionsDeleteConfirmationDialogFragment.newInstance(R.string.msg_delete_transaction_confirmation, transactionId);
-
-                getParentFragmentManager().setFragmentResultListener(
-                        dialog.getRequestKey(transactionId), TransactionsListFragment.this, (requestKey, bundle) -> {
-                            Log.d(LOG_TAG, "onFragmentResult " + requestKey + ", " + bundle);
-                            refresh();
-                        });
-                String title = "delete_transaction";
-                dialog.show(getParentFragmentManager(), title);
-
-                return true;
-            }
-
             @Override
             public boolean onMenuItemClick(MenuItem item) {
                 if (item.getItemId() == R.id.context_menu_delete) {
-                    BackupManager.backupActiveBook();
-                    if (transactionId > 0) {
-                        return handleMenuDeleteTransaction(transactionId);
-                    } else {
-                        mTransactionsDbAdapter.deleteRecord(transactionId);
-                        WidgetConfigurationActivity.updateAllWidgets(getActivity());
-                        refresh();
-                        return true;
-                    }
+                    return handleMenuDeleteTransaction(transactionId);
                 } else if (item.getItemId() == R.id.context_menu_duplicate_transaction) {
                     Transaction transaction = mTransactionsDbAdapter.getRecord(transactionId);
                     Transaction duplicate = new Transaction(transaction, true);
