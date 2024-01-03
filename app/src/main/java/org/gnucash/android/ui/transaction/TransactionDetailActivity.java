@@ -124,10 +124,12 @@ public class TransactionDetailActivity extends PasscodeLockActivity {
     private TableRow bindItemSplitAmountInfo(LayoutInflater inflater, Split split) {
         ItemSplitAmountInfoBinding itemSplitAmountInfoBinding = ItemSplitAmountInfoBinding.inflate(inflater, mDetailTableLayout, false);
         TextView accountName = itemSplitAmountInfoBinding.splitAccountName;
+        TextView splitMemo = itemSplitAmountInfoBinding.splitMemo;
         TextView splitDebit = itemSplitAmountInfoBinding.splitDebit;
         TextView splitCredit = itemSplitAmountInfoBinding.splitCredit;
         AccountsDbAdapter accountsDbAdapter = AccountsDbAdapter.getInstance();
         accountName.setText(accountsDbAdapter.getAccountFullName(split.getAccountUID()));
+        splitMemo.setText(split.getMemo());
         Money quantity = split.getFormattedQuantity();
         TextView balanceView = quantity.isNegative() ? splitDebit : splitCredit;
         TransactionsActivity.displayBalance(balanceView, quantity);
@@ -164,7 +166,9 @@ public class TransactionDetailActivity extends PasscodeLockActivity {
         TextView balanceTextView = accountBalance.isNegative() ? mDebitBalance : mCreditBalance;
         TransactionsActivity.displayBalance(balanceTextView, accountBalance);
 
+        // Get the count before adding any split.
         mDetailTableRows = mDetailTableLayout.getChildCount();
+
         boolean useDoubleEntry = GnuCashApplication.isDoubleEntryEnabled();
         LayoutInflater inflater = LayoutInflater.from(this);
         for (Split split : transaction.getSplits()) {
@@ -196,7 +200,6 @@ public class TransactionDetailActivity extends PasscodeLockActivity {
         } else {
             mRowTrnNotes.setVisibility(View.GONE);
         }
-
     }
 
     /**

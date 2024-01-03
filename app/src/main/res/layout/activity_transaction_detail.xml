@@ -96,6 +96,16 @@
                         android:textColor="@android:color/black" />
 
                     <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight=".5"
+                        android:gravity="center_vertical"
+                        android:text="@string/hint_split_memo"
+                        android:textColor="@android:color/darker_gray"
+                        android:textSize="12sp"
+                        android:textStyle="italic" />
+
+                    <TextView
                         android:id="@+id/balance_debit"
                         android:layout_width="0dp"
                         android:layout_weight="1.5"
