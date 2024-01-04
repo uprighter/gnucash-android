@@ -82,8 +82,10 @@ public class BackupManager {
                 new GncXmlExporter(params).generateExport(writer);
                 writer.close();
             } catch (IOException ex) {
-                Log.e(LOG_TAG, "Auto backup failed for book " + bookUID);
-                ex.printStackTrace();
+                Log.e(LOG_TAG, String.format("Auto backup failed for book %s, IOException: ", bookUID), ex);
+                FirebaseCrashlytics.getInstance().recordException(ex);
+            } catch (SecurityException ex) {
+                Log.e(LOG_TAG, String.format("Auto backup failed for book %s, SecurityException: ", bookUID), ex);
                 FirebaseCrashlytics.getInstance().recordException(ex);
             }
         }
