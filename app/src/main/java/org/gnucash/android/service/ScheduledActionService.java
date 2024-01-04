@@ -20,6 +20,7 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteDatabaseLockedException;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -66,7 +67,6 @@ public class ScheduledActionService extends JobIntentService {
 
     private static final String LOG_TAG = ScheduledActionService.class.getName();
     private static final int JOB_ID = 1001;
-
 
     public static void enqueueWork(Context context) {
         Intent intent = new Intent(context, ScheduledActionService.class);
@@ -151,8 +151,21 @@ public class ScheduledActionService extends JobIntentService {
                     scheduledAction.getLastRunTime());
             contentValues.put(DatabaseSchema.ScheduledActionEntry.COLUMN_EXECUTION_COUNT,
                     scheduledAction.getExecutionCount());
-            db.update(DatabaseSchema.ScheduledActionEntry.TABLE_NAME, contentValues,
-                    DatabaseSchema.ScheduledActionEntry.COLUMN_UID + "=?", new String[]{scheduledAction.getUID()});
+            boolean dbUpdated = false;
+            while (!dbUpdated) {
+                try {
+                    db.update(DatabaseSchema.ScheduledActionEntry.TABLE_NAME, contentValues,
+                            DatabaseSchema.ScheduledActionEntry.COLUMN_UID + "=?", new String[]{scheduledAction.getUID()});
+                    dbUpdated = true;
+                } catch (SQLiteDatabaseLockedException e) {
+                    Log.e(LOG_TAG, String.format("executeScheduledEvent store executionCount error: %s", e.getMessage()));
+                }
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    Log.d(LOG_TAG, String.format("executeScheduledEvent interrupted: %s", e.getMessage()));
+                }
+            }
         }
     }
 
@@ -165,8 +178,9 @@ public class ScheduledActionService extends JobIntentService {
      * @return Number of times backup is executed. This should either be 1 or 0
      */
     private static int executeBackup(ScheduledAction scheduledAction, SQLiteDatabase db) {
-        if (!shouldExecuteScheduledBackup(scheduledAction))
+        if (!shouldExecuteScheduledBackup(scheduledAction)) {
             return 0;
+        }
 
         ExportParams params = ExportParams.parseCsv(Objects.requireNonNull(scheduledAction.getTag()));
         // HACK: the tag isn't updated with the new date, so set the correct by hand
@@ -180,7 +194,7 @@ public class ScheduledActionService extends JobIntentService {
             Log.e(LOG_TAG, String.format("Exception: %s", e.getMessage()));
         }
         if (!result) {
-            Log.i(LOG_TAG, "Backup/export did not occur. There might have been no"
+            Log.i(LOG_TAG, "Backup did not occur. There might have been no"
                     + " new transactions to export or it might have crashed");
             // We don't know if something failed or there weren't transactions to export,
             // so fall on the safe side and return as if something had failed.
@@ -250,8 +264,9 @@ public class ScheduledActionService extends JobIntentService {
             recurringTrxn.setScheduledActionUID(scheduledAction.getUID());
             scheduledAction.setExecutionCount(++executionCount); //required for computingNextScheduledExecutionTime
 
-            if (totalPlannedExecutions > 0 && executionCount >= totalPlannedExecutions)
+            if (totalPlannedExecutions > 0 && executionCount >= totalPlannedExecutions) {
                 break; //if we hit the total planned executions set, then abort
+            }
             transactionTime = scheduledAction.computeNextCountBasedScheduledExecutionTime();
         }
 
