@@ -33,7 +33,7 @@ limitations under the License.
             android:layout_width="48dp"
             android:layout_height="match_parent"
             android:scaleType="center"
-            android:src="@android:mipmap/sym_def_app_icon"
+            android:src="@drawable/icons8_drag_reorder"
             android:visibility="visible"
             tools:ignore="ContentDescription" />
 
