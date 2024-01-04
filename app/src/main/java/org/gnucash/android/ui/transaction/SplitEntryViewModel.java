@@ -10,7 +10,6 @@ import androidx.databinding.library.baseAdapters.BR;
 
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.model.BaseModel;
-import org.gnucash.android.model.Commodity;
 import org.gnucash.android.model.Split;
 import org.gnucash.android.model.TransactionType;
 import org.gnucash.android.ui.util.widget.CalculatorEditText;
@@ -36,26 +35,31 @@ public class SplitEntryViewModel extends BaseObservable {
 
     private final AccountsDbAdapter mAccountsDbAdapter;
     private final SimpleCursorAdapter mCursorAdapter;
+    private final String mDefaultCurrencySymbol;
+    private final Split mSplit;
+
     private CalculatorEditText mSplitAmountEditText;
     private TransactionTypeSwitch mSplitTypeSwitch;
-
     private Object mViewHolder;
-    private final Split mSplit;
 
     public SplitEntryViewModel(AccountsDbAdapter accountsDbAdapter,
                                SimpleCursorAdapter cursorAdapter,
+                               String currencySymbol,
                                Split split) {
         this.mAccountsDbAdapter = accountsDbAdapter;
         this.mCursorAdapter = cursorAdapter;
+        this.mDefaultCurrencySymbol = currencySymbol;
         this.mSplit = split;
     }
 
-    public void init(
+    public void bind(
             CalculatorEditText splitAmountEditText,
-            TransactionTypeSwitch splitTypeSwitch,
-            Commodity commodity) {
+            TransactionTypeSwitch splitTypeSwitch) {
         this.mSplitAmountEditText = splitAmountEditText;
         this.mSplitTypeSwitch = splitTypeSwitch;
+    }
+
+    public void init() {
         if (mSplit != null) {
             setSplitCurrencySymbol(Objects.requireNonNull(Objects.requireNonNull(mSplit.getValue()).getCommodity()).getSymbol());
             setSplitUid(mSplit.getUID());
@@ -69,7 +73,7 @@ public class SplitEntryViewModel extends BaseObservable {
             setInputSplitMemo(mSplit.getMemo());
             setInputSplitAmount(mSplit.getValue().asBigDecimal());
         } else {
-            setSplitCurrencySymbol(commodity.getSymbol());
+            setSplitCurrencySymbol(mDefaultCurrencySymbol);
             setSplitUid(BaseModel.generateUID());
 
             // requestFocus for newly added split.
@@ -143,6 +147,7 @@ public class SplitEntryViewModel extends BaseObservable {
         mSplitTypeSwitch.setChecked(transactionType);
         setSplitTypeChecked(mSplitTypeSwitch.isChecked());
     }
+
     public void setSplitTypeChecked(boolean splitTypeChecked) {
         if (this.splitTypeChecked != splitTypeChecked) {
             this.splitTypeChecked = splitTypeChecked;

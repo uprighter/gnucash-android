@@ -272,7 +272,8 @@ public class SplitEditorFragment extends Fragment {
      * @param split Split to initialize the contents to
      */
     private void addSplitView(Split split) {
-        SplitEntryViewModel viewModel = new SplitEntryViewModel(mAccountsDbAdapter, mCursorAdapter, split);
+        SplitEntryViewModel viewModel = new SplitEntryViewModel(
+                mAccountsDbAdapter, mCursorAdapter, mCommodity.getSymbol(), split);
         mSplitEntryViewModelList.add(0, viewModel);
         mRecyclerViewAdaptor.notifyItemInserted(0);
         mRecyclerView.scrollToPosition(0);
@@ -299,8 +300,8 @@ public class SplitEditorFragment extends Fragment {
             Log.d(LOG_TAG, "onBindViewHolder viewModel: " + mSplitEntryViewModelList.get(position));
 
             SplitEntryViewModel viewModel = mSplitEntryViewModelList.get(position);
-            splitEntryViewHolder.setListeners(viewModel);
-            splitEntryViewHolder.bind();
+            splitEntryViewHolder.bind(viewModel);
+            splitEntryViewHolder.init();
         }
 
         @Override
@@ -330,12 +331,9 @@ public class SplitEditorFragment extends Fragment {
 
         public SplitEntryViewModel getViewModel() { return mViewModel; }
 
-        public void setListeners(SplitEntryViewModel viewModel) {
+        public void bind(SplitEntryViewModel viewModel) {
             this.mViewModel = viewModel;
             Log.d(LOG_TAG, "SplitEntryViewHolder.setListeners: this = " + this + ", mViewModel = " + mViewModel);
-
-            mViewBinding.setSplitEntryViewModel(mViewModel);
-            mViewModel.setViewHolder(this);
 
             ImageButton dragButton = mViewBinding.dragButton;
             splitAmountEditText = mViewBinding.inputSplitAmount;
@@ -346,6 +344,12 @@ public class SplitEditorFragment extends Fragment {
             ImageButton copyImbalanceButton = mViewBinding.copyImbalanceButton;
             ImageButton copyAboveButton = mViewBinding.copyAboveButton;
             ImageButton copyBelowButton = mViewBinding.copyBelowButton;
+
+            mViewBinding.setSplitEntryViewModel(mViewModel);
+            mViewModel.setViewHolder(this);
+            // Call ViewModel.bind first to assign widgets. This should be part of the constructor,
+            // but by that time, these widgets are not inflated yet.
+            mViewModel.bind(splitAmountEditText, splitTypeSwitch);
 
             dragButton.setOnClickListener((View view) -> {
                 // Hide the calculator keyboard to drag item up or down more easily.
@@ -414,10 +418,10 @@ public class SplitEditorFragment extends Fragment {
             });
         }
 
-        public void bind() {
+        public void init() {
             // executePendingBindings first, so that any changes in ViewModel could trigger event listeners.
             mViewBinding.executePendingBindings();
-            mViewModel.init(splitAmountEditText, splitTypeSwitch, mCommodity);
+            mViewModel.init();
         }
 
         @Override
