@@ -16,9 +16,7 @@
 
 package org.gnucash.android.ui.settings;
 
-import android.app.Activity;
 import android.app.AlertDialog;
-import android.content.Intent;
 import android.database.Cursor;
 import android.os.Bundle;
 import android.util.Log;
@@ -65,15 +63,20 @@ public class AccountPreferencesFragment extends PreferenceFragmentCompat impleme
     List<CharSequence> mCurrencyEntries = new ArrayList<>();
     List<CharSequence> mCurrencyEntryValues = new ArrayList<>();
 
-    private final ActivityResultLauncher<Intent> createIntentLauncher = registerForActivityResult(
-            new ActivityResultContracts.StartActivityForResult(),
-            result -> {
-                Log.d(LOG_TAG, "launch intent: result = " + result);
-                if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
-                    Intent data = result.getData();
+    private final ActivityResultLauncher<String> mImportAccountsFromXmlFile = registerForActivityResult(
+            new ActivityResultContracts.GetContent(),
+            uri -> {
+                Log.d(LOG_TAG, String.format("GetContent returns %s.", uri));
+                AccountsActivity.importXmlFileFromIntent(getActivity(), uri, null);
+            });
+
+    private final ActivityResultLauncher<String> mExportToXmlFile = registerForActivityResult(
+            new ActivityResultContracts.CreateDocument("application/text"),
+            uri -> {
+                Log.d(LOG_TAG, String.format("CreateDocument returns %s.", uri));
                     ExportParams exportParams = new ExportParams(ExportFormat.CSVA);
                     exportParams.setExportTarget(ExportParams.ExportTarget.URI);
-                    exportParams.setExportLocation(data.getData().toString());
+                    exportParams.setExportLocation(uri.toString());
                     ExportAsyncTask exportTask = new ExportAsyncTask(getActivity(), GnuCashApplication.getActiveDb(), exportParams);
 
                     try {
@@ -83,15 +86,6 @@ public class AccountPreferencesFragment extends PreferenceFragmentCompat impleme
                         Toast.makeText(getActivity(), "An error occurred during the Accounts export",
                                 Toast.LENGTH_LONG).show();
                     }
-                }
-            }
-    );
-
-    private final ActivityResultLauncher<String> mGetContent = registerForActivityResult(
-            new ActivityResultContracts.GetContent(),
-            uri -> {
-                Log.d(LOG_TAG, String.format("mGetContent returns %s.", uri));
-                    AccountsActivity.importXmlFileFromIntent(getActivity(), uri, null);
             });
 
     @Override
@@ -163,30 +157,16 @@ public class AccountPreferencesFragment extends PreferenceFragmentCompat impleme
         String key = preference.getKey();
 
         if (key.equals(getString(R.string.key_import_accounts))) {
-            mGetContent.launch("*/*");
+            mImportAccountsFromXmlFile.launch("*/*");
             return true;
-        }
-        if (key.equals(getString(R.string.key_export_accounts_csv))) {
-            selectExportFile();
+        } else if (key.equals(getString(R.string.key_export_accounts_csv))) {
+            String bookName = BooksDbAdapter.getInstance().getActiveBookDisplayName();
+            String suggestedFilename = Exporter.buildExportFilename(ExportFormat.CSVA, bookName);
+            mExportToXmlFile.launch(suggestedFilename);
             return true;
         }
 
         return false;
-    }
-
-    /**
-     * Open a chooser for user to pick a file to export to
-     */
-    private void selectExportFile() {
-        Intent createIntent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
-        createIntent.setType("*/*").addCategory(Intent.CATEGORY_OPENABLE);
-        String bookName = BooksDbAdapter.getInstance().getActiveBookDisplayName();
-
-        String filename = Exporter.buildExportFilename(ExportFormat.CSVA, bookName);
-        createIntent.setType("application/text");
-
-        createIntent.putExtra(Intent.EXTRA_TITLE, filename);
-        createIntentLauncher.launch(createIntent);
     }
 
     @Override
