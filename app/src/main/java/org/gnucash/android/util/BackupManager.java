@@ -130,8 +130,11 @@ public class BackupManager {
         } catch (IOException | Exporter.ExporterException e) {
             FirebaseCrashlytics.getInstance().recordException(e);
             Log.e(LOG_TAG, "Error creating XML backup", e);
-            return false;
+        } catch (SecurityException ex) {
+            Log.e(LOG_TAG, String.format("Auto backup failed for book %s, SecurityException: ", bookUID), ex);
+            FirebaseCrashlytics.getInstance().recordException(ex);
         }
+        return false;
     }
 
     /**
