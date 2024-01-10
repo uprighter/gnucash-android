@@ -248,14 +248,14 @@ public class SplitEditorFragment extends Fragment {
                 requireActivity().finish();
             }
             return true;
-        } else if (item.getItemId() == R.id.menu_save){
+        } else if (item.getItemId() == R.id.menu_save) {
             saveSplits();
             return true;
-        } else if (item.getItemId() == R.id.menu_add_split){
+        } else if (item.getItemId() == R.id.menu_add_split) {
             addSplitView(null);
             return true;
         } else {
-                return super.onOptionsItemSelected(item);
+            return super.onOptionsItemSelected(item);
         }
     }
 
@@ -329,7 +329,9 @@ public class SplitEditorFragment extends Fragment {
             this.mViewBinding = binding;
         }
 
-        public SplitEntryViewModel getViewModel() { return mViewModel; }
+        public SplitEntryViewModel getViewModel() {
+            return mViewModel;
+        }
 
         public void bind(SplitEntryViewModel viewModel) {
             this.mViewModel = viewModel;
@@ -468,10 +470,17 @@ public class SplitEditorFragment extends Fragment {
      */
     private boolean canSave() {
         for (SplitEntryViewModel viewModel : mSplitEntryViewModelList) {
-            if (viewModel.getInputSplitAmount() == null) {
+            SplitEntryViewHolder viewHolder = (SplitEntryViewHolder) viewModel.getViewHolder();
+            if (viewHolder != null && viewHolder.splitAmountEditText.getValue() == null) {
+                Log.d(LOG_TAG, String.format("canSave returns false, splitAmountEditText has invalid value: %s", viewHolder.splitAmountEditText.getText()));
+                // split amount input is invalid.
                 return false;
             }
             //TODO: also check that multi-currency splits have a conversion amount present
+        }
+        if (mImbalance.equals(BigDecimal.ZERO)) {
+            Log.d(LOG_TAG, String.format("canSave returns false, mImbalance=%s", mImbalance));
+            return false;
         }
         return true;
     }
