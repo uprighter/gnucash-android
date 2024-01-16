@@ -407,21 +407,13 @@ public class ScheduledActionsListFragment extends ListFragment implements
         @Override
         public View getView(int position, View convertView, ViewGroup parent) {
             final View view = super.getView(position, convertView, parent);
-            final int itemPosition = position;
-            CheckBox checkbox = view.findViewById(R.id.checkbox);
-
-            checkbox.setOnCheckedChangeListener((buttonView, isChecked) -> {
-                getListView().setItemChecked(itemPosition, isChecked);
-                if (isChecked) {
-                    startActionMode();
-                } else {
-                    stopActionMode();
-                }
-                setActionModeTitle();
-            });
+            final CheckBox checkBox = view.findViewById(R.id.checkbox);
 
             final TextView secondaryText = view.findViewById(R.id.secondary_text);
             ListView listView = (ListView) parent;
+            Log.d(LOG_TAG, String.format("position=%d, checked=%b, getChecked=%b", position,
+                    checkBox.isChecked(), listView.isItemChecked(position)));
+            listView.setItemChecked(position, checkBox.isChecked());
             if (mInEditMode && listView.isItemChecked(position)) {
                 view.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.abs__holo_blue_light));
                 secondaryText.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.white));
@@ -429,20 +421,19 @@ public class ScheduledActionsListFragment extends ListFragment implements
                 view.setBackgroundColor(ContextCompat.getColor(requireContext(), android.R.color.transparent));
                 secondaryText.setTextColor(ContextCompat.getColor(requireContext(),
                         android.R.color.holo_green_light));
-                checkbox.setChecked(false);
+                checkBox.setChecked(false);
             }
 
-            final View checkBoxView = checkbox;
             view.post(() -> {
                 if (isAdded()) { //may be run when fragment has been unbound from activity
                     float extraPadding = getResources().getDimension(R.dimen.edge_padding);
                     final Rect hitRect = new Rect();
-                    checkBoxView.getHitRect(hitRect);
+                    checkBox.getHitRect(hitRect);
                     hitRect.right += extraPadding;
                     hitRect.bottom += 3 * extraPadding;
                     hitRect.top -= extraPadding;
                     hitRect.left -= 2 * extraPadding;
-                    view.setTouchDelegate(new TouchDelegate(hitRect, checkBoxView));
+                    view.setTouchDelegate(new TouchDelegate(hitRect, checkBox));
                 }
             });
 
@@ -453,6 +444,19 @@ public class ScheduledActionsListFragment extends ListFragment implements
         @Override
         public void bindView(View view, Context context, Cursor cursor) {
             super.bindView(view, context, cursor);
+
+            final int itemPosition = cursor.getPosition();
+            final CheckBox checkbox = view.findViewById(R.id.checkbox);
+            checkbox.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                Log.d(LOG_TAG, String.format("itemPosition=%d, checked=%b", itemPosition, checkbox.isChecked()));
+                getListView().setItemChecked(itemPosition, isChecked);
+                if (isChecked) {
+                    startActionMode();
+                } else {
+                    stopActionMode();
+                }
+                setActionModeTitle();
+            });
 
             Transaction transaction = mTransactionsDbAdapter.buildModelInstance(cursor);
 
@@ -498,20 +502,11 @@ public class ScheduledActionsListFragment extends ListFragment implements
         public View getView(int position, View convertView, ViewGroup parent) {
             final View view = super.getView(position, convertView, parent);
             final int itemPosition = position;
-            CheckBox checkbox = view.findViewById(R.id.checkbox);
-
-            checkbox.setOnCheckedChangeListener((buttonView, isChecked) -> {
-                getListView().setItemChecked(itemPosition, isChecked);
-                if (isChecked) {
-                    startActionMode();
-                } else {
-                    stopActionMode();
-                }
-                setActionModeTitle();
-            });
+            final CheckBox checkBox = view.findViewById(R.id.checkbox);
 
             final TextView secondaryText = view.findViewById(R.id.secondary_text);
             ListView listView = (ListView) parent;
+            listView.setItemChecked(position, checkBox.isChecked());
             if (mInEditMode && listView.isItemChecked(position)) {
                 view.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.abs__holo_blue_light));
                 secondaryText.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.white));
@@ -519,20 +514,19 @@ public class ScheduledActionsListFragment extends ListFragment implements
                 view.setBackgroundColor(ContextCompat.getColor(requireContext(), android.R.color.transparent));
                 secondaryText.setTextColor(
                         ContextCompat.getColor(requireContext(), android.R.color.holo_green_light));
-                checkbox.setChecked(false);
+                checkBox.setChecked(false);
             }
 
-            final View checkBoxView = checkbox;
             view.post(() -> {
                 if (isAdded()) { //may be run when fragment has been unbound from activity
                     float extraPadding = getResources().getDimension(R.dimen.edge_padding);
                     final Rect hitRect = new Rect();
-                    checkBoxView.getHitRect(hitRect);
+                    checkBox.getHitRect(hitRect);
                     hitRect.right += extraPadding;
                     hitRect.bottom += 3 * extraPadding;
                     hitRect.top -= extraPadding;
                     hitRect.left -= 2 * extraPadding;
-                    view.setTouchDelegate(new TouchDelegate(hitRect, checkBoxView));
+                    view.setTouchDelegate(new TouchDelegate(hitRect, checkBox));
                 }
             });
 
@@ -542,6 +536,20 @@ public class ScheduledActionsListFragment extends ListFragment implements
         @Override
         public void bindView(View view, Context context, Cursor cursor) {
             super.bindView(view, context, cursor);
+
+            final int itemPosition = cursor.getPosition();
+            final CheckBox checkbox = view.findViewById(R.id.checkbox);
+            final CheckBox checkBox = view.findViewById(R.id.checkbox);
+            checkBox.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                getListView().setItemChecked(itemPosition, isChecked);
+                if (isChecked) {
+                    startActionMode();
+                } else {
+                    stopActionMode();
+                }
+                setActionModeTitle();
+            });
+
             ScheduledActionDbAdapter mScheduledActionDbAdapter = ScheduledActionDbAdapter.getInstance();
             ScheduledAction scheduledAction = mScheduledActionDbAdapter.buildModelInstance(cursor);
 

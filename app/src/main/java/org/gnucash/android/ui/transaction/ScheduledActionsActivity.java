@@ -130,7 +130,7 @@ public class ScheduledActionsActivity extends BaseDrawerActivity {
                     return ScheduledActionsListFragment.getInstance(ScheduledAction.ActionType.BACKUP);
                 }
             }
-            Log.e(LOG_TAG, String.format("createFragment for position %d.", position));
+            Log.d(LOG_TAG, String.format("createFragment for position %d.", position));
             return ScheduledActionsListFragment.getInstance(ScheduledAction.ActionType.BACKUP);
         }
 
