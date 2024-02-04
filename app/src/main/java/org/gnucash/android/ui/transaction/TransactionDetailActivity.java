@@ -183,7 +183,7 @@ public class TransactionDetailActivity extends PasscodeLockActivity {
 
 
         Date trnDate = new Date(transaction.getTimeMillis());
-        String timeAndDate = DateFormat.getDateInstance(DateFormat.FULL).format(trnDate);
+        String timeAndDate = DateFormat.getDateTimeInstance(DateFormat.FULL, DateFormat.LONG).format(trnDate);
         mTimeAndDate.setText(timeAndDate);
 
         if (transaction.getScheduledActionUID() != null) {
