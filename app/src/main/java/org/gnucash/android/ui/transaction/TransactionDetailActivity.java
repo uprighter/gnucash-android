@@ -65,7 +65,12 @@ public class TransactionDetailActivity extends PasscodeLockActivity {
     FloatingActionButton mFabEditTransaction;
     private final ActivityResultLauncher<Intent> createTransactionLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
-            result -> Log.d(LOG_TAG, "launch createTransactionIntent: result = " + result)
+            result -> {
+                Log.d(LOG_TAG, "launch createTransactionIntent: result = " + result);
+                if (result.getResultCode() == Activity.RESULT_OK) {
+                    refresh();
+                }
+            }
     );
 
     private String mTransactionUID;
@@ -215,7 +220,7 @@ public class TransactionDetailActivity extends PasscodeLockActivity {
      */
     private void removeSplitItemViews() {
         // Remove all rows that are not special.
-        mDetailTableLayout.removeViews(0, mDetailTableLayout.getChildCount() - mDetailTableRows);
+        mDetailTableLayout.removeViews(mDetailTableRows, mDetailTableLayout.getChildCount() - mDetailTableRows);
         mDebitBalance.setText("");
         mCreditBalance.setText("");
     }
@@ -230,11 +235,12 @@ public class TransactionDetailActivity extends PasscodeLockActivity {
         }
     }
 
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (resultCode == Activity.RESULT_OK) {
-            refresh();
-        }
-    }
+//    @Override
+//    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+//        super.onActivityResult(requestCode, resultCode, data);
+//        Log.d(LOG_TAG, "onActivityResult: resultCode = " + resultCode);
+//        if (resultCode == Activity.RESULT_OK) {
+//            refresh();
+//        }
+//    }
 }
