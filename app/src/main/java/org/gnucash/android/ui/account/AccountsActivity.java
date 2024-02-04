@@ -58,6 +58,7 @@ import org.gnucash.android.databinding.ActivityAccountsBinding;
 import org.gnucash.android.db.DatabaseSchema;
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.db.adapter.BooksDbAdapter;
+import org.gnucash.android.export.Exporter;
 import org.gnucash.android.importer.ImportAsyncTask;
 import org.gnucash.android.ui.common.BaseDrawerActivity;
 import org.gnucash.android.ui.common.FormActivity;
@@ -138,6 +139,26 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
                 Log.d(LOG_TAG, "launch intent: result = " + result);
                 if (result.getResultCode() == Activity.RESULT_CANCELED) {
                     Log.d(LOG_TAG, "intent cancelled.");
+                }
+            }
+    );
+    private final ActivityResultLauncher<Intent> createBackupFileLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                Log.d(LOG_TAG, "launch createBackupFileIntent: result = " + result);
+                if (result.getResultCode() == Activity.RESULT_OK) {
+                    Intent data = result.getData();
+                    if (data == null) {
+                        Log.d(LOG_TAG, "data is null!");
+                        return;
+                    }
+
+                    Uri backupFileUri = data.getData();
+                    if (backupFileUri == null) {
+                        Log.d(LOG_TAG, "backupFileUri is null!");
+                        return;
+                    }
+                    BackupManager.putBookBackupFileUri(getApplicationContext(), null, backupFileUri);
                 }
             }
     );
@@ -309,12 +330,13 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
      * <p>Also handles displaying the What's New dialog</p>
      */
     private void init() {
-        PreferenceManager.setDefaultValues(this, BooksDbAdapter.getInstance().getActiveBookUID(),
+        String bookUID = BooksDbAdapter.getInstance().getActiveBookUID();
+        PreferenceManager.setDefaultValues(this, bookUID,
                 Context.MODE_PRIVATE, R.xml.fragment_transaction_preferences, true);
 
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-        boolean firstRun = prefs.getBoolean(getString(R.string.key_first_run), true);
 
+        boolean firstRun = prefs.getBoolean(getString(R.string.key_first_run), true);
         if (firstRun) {
             startActivity(new Intent(GnuCashApplication.getAppContext(), FirstRunWizardActivity.class));
 
@@ -322,6 +344,13 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
             prefs.edit().putBoolean(getString(R.string.key_use_double_entry), true).apply();
             finish();
             return;
+        }
+
+        // Try to backup. If failed, create the backup file.
+        if (!BackupManager.backupBook(bookUID)) {
+            String bookName = BooksDbAdapter.getInstance().getActiveBookDisplayName();
+            createBackupFileLauncher.launch(BackupManager.createBackupFileIntent(
+                    Exporter.sanitizeFilename(bookName) + "_" + getString(R.string.label_backup_filename)));
         }
 
         if (hasNewFeatures()) {

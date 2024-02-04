@@ -171,11 +171,12 @@ public class TransactionDetailActivity extends PasscodeLockActivity {
         TextView balanceTextView = accountBalance.isNegative() ? mDebitBalance : mCreditBalance;
         TransactionsActivity.displayBalance(balanceTextView, accountBalance);
 
-        // Get the count before adding any split.
+        // Get the special rows count before adding any split.
         mDetailTableRows = mDetailTableLayout.getChildCount();
 
         boolean useDoubleEntry = GnuCashApplication.isDoubleEntryEnabled();
         LayoutInflater inflater = LayoutInflater.from(this);
+        int index = 0;
         for (Split split : transaction.getSplits()) {
             if (!useDoubleEntry &&
                     accountsDbAdapter.getImbalanceAccountUID(Objects.requireNonNull(split.getValue()).getCommodity()).equals(split.getAccountUID())) {
@@ -183,9 +184,8 @@ public class TransactionDetailActivity extends PasscodeLockActivity {
                 continue;
             }
             TableRow row = bindItemSplitAmountInfo(inflater, split);
-            mDetailTableLayout.addView(row);
+            mDetailTableLayout.addView(row, index++);
         }
-
 
         Date trnDate = new Date(transaction.getTimeMillis());
         String timeAndDate = DateFormat.getDateTimeInstance(DateFormat.FULL, DateFormat.LONG).format(trnDate);
@@ -220,7 +220,7 @@ public class TransactionDetailActivity extends PasscodeLockActivity {
      */
     private void removeSplitItemViews() {
         // Remove all rows that are not special.
-        mDetailTableLayout.removeViews(mDetailTableRows, mDetailTableLayout.getChildCount() - mDetailTableRows);
+        mDetailTableLayout.removeViews(0, mDetailTableLayout.getChildCount() - mDetailTableRows);
         mDebitBalance.setText("");
         mCreditBalance.setText("");
     }
@@ -234,13 +234,4 @@ public class TransactionDetailActivity extends PasscodeLockActivity {
             return super.onOptionsItemSelected(item);
         }
     }
-
-//    @Override
-//    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-//        super.onActivityResult(requestCode, resultCode, data);
-//        Log.d(LOG_TAG, "onActivityResult: resultCode = " + resultCode);
-//        if (resultCode == Activity.RESULT_OK) {
-//            refresh();
-//        }
-//    }
 }

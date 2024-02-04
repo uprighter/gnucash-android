@@ -24,6 +24,7 @@ import android.net.Uri;
 import android.os.SystemClock;
 import android.util.Log;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.google.firebase.crashlytics.FirebaseCrashlytics;
@@ -183,6 +184,35 @@ public class BackupManager {
     public static String getBookBackupFileUri(String bookUID) {
         SharedPreferences sharedPreferences = PreferenceActivity.getBookSharedPreferences(bookUID);
         return sharedPreferences.getString(KEY_BACKUP_FILE, null);
+    }
+
+    /**
+     * Set user-set backup file URI for the book with UID {@code bookUID}.
+     *
+     * @param bookUID Unique ID of the book; use active book if it's null.
+     */
+    public static void putBookBackupFileUri(Context context, @Nullable String bookUID, @NonNull Uri backupFileUri) {
+        if (bookUID == null) {
+            bookUID = BooksDbAdapter.getInstance().getActiveBookUID();
+        }
+        final int takeFlags =Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION;
+        context.getContentResolver().takePersistableUriPermission(backupFileUri, takeFlags);
+
+        PreferenceActivity.getBookSharedPreferences(bookUID)
+                .edit()
+                .putString(BackupManager.KEY_BACKUP_FILE, backupFileUri.toString())
+                .apply();
+    }
+
+    /**
+     * Return the Intent to create backup file.
+     */
+    public static Intent createBackupFileIntent(String defaultFileName) {
+        Intent createBackupFileIntent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        createBackupFileIntent.setType("*/*");
+        createBackupFileIntent.addCategory(Intent.CATEGORY_OPENABLE);
+        createBackupFileIntent.putExtra(Intent.EXTRA_TITLE, defaultFileName);
+        return createBackupFileIntent;
     }
 
     public static List<File> getBackupList(String bookUID) {

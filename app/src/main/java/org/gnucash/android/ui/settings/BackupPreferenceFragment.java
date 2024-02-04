@@ -78,20 +78,7 @@ public class BackupPreferenceFragment extends PreferenceFragmentCompat implement
                         Log.d(LOG_TAG, "backupFileUri is null!");
                         return;
                     }
-                    final int takeFlags;
-                    if ((data.getFlags() & Intent.FLAG_GRANT_READ_URI_PERMISSION) == Intent.FLAG_GRANT_READ_URI_PERMISSION) {
-                        takeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION;
-                    } else if ((data.getFlags() & Intent.FLAG_GRANT_WRITE_URI_PERMISSION) == Intent.FLAG_GRANT_WRITE_URI_PERMISSION) {
-                        takeFlags = Intent.FLAG_GRANT_WRITE_URI_PERMISSION;
-                    } else {
-                        takeFlags = 0;
-                    }
-                    requireActivity().getContentResolver().takePersistableUriPermission(backupFileUri, takeFlags);
-
-                    PreferenceActivity.getActiveBookSharedPreferences()
-                            .edit()
-                            .putString(BackupManager.KEY_BACKUP_FILE, backupFileUri.toString())
-                            .apply();
+                    BackupManager.putBookBackupFileUri(requireContext(), null, backupFileUri);
 
                     Preference pref = findPreference(getString(R.string.key_backup_location));
                     if (pref != null) {
@@ -167,18 +154,11 @@ public class BackupPreferenceFragment extends PreferenceFragmentCompat implement
 
         if (key.equals(getString(R.string.key_restore_backup))) {
             restoreBackup();
-        }
-
-        if (key.equals(getString(R.string.key_backup_location))) {
-            Intent createBackupFileIntent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
-            createBackupFileIntent.setType("*/*");
-            createBackupFileIntent.addCategory(Intent.CATEGORY_OPENABLE);
+        } else if (key.equals(getString(R.string.key_backup_location))) {
             String bookName = BooksDbAdapter.getInstance().getActiveBookDisplayName();
-            createBackupFileIntent.putExtra(Intent.EXTRA_TITLE, Exporter.sanitizeFilename(bookName) + "_" + getString(R.string.label_backup_filename));
-            createBackupFileLauncher.launch(createBackupFileIntent);
-        }
-
-        if (key.equals(getString(R.string.key_create_backup))) {
+            createBackupFileLauncher.launch(BackupManager.createBackupFileIntent(
+                    Exporter.sanitizeFilename(bookName) + "_" + getString(R.string.label_backup_filename)));
+        } else if (key.equals(getString(R.string.key_create_backup))) {
             boolean result = BackupManager.backupActiveBook();
             int msg = result ? R.string.toast_backup_successful : R.string.toast_backup_failed;
             Snackbar.make(requireView(), msg, Snackbar.LENGTH_SHORT).show();
