@@ -100,11 +100,22 @@ class Recurrence(periodType: PeriodType) : BaseModel() {
         get() {
             val repeatBuilder = StringBuilder(frequencyRepeatString)
             val context = GnuCashApplication.getAppContext()
-            val dayOfWeek = SimpleDateFormat("EEEE", GnuCashApplication.getDefaultLocale())
-                .format(Date(periodStart.time))
+            val locale = GnuCashApplication.getDefaultLocale()
             if (periodType === PeriodType.WEEK) {
+                val dayOfWeek = SimpleDateFormat("EEEE", locale)
+                        .format(Date(periodStart.time))
                 repeatBuilder.append(" ")
                     .append(context.getString(R.string.repeat_on_weekday, dayOfWeek))
+            } else if (periodType == PeriodType.MONTH) {
+                val dayOfMonth = SimpleDateFormat("d", locale)
+                        .format(Date(periodStart.time))
+                repeatBuilder.append(String.format(locale, " on day %s", dayOfMonth))
+            } else if (periodType == PeriodType.YEAR) {
+                val monthOfYear = SimpleDateFormat("MMMM", locale)
+                        .format(Date(periodStart.time))
+                val dayOfMonth = SimpleDateFormat("d", locale)
+                        .format(Date(periodStart.time))
+                repeatBuilder.append(String.format(locale, " on %s %s", monthOfYear, dayOfMonth))
             }
             if (periodEnd != null) {
                 val endDateString = SimpleDateFormat.getDateInstance().format(

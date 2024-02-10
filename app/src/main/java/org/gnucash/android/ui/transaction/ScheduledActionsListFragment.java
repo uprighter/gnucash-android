@@ -501,7 +501,6 @@ public class ScheduledActionsListFragment extends ListFragment implements
         @Override
         public View getView(int position, View convertView, ViewGroup parent) {
             final View view = super.getView(position, convertView, parent);
-            final int itemPosition = position;
             final CheckBox checkBox = view.findViewById(R.id.checkbox);
 
             final TextView secondaryText = view.findViewById(R.id.secondary_text);
@@ -538,7 +537,6 @@ public class ScheduledActionsListFragment extends ListFragment implements
             super.bindView(view, context, cursor);
 
             final int itemPosition = cursor.getPosition();
-            final CheckBox checkbox = view.findViewById(R.id.checkbox);
             final CheckBox checkBox = view.findViewById(R.id.checkbox);
             checkBox.setOnCheckedChangeListener((buttonView, isChecked) -> {
                 getListView().setItemChecked(itemPosition, isChecked);
