@@ -80,13 +80,12 @@ class Recurrence(periodType: PeriodType) : BaseModel() {
     @get:Deprecated("Do not use in new code. Uses fixed period values for months and years (which have variable units of time)")
     val period: Long
         get() {
-            var baseMillis: Long = 0
-            when (periodType) {
-                PeriodType.HOUR -> baseMillis = RecurrenceParser.HOUR_MILLIS
-                PeriodType.DAY -> baseMillis = RecurrenceParser.DAY_MILLIS
-                PeriodType.WEEK -> baseMillis = RecurrenceParser.WEEK_MILLIS
-                PeriodType.MONTH -> baseMillis = RecurrenceParser.MONTH_MILLIS
-                PeriodType.YEAR -> baseMillis = RecurrenceParser.YEAR_MILLIS
+            val baseMillis: Long = when (periodType) {
+                PeriodType.HOUR -> RecurrenceParser.HOUR_MILLIS
+                PeriodType.DAY -> RecurrenceParser.DAY_MILLIS
+                PeriodType.WEEK -> RecurrenceParser.WEEK_MILLIS
+                PeriodType.MONTH -> RecurrenceParser.MONTH_MILLIS
+                PeriodType.YEAR -> RecurrenceParser.YEAR_MILLIS
             }
             return multiplier * baseMillis
         }
@@ -101,11 +100,19 @@ class Recurrence(periodType: PeriodType) : BaseModel() {
             val repeatBuilder = StringBuilder(frequencyRepeatString)
             val context = GnuCashApplication.getAppContext()
             val locale = GnuCashApplication.getDefaultLocale()
-            if (periodType === PeriodType.WEEK) {
+            if (periodType === PeriodType.HOUR) {
+                val minuteOfHour = SimpleDateFormat("m", locale)
+                        .format(Date(periodStart.time))
+                repeatBuilder.append(String.format(locale, " at %sm", minuteOfHour))
+            } else if (periodType === PeriodType.DAY) {
+                val hourOfDay = SimpleDateFormat("H:mm", locale)
+                        .format(Date(periodStart.time))
+                repeatBuilder.append(String.format(locale, " at %s", hourOfDay))
+            } else if (periodType === PeriodType.WEEK) {
                 val dayOfWeek = SimpleDateFormat("EEEE", locale)
                         .format(Date(periodStart.time))
                 repeatBuilder.append(" ")
-                    .append(context.getString(R.string.repeat_on_weekday, dayOfWeek))
+                        .append(context.getString(R.string.repeat_on_weekday, dayOfWeek))
             } else if (periodType == PeriodType.MONTH) {
                 val dayOfMonth = SimpleDateFormat("d", locale)
                         .format(Date(periodStart.time))
@@ -267,8 +274,7 @@ class Recurrence(periodType: PeriodType) : BaseModel() {
         get() {
             if (periodEnd == null) return -1
             val multiple = multiplier
-            val jodaPeriod: ReadablePeriod
-            jodaPeriod = when (periodType) {
+            val jodaPeriod: ReadablePeriod = when (periodType) {
                 PeriodType.HOUR -> Hours.hours(multiple)
                 PeriodType.DAY -> Days.days(multiple)
                 PeriodType.WEEK -> Weeks.weeks(multiple)
@@ -340,7 +346,7 @@ class Recurrence(periodType: PeriodType) : BaseModel() {
      * @return String describing the period type
      */
     private val frequencyRepeatString: String
-        private get() {
+        get() {
             val res = GnuCashApplication.getAppContext().resources
             return when (periodType) {
                 PeriodType.HOUR -> res.getQuantityString(
