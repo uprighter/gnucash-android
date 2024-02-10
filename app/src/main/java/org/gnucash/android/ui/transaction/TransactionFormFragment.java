@@ -882,9 +882,10 @@ public class TransactionFormFragment extends Fragment implements
                     Transaction templateTransaction = new Transaction(mTransaction, true);
                     templateTransaction.setTemplate(true);
                     mTransactionsDbAdapter.addRecord(templateTransaction, DatabaseAdapter.UpdateMethod.replace);
-                    scheduleRecurringTransaction(templateTransaction.getUID());
-                } else
-                    scheduleRecurringTransaction(mTransaction.getUID());
+                    scheduleRecurringTransaction(templateTransaction.getUID(), 0);
+                } else {
+                    scheduleRecurringTransaction(mTransaction.getUID(), mTransaction.getTimeMillis());
+                }
             } else {
                 String scheduledActionUID = requireArguments().getString(UxArgument.SCHEDULED_ACTION_UID);
                 if (scheduledActionUID != null) { //we were editing a schedule and it was turned off
@@ -908,7 +909,7 @@ public class TransactionFormFragment extends Fragment implements
      *
      * @see #saveNewTransaction()
      */
-    private void scheduleRecurringTransaction(String transactionUID) {
+    private void scheduleRecurringTransaction(String transactionUID, long transactionTime) {
         ScheduledActionDbAdapter scheduledActionDbAdapter = ScheduledActionDbAdapter.getInstance();
 
         Recurrence recurrence = RecurrenceParser.parse(mEventRecurrence);
@@ -925,9 +926,12 @@ public class TransactionFormFragment extends Fragment implements
             Log.d(LOG_TAG, String.format("%s actions updated for %s.", updated, scheduledAction));
             Toast.makeText(getActivity(), R.string.toast_updated_transaction_recurring_schedule, Toast.LENGTH_SHORT).show();
         } else {
-                scheduledAction.setActionUID(transactionUID);
-                scheduledActionDbAdapter.addRecord(scheduledAction, DatabaseAdapter.UpdateMethod.replace);
-                Toast.makeText(getActivity(), R.string.toast_scheduled_recurring_transaction, Toast.LENGTH_SHORT).show();
+            scheduledAction.setActionUID(transactionUID);
+            if (transactionTime != 0) {
+                scheduledAction.setStartTime(transactionTime);
+            }
+            scheduledActionDbAdapter.addRecord(scheduledAction, DatabaseAdapter.UpdateMethod.replace);
+            Toast.makeText(getActivity(), R.string.toast_scheduled_recurring_transaction, Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -969,7 +973,7 @@ public class TransactionFormFragment extends Fragment implements
             }
             return true;
         } else {
-                return super.onOptionsItemSelected(item);
+            return super.onOptionsItemSelected(item);
         }
     }
 
