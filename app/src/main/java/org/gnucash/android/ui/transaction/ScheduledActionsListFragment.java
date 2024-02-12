@@ -94,7 +94,7 @@ public class ScheduledActionsListFragment extends ListFragment implements
 
     private ScheduledAction.ActionType mActionType = ScheduledAction.ActionType.TRANSACTION;
 
-    private final ActivityResultLauncher<Intent> addScheduledExportLauncher = registerForActivityResult(
+    private final ActivityResultLauncher<Intent> refreshOnSuccessLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
             result -> {
                 Log.d(LOG_TAG, "launch intent: result = " + result);
@@ -258,7 +258,7 @@ public class ScheduledActionsListFragment extends ListFragment implements
         if (item.getItemId() == R.id.menu_add_scheduled_export) {
             Intent addScheduledExportIntent = new Intent(getActivity(), FormActivity.class);
             addScheduledExportIntent.putExtra(UxArgument.FORM_TYPE, FormActivity.FormType.EXPORT.name());
-            addScheduledExportLauncher.launch(addScheduledExportIntent);
+            refreshOnSuccessLauncher.launch(addScheduledExportIntent);
             return true;
         }
         return super.onOptionsItemSelected(item);
@@ -266,6 +266,8 @@ public class ScheduledActionsListFragment extends ListFragment implements
 
     @Override
     public void onListItemClick(@NonNull ListView l, @NonNull View v, int position, long id) {
+        Log.d(LOG_TAG, String.format("onListItemClick: position=%d, id=%d. mActionMode=%s, mActionType=%s.",
+                position, id, mActionMode, mActionType));
         super.onListItemClick(l, v, position, id);
         if (mActionMode != null) {
             CheckBox checkbox = v.findViewById(R.id.checkbox);
@@ -297,13 +299,14 @@ public class ScheduledActionsListFragment extends ListFragment implements
      * @param transactionUID GUID of transaction to be edited
      */
     public void openTransactionForEdit(String accountUID, String transactionUID, String scheduledActionUid) {
+        Log.d(LOG_TAG, String.format("openTransactionForEdit(%s, %s, %s).", accountUID, transactionUID, scheduledActionUid));
         Intent createTransactionIntent = new Intent(getActivity(), FormActivity.class);
         createTransactionIntent.setAction(Intent.ACTION_INSERT_OR_EDIT);
         createTransactionIntent.putExtra(UxArgument.FORM_TYPE, FormActivity.FormType.TRANSACTION.name());
         createTransactionIntent.putExtra(UxArgument.SELECTED_ACCOUNT_UID, accountUID);
         createTransactionIntent.putExtra(UxArgument.SELECTED_TRANSACTION_UID, transactionUID);
         createTransactionIntent.putExtra(UxArgument.SCHEDULED_ACTION_UID, scheduledActionUid);
-        startActivity(createTransactionIntent);
+        refreshOnSuccessLauncher.launch(createTransactionIntent);
     }
 
     @NonNull
@@ -335,6 +338,7 @@ public class ScheduledActionsListFragment extends ListFragment implements
      * Edit mode is started when at least one transaction is selected
      */
     public void finishEditMode() {
+        Log.d(LOG_TAG, "finishEditMode.");
         mInEditMode = false;
         uncheckAllItems();
         mActionMode = null;
@@ -363,12 +367,12 @@ public class ScheduledActionsListFragment extends ListFragment implements
         }
     }
 
-
     /**
      * Starts action mode and activates the Context ActionBar (CAB)
      * Action mode is initiated as soon as at least one transaction is selected (highlighted)
      */
     private void startActionMode() {
+        Log.d(LOG_TAG, String.format("startActionMode: startActionMode=%s.", mActionMode));
         if (mActionMode != null) {
             return;
         }
@@ -385,7 +389,8 @@ public class ScheduledActionsListFragment extends ListFragment implements
      * This method only has effect if the number of checked items is greater than 0 and {@link #mActionMode} is not null
      */
     private void stopActionMode() {
-        int checkedCount = getListView().getCheckedItemIds().length;
+        int checkedCount = getListView().getCheckedItemCount();
+        Log.d(LOG_TAG, String.format("stopActionMode: checkedCount=%d.", checkedCount));
         if (checkedCount == 0 && mActionMode != null) {
             mActionMode.finish();
             setDefaultStatusBarColor();
@@ -408,12 +413,22 @@ public class ScheduledActionsListFragment extends ListFragment implements
         public View getView(int position, View convertView, ViewGroup parent) {
             final View view = super.getView(position, convertView, parent);
             final CheckBox checkBox = view.findViewById(R.id.checkbox);
+            final int itemPosition = position;
+            checkBox.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                Log.d(LOG_TAG, String.format("checkBox.OnCheckedChange itemPosition=%d, checked=%b", itemPosition, checkBox.isChecked()));
+                getListView().setItemChecked(itemPosition, isChecked);
+                if (isChecked) {
+                    startActionMode();
+                } else {
+                    stopActionMode();
+                }
+                setActionModeTitle();
+            });
 
             final TextView secondaryText = view.findViewById(R.id.secondary_text);
             ListView listView = (ListView) parent;
-            Log.d(LOG_TAG, String.format("position=%d, checked=%b, getChecked=%b", position,
-                    checkBox.isChecked(), listView.isItemChecked(position)));
-            listView.setItemChecked(position, checkBox.isChecked());
+            Log.d(LOG_TAG, String.format("getView listView.isItemChecked(%d)=%b, %b",
+                    position, listView.isItemChecked(position), checkBox.isChecked()));
             if (mInEditMode && listView.isItemChecked(position)) {
                 view.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.abs__holo_blue_light));
                 secondaryText.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.white));
@@ -444,23 +459,10 @@ public class ScheduledActionsListFragment extends ListFragment implements
         @Override
         public void bindView(View view, Context context, Cursor cursor) {
             super.bindView(view, context, cursor);
-
-            final int itemPosition = cursor.getPosition();
-            final CheckBox checkbox = view.findViewById(R.id.checkbox);
-            checkbox.setOnCheckedChangeListener((buttonView, isChecked) -> {
-                Log.d(LOG_TAG, String.format("itemPosition=%d, checked=%b", itemPosition, checkbox.isChecked()));
-                getListView().setItemChecked(itemPosition, isChecked);
-                if (isChecked) {
-                    startActionMode();
-                } else {
-                    stopActionMode();
-                }
-                setActionModeTitle();
-            });
-
-            Transaction transaction = mTransactionsDbAdapter.buildModelInstance(cursor);
+            Log.d(LOG_TAG, String.format("bindView: view=%s", view));
 
             TextView amountTextView = view.findViewById(R.id.right_text);
+            Transaction transaction = mTransactionsDbAdapter.buildModelInstance(cursor);
             if (transaction.getSplits().size() == 2) {
                 if (transaction.getSplits().get(0).isPairOf(transaction.getSplits().get(1))) {
                     amountTextView.setText(Objects.requireNonNull(transaction.getSplits().get(0).getValue()).formattedString());
@@ -468,8 +470,8 @@ public class ScheduledActionsListFragment extends ListFragment implements
             } else {
                 amountTextView.setText(getString(R.string.label_split_count, transaction.getSplits().size()));
             }
-            TextView descriptionTextView = view.findViewById(R.id.secondary_text);
 
+            TextView descriptionTextView = view.findViewById(R.id.secondary_text);
             ScheduledActionDbAdapter scheduledActionDbAdapter = ScheduledActionDbAdapter.getInstance();
             String scheduledActionUID = cursor.getString(cursor.getColumnIndexOrThrow("origin_scheduled_action_uid")); //column created from join when fetching scheduled transactions
             view.setTag(scheduledActionUID);
@@ -502,10 +504,19 @@ public class ScheduledActionsListFragment extends ListFragment implements
         public View getView(int position, View convertView, ViewGroup parent) {
             final View view = super.getView(position, convertView, parent);
             final CheckBox checkBox = view.findViewById(R.id.checkbox);
+            final int itemPosition = position;
+            checkBox.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                getListView().setItemChecked(itemPosition, isChecked);
+                if (isChecked) {
+                    startActionMode();
+                } else {
+                    stopActionMode();
+                }
+                setActionModeTitle();
+            });
 
             final TextView secondaryText = view.findViewById(R.id.secondary_text);
             ListView listView = (ListView) parent;
-            listView.setItemChecked(position, checkBox.isChecked());
             if (mInEditMode && listView.isItemChecked(position)) {
                 view.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.abs__holo_blue_light));
                 secondaryText.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.white));
@@ -535,18 +546,6 @@ public class ScheduledActionsListFragment extends ListFragment implements
         @Override
         public void bindView(View view, Context context, Cursor cursor) {
             super.bindView(view, context, cursor);
-
-            final int itemPosition = cursor.getPosition();
-            final CheckBox checkBox = view.findViewById(R.id.checkbox);
-            checkBox.setOnCheckedChangeListener((buttonView, isChecked) -> {
-                getListView().setItemChecked(itemPosition, isChecked);
-                if (isChecked) {
-                    startActionMode();
-                } else {
-                    stopActionMode();
-                }
-                setActionModeTitle();
-            });
 
             ScheduledActionDbAdapter mScheduledActionDbAdapter = ScheduledActionDbAdapter.getInstance();
             ScheduledAction scheduledAction = mScheduledActionDbAdapter.buildModelInstance(cursor);
