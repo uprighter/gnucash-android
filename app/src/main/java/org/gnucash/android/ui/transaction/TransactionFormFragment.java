@@ -882,7 +882,7 @@ public class TransactionFormFragment extends Fragment implements
                     Transaction templateTransaction = new Transaction(mTransaction, true);
                     templateTransaction.setTemplate(true);
                     mTransactionsDbAdapter.addRecord(templateTransaction, DatabaseAdapter.UpdateMethod.replace);
-                    scheduleRecurringTransaction(templateTransaction.getUID(), 0);
+                    scheduleRecurringTransaction(templateTransaction.getUID(), mTransaction.getTimeMillis());
                 } else {
                     scheduleRecurringTransaction(mTransaction.getUID(), mTransaction.getTimeMillis());
                 }
@@ -916,6 +916,8 @@ public class TransactionFormFragment extends Fragment implements
         assert recurrence != null;
 
         ScheduledAction scheduledAction = new ScheduledAction(ScheduledAction.ActionType.TRANSACTION);
+        // setStartTime before setRecurrence, as the latter relies on the former.
+        scheduledAction.setStartTime(transactionTime);
         scheduledAction.setRecurrence(recurrence);
 
         String scheduledActionUID = requireArguments().getString(UxArgument.SCHEDULED_ACTION_UID);
@@ -927,9 +929,7 @@ public class TransactionFormFragment extends Fragment implements
             Toast.makeText(getActivity(), R.string.toast_updated_transaction_recurring_schedule, Toast.LENGTH_SHORT).show();
         } else {
             scheduledAction.setActionUID(transactionUID);
-            if (transactionTime != 0) {
-                scheduledAction.setStartTime(transactionTime);
-            }
+            scheduledAction.setLastRun(transactionTime);
             scheduledActionDbAdapter.addRecord(scheduledAction, DatabaseAdapter.UpdateMethod.replace);
             Toast.makeText(getActivity(), R.string.toast_scheduled_recurring_transaction, Toast.LENGTH_SHORT).show();
         }
@@ -1067,8 +1067,9 @@ public class TransactionFormFragment extends Fragment implements
         mSplitQuantity = amount;
 
         //The transfer dialog was called while attempting to save. So try saving again
-        if (onSaveAttempt)
+        if (onSaveAttempt) {
             saveNewTransaction();
+        }
         onSaveAttempt = false;
     }
 

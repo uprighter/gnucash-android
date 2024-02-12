@@ -156,7 +156,6 @@ public class ScheduledActionsListFragment extends ListFragment implements
                 }
                 mode.finish();
                 setDefaultStatusBarColor();
-                LoaderManager.getInstance(ScheduledActionsListFragment.this).destroyLoader(0);
                 refreshList();
                 return true;
             }
@@ -236,6 +235,7 @@ public class ScheduledActionsListFragment extends ListFragment implements
      * Reload the list of transactions and recompute account balances
      */
     public void refreshList() {
+        LoaderManager.getInstance(this).destroyLoader(0);
         LoaderManager.getInstance(this).restartLoader(0, null, this);
     }
 
@@ -312,7 +312,7 @@ public class ScheduledActionsListFragment extends ListFragment implements
     @NonNull
     @Override
     public Loader<Cursor> onCreateLoader(int arg0, Bundle arg1) {
-        Log.d(LOG_TAG, String.format("Creating transactions loader, mActionType %s.", mActionType));
+        Log.d(LOG_TAG, String.format("Creating ScheduledAction loader, mActionType %s.", mActionType));
         if (mActionType == ScheduledAction.ActionType.TRANSACTION)
             return new ScheduledTransactionsCursorLoader(getActivity());
         else { // if (mActionType == ScheduledAction.ActionType.BACKUP) {
@@ -322,14 +322,14 @@ public class ScheduledActionsListFragment extends ListFragment implements
 
     @Override
     public void onLoadFinished(@NonNull Loader<Cursor> loader, Cursor cursor) {
-        Log.d(LOG_TAG, "Transactions loader finished. Swapping in cursor");
+        Log.d(LOG_TAG, "ScheduledAction loader finished. Swapping in cursor");
         mCursorAdapter.swapCursor(cursor);
         mCursorAdapter.notifyDataSetChanged();
     }
 
     @Override
     public void onLoaderReset(@NonNull Loader<Cursor> loader) {
-        Log.d(LOG_TAG, "Resetting transactions loader");
+        Log.d(LOG_TAG, "Resetting ScheduledAction loader");
         mCursorAdapter.swapCursor(null);
     }
 

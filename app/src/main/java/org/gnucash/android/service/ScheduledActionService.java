@@ -91,8 +91,9 @@ public class ScheduledActionService extends JobIntentService {
             processScheduledActions(scheduledActions, db);
 
             //close all databases except the currently active database
-            if (!db.getPath().equals(GnuCashApplication.getActiveDb().getPath()))
+            if (!db.getPath().equals(GnuCashApplication.getActiveDb().getPath())) {
                 db.close();
+            }
         }
 
         Log.i(LOG_TAG, "Completed service @ " + java.text.DateFormat.getDateTimeInstance().format(new Date()));
@@ -121,7 +122,7 @@ public class ScheduledActionService extends JobIntentService {
                 continue;
             }
 
-            executeScheduledEvent(scheduledAction, db);
+            executeScheduledEvent(scheduledAction, now, db);
         }
     }
 
@@ -130,12 +131,12 @@ public class ScheduledActionService extends JobIntentService {
      *
      * @param scheduledAction ScheduledEvent to be executed
      */
-    private static void executeScheduledEvent(ScheduledAction scheduledAction, SQLiteDatabase db) {
+    private static void executeScheduledEvent(ScheduledAction scheduledAction, long now, SQLiteDatabase db) {
         Log.i(LOG_TAG, "Executing scheduled action: " + scheduledAction.toString());
         int executionCount = 0;
 
         switch (scheduledAction.getActionType()) {
-            case TRANSACTION -> executionCount += executeTransactions(scheduledAction, db);
+            case TRANSACTION -> executionCount += executeTransactions(scheduledAction, now, db);
             case BACKUP -> executionCount += executeBackup(scheduledAction, db);
         }
 
@@ -230,10 +231,11 @@ public class ScheduledActionService extends JobIntentService {
      * the end time of the transaction was already reached</p>
      *
      * @param scheduledAction Scheduled action which references the transaction
+     * @param now             currentTimeMillis
      * @param db              SQLiteDatabase where the transactions are to be executed
      * @return Number of transactions created as a result of this action
      */
-    private static int executeTransactions(ScheduledAction scheduledAction, SQLiteDatabase db) {
+    private static int executeTransactions(ScheduledAction scheduledAction, long now, SQLiteDatabase db) {
         int executionCount = 0;
         String actionUID = scheduledAction.getActionUID();
         TransactionsDbAdapter transactionsDbAdapter = new TransactionsDbAdapter(db, new SplitsDbAdapter(db));
@@ -245,7 +247,6 @@ public class ScheduledActionService extends JobIntentService {
             return executionCount;
         }
 
-        long now = System.currentTimeMillis();
         //if there is an end time in the past, we execute all schedules up to the end time.
         //if the end time is in the future, we execute all schedules until now (current time)
         //if there is no end time, we execute all schedules until now

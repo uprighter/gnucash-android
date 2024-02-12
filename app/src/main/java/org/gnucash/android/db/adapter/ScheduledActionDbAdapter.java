@@ -15,6 +15,7 @@
  */
 package org.gnucash.android.db.adapter;
 
+import static org.gnucash.android.db.DatabaseSchema.RecurrenceEntry;
 import static org.gnucash.android.db.DatabaseSchema.ScheduledActionEntry;
 
 import android.content.ContentValues;
@@ -108,12 +109,12 @@ public class ScheduledActionDbAdapter extends DatabaseAdapter<ScheduledAction> {
     public long updateRecurrenceAttributes(ScheduledAction scheduledAction) {
         //since we are updating, first fetch the existing recurrence UID and set it to the object
         //so that it will be updated and not a new one created
-        RecurrenceDbAdapter recurrenceDbAdapter = new RecurrenceDbAdapter(mDb);
-        String recurrenceUID = recurrenceDbAdapter.getAttribute(Objects.requireNonNull(scheduledAction.getUID()), ScheduledActionEntry.COLUMN_RECURRENCE_UID);
+        String recurrenceUID = this.getAttribute(Objects.requireNonNull(scheduledAction.getUID()), ScheduledActionEntry.COLUMN_RECURRENCE_UID);
 
         Recurrence recurrence = scheduledAction.getRecurrence();
         assert recurrence != null;
         recurrence.setUID(recurrenceUID);
+        RecurrenceDbAdapter recurrenceDbAdapter = new RecurrenceDbAdapter(mDb);
         recurrenceDbAdapter.addRecord(recurrence, UpdateMethod.update);
 
         ContentValues contentValues = new ContentValues();
