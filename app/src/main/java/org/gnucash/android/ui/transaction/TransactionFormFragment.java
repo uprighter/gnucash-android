@@ -234,7 +234,6 @@ public class TransactionFormFragment extends Fragment implements
     private String mRRule;
     private final RRuleFormatter mRRuleFormatter = new RRuleFormatter();
     private final RecurrenceFormatter mRecurrenceFormatter = new RecurrenceFormatter(DateFormat.getInstance());
-    private com.maltaisn.recurpicker.Recurrence mSelectedRecurrence = com.maltaisn.recurpicker.Recurrence.DOES_NOT_REPEAT;
 
     private String mAccountUID;
 
@@ -548,7 +547,6 @@ public class TransactionFormFragment extends Fragment implements
         if (scheduledActionUID != null && !scheduledActionUID.isEmpty()) {
             ScheduledAction scheduledAction = ScheduledActionDbAdapter.getInstance().getRecord(scheduledActionUID);
             mRRule = scheduledAction.getRuleString();
-            mSelectedRecurrence = mRRuleFormatter.parse(mRRule);
             mRecurrenceTextView.setText(scheduledAction.getRepeatString());
         }
     }
@@ -675,11 +673,10 @@ public class TransactionFormFragment extends Fragment implements
     @Override
     public void onRecurrenceSet(com.maltaisn.recurpicker.Recurrence recurrence) {
         Log.d(LOG_TAG, String.format("setSelectedRecurrence(%s).", recurrence));
-        mSelectedRecurrence = recurrence;
-        mRRule = mRRuleFormatter.format(mSelectedRecurrence);
         String repeatString = getString(R.string.label_tap_to_create_schedule);
-        if (mSelectedRecurrence != com.maltaisn.recurpicker.Recurrence.DOES_NOT_REPEAT) {
-            repeatString = mRecurrenceFormatter.format(requireContext(), mSelectedRecurrence);
+        if (recurrence != com.maltaisn.recurpicker.Recurrence.DOES_NOT_REPEAT) {
+            mRRule = mRRuleFormatter.format(recurrence);
+            repeatString = mRecurrenceFormatter.format(requireContext(), recurrence);
 
             //when recurrence is set, we will definitely be saving a template
             mSaveTemplateCheckbox.setChecked(true);
@@ -737,7 +734,9 @@ public class TransactionFormFragment extends Fragment implements
 
         mRecurrenceTextView.setOnClickListener(v -> {
             Log.d(LOG_TAG, "mRecurrenceTextView.setOnClickListener.");
-            new DateTimePicker.RecurrencePicker(getChildFragmentManager(), this, mSelectedRecurrence).show();
+            com.maltaisn.recurpicker.Recurrence selectedRecurrence = mRRuleFormatter.parse(mRRule);
+
+            new DateTimePicker.RecurrencePicker(getChildFragmentManager(), this, selectedRecurrence).show();
         });
     }
 
@@ -954,7 +953,9 @@ public class TransactionFormFragment extends Fragment implements
     private void scheduleRecurringTransaction(String transactionUID, long transactionTime) {
         ScheduledActionDbAdapter scheduledActionDbAdapter = ScheduledActionDbAdapter.getInstance();
 
-        Recurrence recurrence = RecurrenceParser.parse(transactionTime, mSelectedRecurrence);
+        com.maltaisn.recurpicker.Recurrence selectedRecurrence = mRRuleFormatter.parse(mRRule);
+
+        Recurrence recurrence = RecurrenceParser.parse(transactionTime, selectedRecurrence);
         assert recurrence != null;
 
         ScheduledAction scheduledAction = new ScheduledAction(ScheduledAction.ActionType.TRANSACTION);

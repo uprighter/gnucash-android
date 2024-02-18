@@ -99,7 +99,6 @@ public class BudgetFormFragment extends Fragment
     private String mRRule;
     private final RRuleFormatter mRRuleFormatter = new RRuleFormatter();
     private final RecurrenceFormatter mRecurrenceFormatter = new RecurrenceFormatter(DateFormat.getInstance());
-    private com.maltaisn.recurpicker.Recurrence mSelectedRecurrence = com.maltaisn.recurpicker.Recurrence.DOES_NOT_REPEAT;
 
     private BudgetsDbAdapter mBudgetsDbAdapter;
 
@@ -180,7 +179,8 @@ public class BudgetFormFragment extends Fragment
 
         mRecurrenceInput.setOnClickListener(v -> {
             Log.d(LOG_TAG, "mRecurrenceTextView.setOnClickListener.");
-            new DateTimePicker.RecurrencePicker(getChildFragmentManager(), this, mSelectedRecurrence).show();
+            com.maltaisn.recurpicker.Recurrence selectedRecurrence = mRRuleFormatter.parse(mRRule);
+            new DateTimePicker.RecurrencePicker(getChildFragmentManager(), this, selectedRecurrence).show();
         });
 
         mStartDateInput.setOnClickListener((View v) -> {
@@ -223,9 +223,6 @@ public class BudgetFormFragment extends Fragment
         mDescriptionInput.setText(budget.getDescription());
 
         mRRule = Objects.requireNonNull(budget.getRecurrence()).getRuleString();
-        if (!mRRule.isEmpty()) {
-            mSelectedRecurrence = mRRuleFormatter.parse(mRRule);
-        }
         mRecurrenceInput.setText(budget.getRecurrence().getRepeatString());
 
         mBudgetAmounts = (ArrayList<BudgetAmount>) budget.getCompactedBudgetAmounts();
@@ -315,7 +312,8 @@ public class BudgetFormFragment extends Fragment
 
         mBudget.setDescription(mDescriptionInput.getText().toString().trim());
 
-        Recurrence recurrence = RecurrenceParser.parse(0, mSelectedRecurrence);
+        com.maltaisn.recurpicker.Recurrence selectedRecurrence = mRRuleFormatter.parse(mRRule);
+        Recurrence recurrence = RecurrenceParser.parse(0, selectedRecurrence);
         recurrence.setPeriodStart(new Timestamp(mStartDate.getTimeInMillis()));
         mBudget.setRecurrence(recurrence);
 
@@ -340,11 +338,10 @@ public class BudgetFormFragment extends Fragment
     @Override
     public void onRecurrenceSet(com.maltaisn.recurpicker.Recurrence recurrence) {
         Log.d(LOG_TAG, String.format("setSelectedRecurrence(%s).", recurrence));
-        mSelectedRecurrence = recurrence;
-        mRRule = mRRuleFormatter.format(mSelectedRecurrence);
         String repeatString = getString(R.string.label_tap_to_create_schedule);
-        if (mSelectedRecurrence != com.maltaisn.recurpicker.Recurrence.DOES_NOT_REPEAT) {
-            repeatString = mRecurrenceFormatter.format(requireContext(), mSelectedRecurrence);
+        if (recurrence != com.maltaisn.recurpicker.Recurrence.DOES_NOT_REPEAT) {
+            mRRule = mRRuleFormatter.format(recurrence);
+            repeatString = mRecurrenceFormatter.format(requireContext(), recurrence);
         }
 
         mRecurrenceInput.setText(repeatString);
