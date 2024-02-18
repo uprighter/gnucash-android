@@ -31,7 +31,7 @@
         android:layout_height="?attr/actionBarSize"
         app:elevation="@dimen/elevation_default"
         app:layout_scrollFlags="enterAlways"
-        android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
-        app:popupTheme="@style/ThemeOverlay.AppCompat.Light"
+        android:theme="@style/ThemeOverlay.MaterialComponents.Dark.ActionBar"
+        app:popupTheme="@style/ThemeOverlay.MaterialComponents.Light"
         tools:showIn="@layout/activity_form" />
 </FrameLayout>

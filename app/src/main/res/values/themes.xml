@@ -19,11 +19,7 @@
 <resources xmlns:android="http://schemas.android.com/apk/res/android">
 
     <style name="Theme.GnucashTheme" parent="Theme.MaterialComponents.Light.DarkActionBar">
-        <!-- Set AppCompat’s actionBarStyle
-        <item name="actionBarStyle">@style/MyActionBarStyle</item>
-        -->
-
-        <!-- Set AppCompat’s color theming attrs -->
+        <!-- Keep the Gnucash color theming attrs -->
         <item name="colorPrimary">@color/theme_primary</item>
         <item name="colorPrimaryDark">@color/theme_primary_dark</item>
         <item name="colorAccent">@color/theme_accent</item>
@@ -37,7 +33,7 @@
     </style>
 
     <style name="Theme.GnucashTheme.NoActionBar" parent="Theme.MaterialComponents.Light.NoActionBar">
-        <!-- Set AppCompat’s color theming attrs -->
+        <!-- Keep the Gnucash color theming attrs -->
         <item name="colorPrimary">@color/theme_primary</item>
         <item name="colorPrimaryDark">@color/theme_primary_dark</item>
         <item name="colorAccent">@color/theme_accent</item>
@@ -47,18 +43,5 @@
         <item name="windowActionModeOverlay">true</item>
         <item name="colorButtonNormal">#FFAB00</item>
         <item name="actionMenuTextAppearance">@style/ActionMenuText</item>
-
-        <item name="drawerArrowStyle">@style/DrawerArrowStyle</item>
-        <item name="preferenceTheme">@style/PreferenceThemeOverlay</item>
-        <!-- <item name="colorControlNormal">@android:color/white</item> -->
-    </style>
-
-    <style name="DrawerArrowStyle" parent="Widget.AppCompat.DrawerArrowToggle">
-        <item name="spinBars">true</item>
-        <item name="color">@android:color/white</item>
-    </style>
-
-    <style name="UserVoiceTheme" parent="Theme.GnucashTheme">
-        <!-- theme customizations -->
     </style>
 </resources>

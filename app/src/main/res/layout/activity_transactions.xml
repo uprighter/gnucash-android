@@ -43,6 +43,7 @@
                 app:elevation="10dp"
                 android:minHeight="?attr/actionBarSize"
                 app:tabIndicatorColor="@android:color/white"
+                app:tabSelectedTextColor="?attr/colorAccent"
                 app:tabGravity="fill"
                 android:theme="@style/ThemeOverlay.MaterialComponents.Dark.ActionBar" />
 
