@@ -568,21 +568,26 @@ public class SplitEditorFragment extends Fragment {
                         imbalance = imbalance.subtract(amount);
                     }
                 } else {
-                    BigDecimal amount = viewHolder.getAmountValue().abs();
-                    long accountId = viewHolder.accountsSpinner.getSelectedItemId();
-                    boolean hasDebitNormalBalance = AccountsDbAdapter.getInstance()
-                            .getAccountType(accountId).hasDebitNormalBalance();
+                    try {
+                        BigDecimal amount = viewHolder.getAmountValue().abs();
+                        long accountId = viewHolder.accountsSpinner.getSelectedItemId();
+                        boolean hasDebitNormalBalance = AccountsDbAdapter.getInstance()
+                                .getAccountType(accountId).hasDebitNormalBalance();
 
-                    if (viewHolder.splitTypeSwitch.isChecked()) {
-                        if (hasDebitNormalBalance)
-                            imbalance = imbalance.add(amount);
-                        else
-                            imbalance = imbalance.subtract(amount);
-                    } else {
-                        if (hasDebitNormalBalance)
-                            imbalance = imbalance.subtract(amount);
-                        else
-                            imbalance = imbalance.add(amount);
+                        if (viewHolder.splitTypeSwitch.isChecked()) {
+                            if (hasDebitNormalBalance)
+                                imbalance = imbalance.add(amount);
+                            else
+                                imbalance = imbalance.subtract(amount);
+                        } else {
+                            if (hasDebitNormalBalance)
+                                imbalance = imbalance.subtract(amount);
+                            else
+                                imbalance = imbalance.add(amount);
+                        }
+                    } catch (ArithmeticException e) {
+                        Log.d(LOG_TAG, String.format("possible transient expression error, ignore: %s.", e.getMessage()));
+                        return;
                     }
                 }
             }
