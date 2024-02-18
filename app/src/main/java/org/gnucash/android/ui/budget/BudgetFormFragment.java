@@ -17,6 +17,7 @@
 package org.gnucash.android.ui.budget;
 
 import android.app.Activity;
+import android.app.DatePickerDialog;
 import android.content.Intent;
 import android.database.Cursor;
 import android.inputmethodservice.KeyboardView;
@@ -29,6 +30,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.DatePicker;
 import android.widget.EditText;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -42,11 +44,9 @@ import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
 
-import com.codetroopers.betterpickers.calendardatepicker.CalendarDatePickerDialogFragment;
-import com.codetroopers.betterpickers.recurrencepicker.EventRecurrence;
-import com.codetroopers.betterpickers.recurrencepicker.EventRecurrenceFormatter;
-import com.codetroopers.betterpickers.recurrencepicker.RecurrencePickerDialogFragment;
 import com.google.android.material.textfield.TextInputLayout;
+import com.maltaisn.recurpicker.format.RRuleFormatter;
+import com.maltaisn.recurpicker.format.RecurrenceFormatter;
 
 import org.gnucash.android.R;
 import org.gnucash.android.databinding.FragmentBudgetFormBinding;
@@ -62,13 +62,14 @@ import org.gnucash.android.model.Recurrence;
 import org.gnucash.android.ui.common.FormActivity;
 import org.gnucash.android.ui.common.UxArgument;
 import org.gnucash.android.ui.transaction.TransactionFormFragment;
+import org.gnucash.android.ui.util.DateTimePicker;
 import org.gnucash.android.ui.util.RecurrenceParser;
-import org.gnucash.android.ui.util.RecurrenceViewClickListener;
 import org.gnucash.android.ui.util.widget.CalculatorEditText;
 import org.gnucash.android.util.QualifiedAccountNameCursorAdapter;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.text.DateFormat;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -79,7 +80,8 @@ import java.util.Objects;
 /**
  * Fragment for creating or editing Budgets
  */
-public class BudgetFormFragment extends Fragment implements RecurrencePickerDialogFragment.OnRecurrenceSetListener, CalendarDatePickerDialogFragment.OnDateSetListener {
+public class BudgetFormFragment extends Fragment
+        implements DatePickerDialog.OnDateSetListener, DateTimePicker.RecurrencePickerListener {
 
     public static final String LOG_TAG = BudgetFormFragment.class.getName();
 
@@ -94,8 +96,10 @@ public class BudgetFormFragment extends Fragment implements RecurrencePickerDial
     TextView mStartDateInput;
     View mBudgetAmountLayout;
 
-    EventRecurrence mEventRecurrence = new EventRecurrence();
-    String mRecurrenceRule;
+    private String mRRule;
+    private final RRuleFormatter mRRuleFormatter = new RRuleFormatter();
+    private final RecurrenceFormatter mRecurrenceFormatter = new RecurrenceFormatter(DateFormat.getInstance());
+    private com.maltaisn.recurpicker.Recurrence mSelectedRecurrence = com.maltaisn.recurpicker.Recurrence.DOES_NOT_REPEAT;
 
     private BudgetsDbAdapter mBudgetsDbAdapter;
 
@@ -163,19 +167,21 @@ public class BudgetFormFragment extends Fragment implements RecurrencePickerDial
 
         mBudgetAccountSpinner.setAdapter(mAccountsCursorAdapter);
         String budgetUID = requireArguments().getString(UxArgument.BUDGET_UID);
-        if (budgetUID != null) { //if we are editing the budget
+        if (budgetUID != null) { // if we are editing the budget
             initViews(mBudget = mBudgetsDbAdapter.getRecord(budgetUID));
         }
         ActionBar actionbar = ((AppCompatActivity) requireActivity()).getSupportActionBar();
         assert actionbar != null;
-        if (mBudget == null)
+        if (mBudget == null) {
             actionbar.setTitle("Create Budget");
-        else
+        } else {
             actionbar.setTitle("Edit Budget");
+        }
 
-        mRecurrenceInput.setOnClickListener(
-                new RecurrenceViewClickListener((AppCompatActivity) getActivity(), mRecurrenceRule, this));
-
+        mRecurrenceInput.setOnClickListener(v -> {
+            Log.d(LOG_TAG, "mRecurrenceTextView.setOnClickListener.");
+            new DateTimePicker.RecurrencePicker(getChildFragmentManager(), this, mSelectedRecurrence).show();
+        });
 
         mStartDateInput.setOnClickListener((View v) -> {
             long dateMillis = 0;
@@ -192,10 +198,9 @@ public class BudgetFormFragment extends Fragment implements RecurrencePickerDial
             int year = calendar.get(Calendar.YEAR);
             int monthOfYear = calendar.get(Calendar.MONTH);
             int dayOfMonth = calendar.get(Calendar.DAY_OF_MONTH);
-            CalendarDatePickerDialogFragment datePickerDialog = new CalendarDatePickerDialogFragment();
-            datePickerDialog.setOnDateSetListener(BudgetFormFragment.this);
-            datePickerDialog.setPreselectedDate(year, monthOfYear, dayOfMonth);
-            datePickerDialog.show(getParentFragmentManager(), "date_picker_fragment");
+
+            new DateTimePicker.DatePickerFragment(BudgetFormFragment.this, year, monthOfYear, dayOfMonth)
+                    .show(getChildFragmentManager(), "date_picker_dialog_fragment");
         });
 
         mAddBudgetAmount.setOnClickListener((View v) -> {
@@ -217,9 +222,10 @@ public class BudgetFormFragment extends Fragment implements RecurrencePickerDial
         mBudgetNameInput.setText(budget.getName());
         mDescriptionInput.setText(budget.getDescription());
 
-        String recurrenceRuleString = Objects.requireNonNull(budget.getRecurrence()).getRuleString();
-        mRecurrenceRule = recurrenceRuleString;
-        mEventRecurrence.parse(recurrenceRuleString);
+        mRRule = Objects.requireNonNull(budget.getRecurrence()).getRuleString();
+        if (!mRRule.isEmpty()) {
+            mSelectedRecurrence = mRRuleFormatter.parse(mRRule);
+        }
         mRecurrenceInput.setText(budget.getRecurrence().getRepeatString());
 
         mBudgetAmounts = (ArrayList<BudgetAmount>) budget.getCompactedBudgetAmounts();
@@ -258,17 +264,10 @@ public class BudgetFormFragment extends Fragment implements RecurrencePickerDial
      * @return {@code true} if the budget can be saved, {@code false} otherwise
      */
     private boolean canSave() {
-        if (mEventRecurrence.until != null && mEventRecurrence.until.length() > 0
-                || mEventRecurrence.count <= 0) {
-            Toast.makeText(getActivity(),
-                    "Set a number periods in the recurrence dialog to save the budget",
-                    Toast.LENGTH_SHORT).show();
-            return false;
-        }
 
         mBudgetAmounts = extractBudgetAmounts();
         String budgetName = mBudgetNameInput.getText().toString();
-        boolean canSave = mRecurrenceRule != null
+        boolean canSave = (mRRule != null)
                 && !budgetName.isEmpty()
                 && !mBudgetAmounts.isEmpty();
 
@@ -286,7 +285,7 @@ public class BudgetFormFragment extends Fragment implements RecurrencePickerDial
                         Toast.LENGTH_SHORT).show();
             }
 
-            if (mRecurrenceRule == null) {
+            if (mRRule == null) {
                 Toast.makeText(getActivity(), "Set a repeat pattern to create a budget!",
                         Toast.LENGTH_SHORT).show();
             }
@@ -316,7 +315,7 @@ public class BudgetFormFragment extends Fragment implements RecurrencePickerDial
 
         mBudget.setDescription(mDescriptionInput.getText().toString().trim());
 
-        Recurrence recurrence = RecurrenceParser.parse(mEventRecurrence);
+        Recurrence recurrence = RecurrenceParser.parse(0, mSelectedRecurrence);
         recurrence.setPeriodStart(new Timestamp(mStartDate.getTimeInMillis()));
         mBudget.setRecurrence(recurrence);
 
@@ -339,19 +338,20 @@ public class BudgetFormFragment extends Fragment implements RecurrencePickerDial
     }
 
     @Override
-    public void onRecurrenceSet(String rrule) {
-        mRecurrenceRule = rrule;
+    public void onRecurrenceSet(com.maltaisn.recurpicker.Recurrence recurrence) {
+        Log.d(LOG_TAG, String.format("setSelectedRecurrence(%s).", recurrence));
+        mSelectedRecurrence = recurrence;
+        mRRule = mRRuleFormatter.format(mSelectedRecurrence);
         String repeatString = getString(R.string.label_tap_to_create_schedule);
-        if (mRecurrenceRule != null) {
-            mEventRecurrence.parse(mRecurrenceRule);
-            repeatString = EventRecurrenceFormatter.getRepeatString(getActivity(), getResources(), mEventRecurrence, true);
+        if (mSelectedRecurrence != com.maltaisn.recurpicker.Recurrence.DOES_NOT_REPEAT) {
+            repeatString = mRecurrenceFormatter.format(requireContext(), mSelectedRecurrence);
         }
 
         mRecurrenceInput.setText(repeatString);
     }
 
     @Override
-    public void onDateSet(CalendarDatePickerDialogFragment dialog, int year, int monthOfYear, int dayOfMonth) {
+    public void onDateSet(DatePicker view, int year, int monthOfYear, int dayOfMonth) {
         Calendar cal = new GregorianCalendar(year, monthOfYear, dayOfMonth);
         mStartDateInput.setText(TransactionFormFragment.DATE_FORMATTER.format(cal.getTime()));
         mStartDate.set(Calendar.YEAR, year);

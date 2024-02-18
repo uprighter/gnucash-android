@@ -17,6 +17,8 @@
 package org.gnucash.android.ui.export;
 
 import android.app.Activity;
+import android.app.DatePickerDialog;
+import android.app.TimePickerDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
@@ -33,10 +35,12 @@ import android.view.animation.Transformation;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.CheckBox;
+import android.widget.DatePicker;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
 import android.widget.Spinner;
 import android.widget.TextView;
+import android.widget.TimePicker;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -48,11 +52,8 @@ import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.preference.PreferenceManager;
 
-import com.codetroopers.betterpickers.calendardatepicker.CalendarDatePickerDialogFragment;
-import com.codetroopers.betterpickers.radialtimepicker.RadialTimePickerDialogFragment;
-import com.codetroopers.betterpickers.recurrencepicker.EventRecurrence;
-import com.codetroopers.betterpickers.recurrencepicker.EventRecurrenceFormatter;
-import com.codetroopers.betterpickers.recurrencepicker.RecurrencePickerDialogFragment;
+import com.maltaisn.recurpicker.format.RRuleFormatter;
+import com.maltaisn.recurpicker.format.RecurrenceFormatter;
 
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
@@ -68,12 +69,13 @@ import org.gnucash.android.model.BaseModel;
 import org.gnucash.android.model.ScheduledAction;
 import org.gnucash.android.ui.common.UxArgument;
 import org.gnucash.android.ui.transaction.TransactionFormFragment;
+import org.gnucash.android.ui.util.DateTimePicker;
 import org.gnucash.android.ui.util.RecurrenceParser;
-import org.gnucash.android.ui.util.RecurrenceViewClickListener;
 import org.gnucash.android.util.PreferencesHelper;
 import org.gnucash.android.util.TimestampHelper;
 
 import java.sql.Timestamp;
+import java.text.DateFormat;
 import java.text.ParseException;
 import java.util.Calendar;
 import java.util.Date;
@@ -88,9 +90,14 @@ import java.util.Objects;
  * @author Ngewi Fet <ngewif@gmail.com>
  */
 public class ExportFormFragment extends Fragment implements
-        RecurrencePickerDialogFragment.OnRecurrenceSetListener,
-        CalendarDatePickerDialogFragment.OnDateSetListener,
-        RadialTimePickerDialogFragment.OnTimeSetListener {
+        TimePickerDialog.OnTimeSetListener, DatePickerDialog.OnDateSetListener,
+        DateTimePicker.RecurrencePickerListener {
+
+    /**
+     * Tag for logging
+     */
+    private static final String LOG_TAG = ExportFormFragment.class.getName();
+
     private FragmentExportFormBinding mBinding;
 
     /**
@@ -142,22 +149,16 @@ public class ExportFormFragment extends Fragment implements
     LinearLayout mCsvOptionsLayout;
 
     View mRecurrenceOptionsView;
-    /**
-     * Event recurrence options
-     */
-    private final EventRecurrence mEventRecurrence = new EventRecurrence();
 
     /**
      * Recurrence rule
      */
-    private String mRecurrenceRule;
+    private String mRRule;
+    private final RRuleFormatter mRRuleFormatter = new RRuleFormatter();
+    private final RecurrenceFormatter mRecurrenceFormatter = new RecurrenceFormatter(DateFormat.getInstance());
+    private com.maltaisn.recurpicker.Recurrence mSelectedRecurrence = com.maltaisn.recurpicker.Recurrence.DOES_NOT_REPEAT;
 
     private final Calendar mExportStartCalendar = Calendar.getInstance();
-
-    /**
-     * Tag for logging
-     */
-    private static final String LOG_TAG = "ExportFormFragment";
 
     /**
      * Export format
@@ -360,9 +361,9 @@ public class ExportFormFragment extends Fragment implements
         Log.i(LOG_TAG, "Commencing async export of transactions");
         new ExportAsyncTask(getActivity(), GnuCashApplication.getActiveDb(), exportParameters).asyncExecute();
 
-        if (mRecurrenceRule != null) {
+        if (mRRule != null) {
             ScheduledAction scheduledAction = new ScheduledAction(ScheduledAction.ActionType.BACKUP);
-            scheduledAction.setRecurrence(RecurrenceParser.parse(mEventRecurrence));
+            scheduledAction.setRecurrence(RecurrenceParser.parse(0, mSelectedRecurrence));
             scheduledAction.setTag(exportParameters.toCsv());
             scheduledAction.setActionUID(BaseModel.generateUID());
             ScheduledActionDbAdapter.getInstance().addRecord(scheduledAction, DatabaseAdapter.UpdateMethod.insert);
@@ -390,8 +391,10 @@ public class ExportFormFragment extends Fragment implements
         mDestinationSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                if (view == null) //the item selection is fired twice by the Android framework. Ignore the first one
+                if (view == null) {
+                    //the item selection is fired twice by the Android framework. Ignore the first one
                     return;
+                }
                 switch (position) {
                     case 0 -> { //Save As..
                         mExportTarget = ExportParams.ExportTarget.URI;
@@ -441,10 +444,9 @@ public class ExportFormFragment extends Fragment implements
             int year = calendar.get(Calendar.YEAR);
             int monthOfYear = calendar.get(Calendar.MONTH);
             int dayOfMonth = calendar.get(Calendar.DAY_OF_MONTH);
-            CalendarDatePickerDialogFragment datePickerDialog = new CalendarDatePickerDialogFragment();
-            datePickerDialog.setOnDateSetListener(ExportFormFragment.this);
-            datePickerDialog.setPreselectedDate(year, monthOfYear, dayOfMonth);
-            datePickerDialog.show(getParentFragmentManager(), "date_picker_fragment");
+
+            new DateTimePicker.DatePickerFragment(this, year, monthOfYear, dayOfMonth)
+                    .show(getChildFragmentManager(), "date_picker_dialog_fragment");
         });
 
         mExportStartTime.setOnClickListener(v -> {
@@ -459,11 +461,15 @@ public class ExportFormFragment extends Fragment implements
             Calendar calendar = Calendar.getInstance();
             calendar.setTimeInMillis(timeMillis);
 
-            RadialTimePickerDialogFragment timePickerDialog = new RadialTimePickerDialogFragment();
-            timePickerDialog.setOnTimeSetListener(ExportFormFragment.this);
-            timePickerDialog.setStartTime(calendar.get(Calendar.HOUR_OF_DAY),
-                    calendar.get(Calendar.MINUTE));
-            timePickerDialog.show(getParentFragmentManager(), "time_picker_dialog_fragment");
+            new DateTimePicker.TimePickerFragment(
+                    this,
+                    calendar.get(Calendar.HOUR_OF_DAY),
+                    calendar.get(Calendar.MINUTE)).show(getChildFragmentManager(), "time_picker_dialog_fragment");
+        });
+
+        mRecurrenceTextView.setOnClickListener(v -> {
+            Log.d(LOG_TAG, "mRecurrenceTextView.setOnClickListener.");
+            new DateTimePicker.RecurrencePicker(getChildFragmentManager(), this, mSelectedRecurrence).show();
         });
 
         SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(requireActivity());
@@ -477,8 +483,6 @@ public class ExportFormFragment extends Fragment implements
 
         mExportAllSwitch.setChecked(sharedPrefs.getBoolean(getString(R.string.key_export_all_transactions), true));
         mDeleteAllCheckBox.setChecked(sharedPrefs.getBoolean(getString(R.string.key_delete_transactions_after_export), false));
-
-        mRecurrenceTextView.setOnClickListener(new RecurrenceViewClickListener((AppCompatActivity) getActivity(), mRecurrenceRule, this));
 
         //this part (setting the export format) must come after the recurrence view bindings above
         String defaultExportFormat = sharedPrefs.getString(getString(R.string.key_default_export_format), ExportFormat.CSVT.name());
@@ -544,20 +548,7 @@ public class ExportFormFragment extends Fragment implements
     }
 
     @Override
-    public void onRecurrenceSet(String rrule) {
-        mRecurrenceRule = rrule;
-        String repeatString = getString(R.string.label_tap_to_create_schedule);
-
-        if (mRecurrenceRule != null) {
-            mEventRecurrence.parse(mRecurrenceRule);
-            repeatString = EventRecurrenceFormatter.getRepeatString(getActivity(), getResources(),
-                    mEventRecurrence, true);
-        }
-        mRecurrenceTextView.setText(repeatString);
-    }
-
-    @Override
-    public void onDateSet(CalendarDatePickerDialogFragment dialog, int year, int monthOfYear, int dayOfMonth) {
+    public void onDateSet(DatePicker view, int year, int monthOfYear, int dayOfMonth) {
         Calendar cal = new GregorianCalendar(year, monthOfYear, dayOfMonth);
         mExportStartDate.setText(TransactionFormFragment.DATE_FORMATTER.format(cal.getTime()));
         mExportStartCalendar.set(Calendar.YEAR, year);
@@ -566,11 +557,24 @@ public class ExportFormFragment extends Fragment implements
     }
 
     @Override
-    public void onTimeSet(RadialTimePickerDialogFragment dialog, int hourOfDay, int minute) {
+    public void onTimeSet(TimePicker view, int hourOfDay, int minute) {
         Calendar cal = new GregorianCalendar(0, 0, 0, hourOfDay, minute);
         mExportStartTime.setText(TransactionFormFragment.TIME_FORMATTER.format(cal.getTime()));
         mExportStartCalendar.set(Calendar.HOUR_OF_DAY, hourOfDay);
         mExportStartCalendar.set(Calendar.MINUTE, minute);
+    }
+
+    @Override
+    public void onRecurrenceSet(com.maltaisn.recurpicker.Recurrence recurrence) {
+        Log.d(LOG_TAG, String.format("setSelectedRecurrence(%s).", recurrence));
+        mSelectedRecurrence = recurrence;
+        mRRule = mRRuleFormatter.format(mSelectedRecurrence);
+        String repeatString = getString(R.string.label_tap_to_create_schedule);
+        if (mSelectedRecurrence != com.maltaisn.recurpicker.Recurrence.DOES_NOT_REPEAT) {
+            repeatString = mRecurrenceFormatter.format(requireContext(), mSelectedRecurrence);
+        }
+
+        mRecurrenceTextView.setText(repeatString);
     }
 }
 

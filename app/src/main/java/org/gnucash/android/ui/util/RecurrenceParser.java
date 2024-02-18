@@ -16,12 +16,7 @@
 
 package org.gnucash.android.ui.util;
 
-import android.text.format.Time;
-
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-
-import com.codetroopers.betterpickers.recurrencepicker.EventRecurrence;
 
 import org.gnucash.android.model.PeriodType;
 import org.gnucash.android.model.Recurrence;
@@ -49,75 +44,6 @@ public class RecurrenceParser {
     public static final long MONTH_MILLIS = 30 * DAY_MILLIS;
     public static final long YEAR_MILLIS = 12 * MONTH_MILLIS;
 
-
-    /**
-     * Parse an {@link EventRecurrence} into a {@link Recurrence} object
-     *
-     * @param eventRecurrence EventRecurrence object
-     * @return Recurrence object
-     */
-    public static Recurrence parse(EventRecurrence eventRecurrence) {
-        if (eventRecurrence == null)
-            return null;
-
-        PeriodType periodType = switch (eventRecurrence.freq) {
-            case EventRecurrence.HOURLY -> PeriodType.HOUR;
-            case EventRecurrence.DAILY -> PeriodType.DAY;
-            case EventRecurrence.WEEKLY -> PeriodType.WEEK;
-            case EventRecurrence.MONTHLY -> PeriodType.MONTH;
-            case EventRecurrence.YEARLY -> PeriodType.YEAR;
-            default -> PeriodType.MONTH;
-        };
-
-        int interval = eventRecurrence.interval == 0 ? 1 : eventRecurrence.interval; //bug from betterpickers library sometimes returns 0 as the interval
-        Recurrence recurrence = new Recurrence(periodType);
-        recurrence.setMultiplier(interval);
-        parseEndTime(eventRecurrence, recurrence);
-        recurrence.setByDays(parseByDay(eventRecurrence.byday));
-        if (eventRecurrence.startDate != null)
-            recurrence.setPeriodStart(new Timestamp(eventRecurrence.startDate.toMillis(false)));
-
-        return recurrence;
-    }
-
-    /**
-     * Parses the end time from an EventRecurrence object and sets it to the <code>scheduledEvent</code>.
-     * The end time is specified in the dialog either by number of occurrences or a date.
-     *
-     * @param eventRecurrence Event recurrence pattern obtained from dialog
-     * @param recurrence      Recurrence event to set the end period to
-     */
-    private static void parseEndTime(EventRecurrence eventRecurrence, Recurrence recurrence) {
-        if (eventRecurrence.until != null && eventRecurrence.until.length() > 0) {
-            Time endTime = new Time();
-            endTime.parse(eventRecurrence.until);
-            recurrence.setPeriodEnd(new Timestamp(endTime.toMillis(false)));
-        } else if (eventRecurrence.count > 0) {
-            recurrence.setPeriodEnd(eventRecurrence.count);
-        }
-    }
-
-    /**
-     * Parses an array of byDay values to return a list of days of week
-     * constants from {@link Calendar}.
-     *
-     * <p>Currently only supports byDay values for weeks.</p>
-     *
-     * @param byDay Array of byDay values
-     * @return list of days of week constants from Calendar.
-     */
-    private static @NonNull List<Integer> parseByDay(@Nullable int[] byDay) {
-        if (byDay == null) {
-            return Collections.emptyList();
-        }
-
-        List<Integer> byDaysList = new ArrayList<>(byDay.length);
-        for (int day : byDay) {
-            byDaysList.add(EventRecurrence.day2CalendarDay(day));
-        }
-
-        return byDaysList;
-    }
 
     /**
      * Parse an {@link com.maltaisn.recurpicker.Recurrence } into a {@link Recurrence} object

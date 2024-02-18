@@ -86,7 +86,7 @@ public class DateRangePickerDialogFragment extends DialogFragment {
                 .inMode(CalendarPickerView.SelectionMode.RANGE)
                 .withSelectedDate(today);
 
-        mDoneButton.setText(R.string.done_label);
+        mDoneButton.setText(R.string.btn_save);
         mDoneButton.setOnClickListener(v -> {
             List<Date> selectedDates = mCalendarPickerView.getSelectedDates();
             Date startDate = selectedDates.get(0);
