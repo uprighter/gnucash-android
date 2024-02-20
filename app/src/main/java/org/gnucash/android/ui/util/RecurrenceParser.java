@@ -18,6 +18,8 @@ package org.gnucash.android.ui.util;
 
 import androidx.annotation.NonNull;
 
+import com.maltaisn.recurpicker.format.RRuleFormatter;
+
 import org.gnucash.android.model.PeriodType;
 import org.gnucash.android.model.Recurrence;
 
@@ -44,17 +46,20 @@ public class RecurrenceParser {
     public static final long MONTH_MILLIS = 30 * DAY_MILLIS;
     public static final long YEAR_MILLIS = 12 * MONTH_MILLIS;
 
+    private static final RRuleFormatter mRRuleFormatter = new RRuleFormatter();
+
 
     /**
-     * Parse an {@link com.maltaisn.recurpicker.Recurrence } into a {@link Recurrence} object
+     * Parse an RFC5545 string into a {@link Recurrence} object
      *
-     * @param eventRecurrence EventRecurrence object
+     * @param rRule String
      * @return Recurrence object
      */
-    public static Recurrence parse(long startTime, com.maltaisn.recurpicker.Recurrence eventRecurrence) {
-        if (eventRecurrence == null) {
+    public static Recurrence parse(long startTime, String rRule) {
+        if (rRule == null) {
             return null;
         }
+        com.maltaisn.recurpicker.Recurrence eventRecurrence = mRRuleFormatter.parse(rRule);
         PeriodType periodType = switch (eventRecurrence.getPeriod()) {
             case DAILY -> PeriodType.DAY;
             case WEEKLY -> PeriodType.WEEK;

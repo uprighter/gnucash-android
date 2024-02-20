@@ -19,16 +19,20 @@ package org.gnucash.android.ui.util;
 import android.app.DatePickerDialog;
 import android.app.Dialog;
 import android.app.TimePickerDialog;
+import android.content.Context;
 import android.os.Bundle;
 import android.util.Log;
 
+import androidx.annotation.MainThread;
 import androidx.annotation.NonNull;
 import androidx.fragment.app.DialogFragment;
+import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
 
 import com.maltaisn.recurpicker.Recurrence;
 import com.maltaisn.recurpicker.RecurrencePickerSettings;
+import com.maltaisn.recurpicker.format.RRuleFormatter;
 import com.maltaisn.recurpicker.list.RecurrenceListCallback;
 import com.maltaisn.recurpicker.list.RecurrenceListDialog;
 import com.maltaisn.recurpicker.picker.RecurrencePickerCallback;
@@ -79,34 +83,56 @@ public class DateTimePicker {
         }
     }
 
-    public interface RecurrencePickerListener {
-        void onRecurrenceSet(Recurrence recurrence);
+    public interface RRulePickerListener {
+        void onRecurrenceSet(String rRule);
     }
 
-    public static class RecurrencePicker implements
+    public static class RRulePickerFragment extends Fragment implements
             RecurrenceListCallback, RecurrencePickerCallback {
+        // Because RecurrenceListDialog could only use its parentFragment/targetFragment or
+        // activity as listener, this wrapper is necessary to implement listeners here.
         RecurrencePickerSettings settings = new RecurrencePickerSettings.Builder().build();
         long now = System.currentTimeMillis();
 
         RecurrenceListDialog listDialog;
         RecurrencePickerFragment pickerFragment;
         FragmentManager fm;
-        RecurrencePickerListener listener;
+        RRulePickerListener listener;
+        private static final RRuleFormatter mRRuleFormatter = new RRuleFormatter();
 
+        String initialRRule;
         Recurrence initialRecurrence;
 
-        public RecurrencePicker(FragmentManager fm, RecurrencePickerListener listener, Recurrence initialRecurrence) {
-            this.fm = fm;
+        public RRulePickerFragment(RRulePickerListener listener, String initialRRule) {
+            super(R.layout.fragment_rrule_picker);
+
             this.listener = listener;
-            this.initialRecurrence = initialRecurrence;
+            this.initialRRule = initialRRule;
+            if (initialRRule == null) {
+                this.initialRecurrence = Recurrence.DOES_NOT_REPEAT;
+            } else {
+                this.initialRecurrence = mRRuleFormatter.parse(initialRRule);
+            }
             listDialog = RecurrenceListDialog.newInstance(settings);
             pickerFragment = RecurrencePickerFragment.newInstance(settings);
         }
 
-        public void show() {
+        public void show(FragmentManager fm) {
+            fm.beginTransaction()
+                    .add(R.id.picker_fragment_container, this, "recurrence-picker-fragment")
+                    .setTransition(FragmentTransaction.TRANSIT_FRAGMENT_FADE)
+                    .addToBackStack(null)
+                    .commit();
+        }
+
+        @MainThread
+        @Override
+        public void onAttach(@NonNull Context context) {
+            super.onAttach(context);
+
             listDialog.setSelectedRecurrence(initialRecurrence);
             listDialog.setStartDate(now);
-            listDialog.show(fm, "recurrence-list-dialog");
+            listDialog.show(getChildFragmentManager(), "recurrence-list-dialog");
         }
 
         @Override
@@ -115,8 +141,8 @@ public class DateTimePicker {
             Log.d(LOG_TAG, "onRecurrenceCustomClicked.");
             pickerFragment.setSelectedRecurrence(initialRecurrence);
             pickerFragment.setStartDate(now);
-            fm.beginTransaction()
-                    .add(R.id.picker_fragment_container, pickerFragment, "recurrence-picker-fragment")
+            getChildFragmentManager().beginTransaction()
+                    .add(R.id.custom_picker_fragment_container, pickerFragment, "recurrence-picker-fragment")
                     .setTransition(FragmentTransaction.TRANSIT_FRAGMENT_FADE)
                     .addToBackStack(null)
                     .commit();
@@ -128,17 +154,25 @@ public class DateTimePicker {
         }
 
         @Override
-        public void onRecurrencePresetSelected(@NonNull com.maltaisn.recurpicker.Recurrence recurrence) {
+        public void onRecurrencePresetSelected(@NonNull Recurrence recurrence) {
             // A recurrence preset item in the recurrence list dialog was selected.
             Log.d(LOG_TAG, String.format("onRecurrencePresetSelected(%s).", recurrence));
-            listener.onRecurrenceSet(recurrence);
+            if (recurrence == Recurrence.DOES_NOT_REPEAT) {
+                listener.onRecurrenceSet(null);
+            } else {
+                listener.onRecurrenceSet(mRRuleFormatter.format(recurrence));
+            }
         }
 
         @Override
-        public void onRecurrenceCreated(@NonNull com.maltaisn.recurpicker.Recurrence recurrence) {
+        public void onRecurrenceCreated(@NonNull Recurrence recurrence) {
             // A custom recurrence was created with the recurrence picker fragment.
             Log.d(LOG_TAG, String.format("onRecurrenceCreated(%s).", recurrence));
-            listener.onRecurrenceSet(recurrence);
+            if (recurrence == Recurrence.DOES_NOT_REPEAT) {
+                listener.onRecurrenceSet(null);
+            } else {
+                listener.onRecurrenceSet(mRRuleFormatter.format(recurrence));
+            }
         }
 
         @Override

@@ -91,7 +91,7 @@ import java.util.Objects;
  */
 public class ExportFormFragment extends Fragment implements
         TimePickerDialog.OnTimeSetListener, DatePickerDialog.OnDateSetListener,
-        DateTimePicker.RecurrencePickerListener {
+        DateTimePicker.RRulePickerListener {
 
     /**
      * Tag for logging
@@ -362,8 +362,7 @@ public class ExportFormFragment extends Fragment implements
 
         if (mRRule != null) {
             ScheduledAction scheduledAction = new ScheduledAction(ScheduledAction.ActionType.BACKUP);
-            com.maltaisn.recurpicker.Recurrence selectedRecurrence = mRRuleFormatter.parse(mRRule);
-            scheduledAction.setRecurrence(RecurrenceParser.parse(0, selectedRecurrence));
+            scheduledAction.setRecurrence(RecurrenceParser.parse(0, mRRule));
             scheduledAction.setTag(exportParameters.toCsv());
             scheduledAction.setActionUID(BaseModel.generateUID());
             ScheduledActionDbAdapter.getInstance().addRecord(scheduledAction, DatabaseAdapter.UpdateMethod.insert);
@@ -469,8 +468,7 @@ public class ExportFormFragment extends Fragment implements
 
         mRecurrenceTextView.setOnClickListener(v -> {
             Log.d(LOG_TAG, "mRecurrenceTextView.setOnClickListener.");
-            com.maltaisn.recurpicker.Recurrence selectedRecurrence = mRRuleFormatter.parse(mRRule);
-            new DateTimePicker.RecurrencePicker(getChildFragmentManager(), this, selectedRecurrence).show();
+            new DateTimePicker.RRulePickerFragment(this, mRRule).show(getChildFragmentManager());
         });
 
         SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(requireActivity());
@@ -566,12 +564,12 @@ public class ExportFormFragment extends Fragment implements
     }
 
     @Override
-    public void onRecurrenceSet(com.maltaisn.recurpicker.Recurrence recurrence) {
-        Log.d(LOG_TAG, String.format("setSelectedRecurrence(%s).", recurrence));
+    public void onRecurrenceSet(String rRule) {
+        Log.d(LOG_TAG, String.format("onRecurrenceSet(%s).", rRule));
         String repeatString = getString(R.string.label_tap_to_create_schedule);
-        if (recurrence != com.maltaisn.recurpicker.Recurrence.DOES_NOT_REPEAT) {
-            mRRule = mRRuleFormatter.format(recurrence);
-            repeatString = mRecurrenceFormatter.format(requireContext(), recurrence);
+        if (rRule != null) {
+            mRRule = rRule;
+            repeatString = mRecurrenceFormatter.format(requireContext(), mRRuleFormatter.parse(mRRule));
         }
 
         mRecurrenceTextView.setText(repeatString);

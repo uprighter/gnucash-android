@@ -81,7 +81,7 @@ import java.util.Objects;
  * Fragment for creating or editing Budgets
  */
 public class BudgetFormFragment extends Fragment
-        implements DatePickerDialog.OnDateSetListener, DateTimePicker.RecurrencePickerListener {
+        implements DatePickerDialog.OnDateSetListener, DateTimePicker.RRulePickerListener {
 
     public static final String LOG_TAG = BudgetFormFragment.class.getName();
 
@@ -179,8 +179,7 @@ public class BudgetFormFragment extends Fragment
 
         mRecurrenceInput.setOnClickListener(v -> {
             Log.d(LOG_TAG, "mRecurrenceTextView.setOnClickListener.");
-            com.maltaisn.recurpicker.Recurrence selectedRecurrence = mRRuleFormatter.parse(mRRule);
-            new DateTimePicker.RecurrencePicker(getChildFragmentManager(), this, selectedRecurrence).show();
+            new DateTimePicker.RRulePickerFragment(this, mRRule).show(getChildFragmentManager());
         });
 
         mStartDateInput.setOnClickListener((View v) -> {
@@ -312,8 +311,7 @@ public class BudgetFormFragment extends Fragment
 
         mBudget.setDescription(mDescriptionInput.getText().toString().trim());
 
-        com.maltaisn.recurpicker.Recurrence selectedRecurrence = mRRuleFormatter.parse(mRRule);
-        Recurrence recurrence = RecurrenceParser.parse(0, selectedRecurrence);
+        Recurrence recurrence = RecurrenceParser.parse(0, mRRule);
         recurrence.setPeriodStart(new Timestamp(mStartDate.getTimeInMillis()));
         mBudget.setRecurrence(recurrence);
 
@@ -336,12 +334,12 @@ public class BudgetFormFragment extends Fragment
     }
 
     @Override
-    public void onRecurrenceSet(com.maltaisn.recurpicker.Recurrence recurrence) {
-        Log.d(LOG_TAG, String.format("setSelectedRecurrence(%s).", recurrence));
+    public void onRecurrenceSet(String rRule) {
+        Log.d(LOG_TAG, String.format("onRecurrenceSet(%s).", rRule));
         String repeatString = getString(R.string.label_tap_to_create_schedule);
-        if (recurrence != com.maltaisn.recurpicker.Recurrence.DOES_NOT_REPEAT) {
-            mRRule = mRRuleFormatter.format(recurrence);
-            repeatString = mRecurrenceFormatter.format(requireContext(), recurrence);
+        if (rRule != null) {
+            mRRule = rRule;
+            repeatString = mRecurrenceFormatter.format(requireContext(), mRRuleFormatter.parse(mRRule));
         }
 
         mRecurrenceInput.setText(repeatString);

@@ -134,6 +134,12 @@
         </TableLayout>
     </ScrollView>
 
+    <FrameLayout
+        android:id="@+id/picker_fragment_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        />
+
     <android.inputmethodservice.KeyboardView
         android:id="@+id/calculator_keyboard"
         android:layout_width="match_parent"

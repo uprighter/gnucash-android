@@ -252,4 +252,11 @@
         </LinearLayout>
 
     </LinearLayout>
+
+    <FrameLayout
+        android:id="@+id/picker_fragment_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        />
+
 </ScrollView>
