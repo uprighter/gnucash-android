@@ -47,6 +47,8 @@ import com.github.mikephil.charting.components.LimitLine;
 import com.github.mikephil.charting.data.BarData;
 import com.github.mikephil.charting.data.BarDataSet;
 import com.github.mikephil.charting.data.BarEntry;
+import com.maltaisn.recurpicker.format.RRuleFormatter;
+import com.maltaisn.recurpicker.format.RecurrenceFormatter;
 
 import org.gnucash.android.R;
 import org.gnucash.android.databinding.CardviewBudgetAmountBinding;
@@ -65,6 +67,7 @@ import org.gnucash.android.ui.util.widget.EmptyRecyclerView;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -93,6 +96,9 @@ public class BudgetDetailFragment extends Fragment implements Refreshable {
                 }
             }
     );
+
+    private final RRuleFormatter mRRuleFormatter = new RRuleFormatter();
+    private final RecurrenceFormatter mRecurrenceFormatter = new RecurrenceFormatter(DateFormat.getInstance());
 
     public static BudgetDetailFragment newInstance(String budgetUID) {
         BudgetDetailFragment fragment = new BudgetDetailFragment();
@@ -147,7 +153,12 @@ public class BudgetDetailFragment extends Fragment implements Refreshable {
         else {
             mBudgetDescriptionTextView.setVisibility(View.GONE);
         }
-        mBudgetRecurrence.setText(Objects.requireNonNull(budget.getRecurrence()).getRepeatString());
+        String repeatString = getString(R.string.label_tap_to_create_schedule);
+        if (budget.getRecurrence() != null) {
+            repeatString = mRecurrenceFormatter.format(BudgetDetailFragment.this.requireContext(),
+                    mRRuleFormatter.parse(Objects.requireNonNull(budget.getRecurrence().getRrule())));
+        }
+        mBudgetRecurrence.setText(repeatString);
 
         mRecyclerView.setAdapter(new BudgetAmountAdapter());
     }
@@ -265,7 +276,7 @@ public class BudgetDetailFragment extends Fragment implements Refreshable {
             //todo: refactor getNumberOfPeriods into budget
             int budgetPeriods = (int) mBudget.getNumberOfPeriods();
             budgetPeriods = budgetPeriods == 0 ? 12 : budgetPeriods;
-            int periods = Objects.requireNonNull(mBudget.getRecurrence()).getNumberOfPeriods(budgetPeriods); //// FIXME: 15.08.2016 why do we need number of periods
+            int periods = budgetPeriods; //// FIXME: 15.08.2016 why do we need number of periods
 
             for (int periodNum = 1; periodNum <= periods; periodNum++) {
                 BigDecimal amount = accountsDbAdapter.getAccountBalance(budgetAmount.getAccountUID(),
@@ -277,7 +288,7 @@ public class BudgetDetailFragment extends Fragment implements Refreshable {
                 }
 
                 barEntries.add(new BarEntry(amount.floatValue(), periodNum));
-                xVals.add(mBudget.getRecurrence().getTextOfCurrentPeriod(periodNum));
+                xVals.add(Integer.toString(periodNum));
             }
 
             String label = accountsDbAdapter.getAccountName(budgetAmount.getAccountUID());

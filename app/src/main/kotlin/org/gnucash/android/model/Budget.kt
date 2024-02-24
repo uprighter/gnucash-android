@@ -16,7 +16,6 @@
 package org.gnucash.android.model
 
 import android.util.Log
-import org.gnucash.android.model.Money.Companion.zeroInstance
 import org.gnucash.android.model.Money.CurrencyMismatchException
 import org.joda.time.LocalDateTime
 import java.math.BigDecimal
@@ -128,22 +127,6 @@ class Budget : BaseModel {
             if (budgetAmount.accountUID == accountUID) return budgetAmount.amount
         }
         return null
-    }
-
-    /**
-     * Returns the budget amount for a specific account and period
-     *
-     * @param accountUID GUID of the account
-     * @param periodNum  Budgeting period, zero-based index
-     * @return Money amount or zero if no matching [BudgetAmount] is found for the period
-     */
-    fun getAmount(accountUID: String, periodNum: Int): Money? {
-        for (budgetAmount in _budgetAmounts) {
-            if (budgetAmount.accountUID == accountUID && (budgetAmount.periodNum == periodNum.toLong() || budgetAmount.periodNum == -1L)) {
-                return budgetAmount.amount
-            }
-        }
-        return zeroInstance
     }
 
     /**

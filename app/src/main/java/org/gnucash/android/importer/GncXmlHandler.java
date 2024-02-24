@@ -61,9 +61,6 @@ import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.text.ParseException;
 import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Collections;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -264,15 +261,6 @@ public class GncXmlHandler extends DefaultHandler {
      */
     boolean mIgnoreScheduledAction = false;
 
-    /**
-     * Used for parsing old backup files where recurrence was saved inside the transaction.
-     * Newer backup files will not require this
-     *
-     * @deprecated Use the new scheduled action elements instead
-     */
-    @Deprecated
-    private long mRecurrencePeriod = 0;
-
     private TransactionsDbAdapter mTransactionsDbAdapter;
 
     private ScheduledActionDbAdapter mScheduledActionsDbAdapter;
@@ -373,7 +361,7 @@ public class GncXmlHandler extends DefaultHandler {
             case GncXmlHelper.TAG_BUDGET -> mBudget = new Budget();
             case GncXmlHelper.TAG_GNC_RECURRENCE, GncXmlHelper.TAG_BUDGET_RECURRENCE -> {
                 mRecurrenceMultiplier = 1;
-                mRecurrence = new Recurrence(PeriodType.MONTH);
+                mRecurrence = new Recurrence(PeriodType.MONTH, "", new Timestamp(0));
             }
             case GncXmlHelper.TAG_BUDGET_SLOTS -> mInBudgetSlot = true;
             case GncXmlHelper.TAG_SLOT -> {
@@ -596,10 +584,6 @@ public class GncXmlHandler extends DefaultHandler {
                     throw new SAXException(message, e);
                 }
                 break;
-            case GncXmlHelper.TAG_RECURRENCE_PERIOD: //for parsing of old backup files
-                mRecurrencePeriod = Long.parseLong(characterString);
-                mTransaction.setTemplate(mRecurrencePeriod > 0);
-                break;
             case GncXmlHelper.TAG_SPLIT_ID:
                 mSplit.setUID(characterString);
                 break;
@@ -647,27 +631,6 @@ public class GncXmlHandler extends DefaultHandler {
             //todo: import split reconciled state and date
             case GncXmlHelper.TAG_TRN_SPLIT:
                 mTransaction.addSplit(mSplit);
-                break;
-            case GncXmlHelper.TAG_TRANSACTION:
-                mTransaction.setTemplate(mInTemplates);
-                Split imbSplit = mTransaction.createAutoBalanceSplit();
-                if (imbSplit != null) {
-                    mAutoBalanceSplits.add(imbSplit);
-                }
-                if (mInTemplates) {
-                    if (!mIgnoreTemplateTransaction)
-                        mTemplateTransactions.add(mTransaction);
-                } else {
-                    mTransactionList.add(mTransaction);
-                }
-                if (mRecurrencePeriod > 0) { //if we find an old format recurrence period, parse it
-                    mTransaction.setTemplate(true);
-                    ScheduledAction scheduledAction = ScheduledAction.parseScheduledAction(mTransaction, mRecurrencePeriod);
-                    mScheduledActionsList.add(scheduledAction);
-                }
-                mRecurrencePeriod = 0;
-                mIgnoreTemplateTransaction = true;
-                mTransaction = null;
                 break;
             case GncXmlHelper.TAG_TEMPLATE_TRANSACTIONS:
                 mInTemplates = false;
@@ -753,13 +716,7 @@ public class GncXmlHandler extends DefaultHandler {
 
             case GncXmlHelper.TAG_SCHEDULED_ACTION:
                 if (mScheduledAction.getActionUID() != null && !mIgnoreScheduledAction) {
-                    if (Objects.requireNonNull(mScheduledAction.getRecurrence()).getPeriodType() == PeriodType.WEEK) {
-                        // TODO: implement parsing of by days for scheduled actions
-                        setMinimalScheduledActionByDays();
-                    }
                     mScheduledActionsList.add(mScheduledAction);
-                    int count = generateMissedScheduledTransactions(mScheduledAction);
-                    Log.i(LOG_TAG, String.format("Generated %d transactions from scheduled action", count));
                 }
                 mIgnoreScheduledAction = false;
                 break;
@@ -1037,63 +994,5 @@ public class GncXmlHandler extends DefaultHandler {
             else
                 mInDebitNumericSlot = false;
         }
-    }
-
-    /**
-     * Generates the runs of the scheduled action which have been missed since the file was last opened.
-     *
-     * @param scheduledAction Scheduled action for transaction
-     * @return Number of transaction instances generated
-     */
-    private int generateMissedScheduledTransactions(ScheduledAction scheduledAction) {
-        //if this scheduled action should not be run for any reason, return immediately
-        if (scheduledAction.getActionType() != ScheduledAction.ActionType.TRANSACTION
-                || !scheduledAction.isEnabled() || !scheduledAction.shouldAutoCreate()
-                || (scheduledAction.getEndTime() > 0 && scheduledAction.getEndTime() > System.currentTimeMillis())
-                || (scheduledAction.getTotalPlannedExecutionCount() > 0 && scheduledAction.getExecutionCount() >= scheduledAction.getTotalPlannedExecutionCount())) {
-            return 0;
-        }
-
-        long lastRuntime = scheduledAction.getStartTime();
-        if (scheduledAction.getLastRunTime() > 0) {
-            lastRuntime = scheduledAction.getLastRunTime();
-        }
-
-        int generatedTransactionCount = 0;
-        long period = scheduledAction.getPeriod();
-        final String actionUID = scheduledAction.getActionUID();
-        assert actionUID != null;
-        while ((lastRuntime = lastRuntime + period) <= System.currentTimeMillis()) {
-            for (Transaction templateTransaction : mTemplateTransactions) {
-                if (actionUID.equals(templateTransaction.getUID())) {
-                    Transaction transaction = new Transaction(templateTransaction, true);
-                    transaction.setTime(lastRuntime);
-                    transaction.setScheduledActionUID(scheduledAction.getUID());
-                    mTransactionList.add(transaction);
-                    //autobalance splits are generated with the currency of the transactions as the GUID
-                    //so we add them to the mAutoBalanceSplits which will be updated to real GUIDs before saving
-                    List<Split> autoBalanceSplits = transaction.getSplits(transaction.getCurrencyCode());
-                    mAutoBalanceSplits.addAll(autoBalanceSplits);
-                    scheduledAction.setExecutionCount(scheduledAction.getExecutionCount() + 1);
-                    ++generatedTransactionCount;
-                    break;
-                }
-            }
-        }
-        scheduledAction.setLastRun(lastRuntime);
-        return generatedTransactionCount;
-    }
-
-    /**
-     * Sets the by days of the scheduled action to the day of the week of the start time.
-     *
-     * <p>Until we implement parsing of days of the week for scheduled actions,
-     * this ensures they are executed at least once per week.</p>
-     */
-    private void setMinimalScheduledActionByDays() {
-        Calendar calendar = Calendar.getInstance();
-        calendar.setTime(new Date(mScheduledAction.getStartTime()));
-        Objects.requireNonNull(mScheduledAction.getRecurrence()).setByDays(
-                Collections.singletonList(calendar.get(Calendar.DAY_OF_WEEK)));
     }
 }

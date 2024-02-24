@@ -61,19 +61,14 @@ public class RecurrenceDbAdapter extends DatabaseAdapter<Recurrence> {
     @Override
     public Recurrence buildModelInstance(@NonNull Cursor cursor) {
         String type = cursor.getString(cursor.getColumnIndexOrThrow(RecurrenceEntry.COLUMN_PERIOD_TYPE));
-        long multiplier = cursor.getLong(cursor.getColumnIndexOrThrow(RecurrenceEntry.COLUMN_MULTIPLIER));
         String periodStart = cursor.getString(cursor.getColumnIndexOrThrow(RecurrenceEntry.COLUMN_PERIOD_START));
-        String periodEnd = cursor.getString(cursor.getColumnIndexOrThrow(RecurrenceEntry.COLUMN_PERIOD_END));
         String byDays = cursor.getString(cursor.getColumnIndexOrThrow(RecurrenceEntry.COLUMN_BYDAY));
 
         PeriodType periodType = PeriodType.valueOf(type);
 
-        Recurrence recurrence = new Recurrence(periodType);
-        recurrence.setMultiplier((int) multiplier);
+        Recurrence recurrence = new Recurrence(periodType, "", new Timestamp(0));
         recurrence.setPeriodStart(Timestamp.valueOf(periodStart));
-        if (periodEnd != null)
-            recurrence.setPeriodEnd(Timestamp.valueOf(periodEnd));
-        recurrence.setByDays(stringToByDays(byDays));
+        recurrence.setRrule(byDays);
 
         populateBaseModelAttributes(cursor, recurrence);
 
@@ -85,13 +80,9 @@ public class RecurrenceDbAdapter extends DatabaseAdapter<Recurrence> {
         stmt.clearBindings();
         stmt.bindLong(1, recurrence.getMultiplier());
         stmt.bindString(2, recurrence.getPeriodType().name());
-        if (!recurrence.getByDays().isEmpty())
-            stmt.bindString(3, byDaysToString(recurrence.getByDays()));
+        stmt.bindString(3, recurrence.getRrule());
         //recurrence should always have a start date
         stmt.bindString(4, recurrence.getPeriodStart().toString());
-
-        if (recurrence.getPeriodEnd() != null)
-            stmt.bindString(5, recurrence.getPeriodEnd().toString());
         stmt.bindString(6, recurrence.getUID());
 
         return stmt;

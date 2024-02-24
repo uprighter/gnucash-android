@@ -16,17 +16,13 @@
 
 package org.gnucash.android.ui.util;
 
-import androidx.annotation.NonNull;
-
+import com.maltaisn.recurpicker.RecurrenceFinder;
 import com.maltaisn.recurpicker.format.RRuleFormatter;
 
 import org.gnucash.android.model.PeriodType;
 import org.gnucash.android.model.Recurrence;
 
 import java.sql.Timestamp;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Collections;
 import java.util.List;
 
 /**
@@ -36,18 +32,23 @@ import java.util.List;
  * @author Ngewi Fet <ngewif@gmail.com>
  */
 public class RecurrenceParser {
-    //these are time millisecond constants which are used for scheduled actions.
-    //they may not be calendar accurate, but they serve the purpose for scheduling approximate time for background service execution
-    public static final long SECOND_MILLIS = 1000;
-    public static final long MINUTE_MILLIS = 60 * SECOND_MILLIS;
-    public static final long HOUR_MILLIS = 60 * MINUTE_MILLIS;
-    public static final long DAY_MILLIS = 24 * HOUR_MILLIS;
-    public static final long WEEK_MILLIS = 7 * DAY_MILLIS;
-    public static final long MONTH_MILLIS = 30 * DAY_MILLIS;
-    public static final long YEAR_MILLIS = 12 * MONTH_MILLIS;
 
     private static final RRuleFormatter mRRuleFormatter = new RRuleFormatter();
+    private static final RecurrenceFinder mRecurrenceFinder = new RecurrenceFinder();
 
+    public static String format(Recurrence recurrence) {
+        return recurrence.getRrule();
+    }
+
+    /**
+     * Parse an RFC5545 string into a {@link Recurrence} object
+     *
+     * @param rRule String
+     * @return Recurrence object
+     */
+    public static Recurrence parse(String rRule) {
+        return parse(System.currentTimeMillis(), rRule);
+    }
 
     /**
      * Parse an RFC5545 string into a {@link Recurrence} object
@@ -59,8 +60,8 @@ public class RecurrenceParser {
         if (rRule == null) {
             return null;
         }
-        com.maltaisn.recurpicker.Recurrence eventRecurrence = mRRuleFormatter.parse(rRule);
-        PeriodType periodType = switch (eventRecurrence.getPeriod()) {
+        com.maltaisn.recurpicker.Recurrence pickerRecurrence = mRRuleFormatter.parse(rRule);
+        PeriodType periodType = switch (pickerRecurrence.getPeriod()) {
             case DAILY -> PeriodType.DAY;
             case WEEKLY -> PeriodType.WEEK;
             case YEARLY -> PeriodType.YEAR;
@@ -68,68 +69,33 @@ public class RecurrenceParser {
             default -> PeriodType.MONTH;
         };
 
-        Recurrence recurrence = new Recurrence(periodType);
-        recurrence.setMultiplier(eventRecurrence.getFrequency());
-        recurrence.setByDays(parseByDay(eventRecurrence.getByDay()));
-        if (startTime != 0 ) {
-            recurrence.setPeriodStart(new Timestamp(startTime));
-        }
-        parseEndTime(eventRecurrence, recurrence);
-
-        return recurrence;
+        return new Recurrence(periodType, rRule, new Timestamp(startTime));
     }
-
-    /**
-     * Parses the end time from an EventRecurrence object and sets it to the <code>scheduledEvent</code>.
-     * The end time is specified in the dialog either by number of occurrences or a date.
-     *
-     * @param eventRecurrence Event recurrence pattern obtained from dialog
-     * @param recurrence      Recurrence event to set the end period to
-     */
-    private static void parseEndTime(com.maltaisn.recurpicker.Recurrence  eventRecurrence, Recurrence recurrence) {
-        if (eventRecurrence.getEndType() == com.maltaisn.recurpicker.Recurrence.EndType.BY_DATE) {
-            recurrence.setPeriodEnd(new Timestamp(eventRecurrence.getEndDate()));
-        } else if (eventRecurrence.getEndType() == com.maltaisn.recurpicker.Recurrence.EndType.BY_COUNT) {
-            recurrence.setPeriodEnd(eventRecurrence.getEndCount());
+    public static long getEndTime(String rRule, long startTime) {
+        com.maltaisn.recurpicker.Recurrence pickerRecurrence = mRRuleFormatter.parse(rRule);
+        if (pickerRecurrence.getEndType() == com.maltaisn.recurpicker.Recurrence.EndType.BY_DATE) {
+            return pickerRecurrence.getEndDate();
+        } else if (pickerRecurrence.getEndType() == com.maltaisn.recurpicker.Recurrence.EndType.BY_COUNT) {
+            List<Long> events = mRecurrenceFinder.find(pickerRecurrence, startTime, pickerRecurrence.getEndCount());
+            if (events.size() == 0) {
+                return startTime - 1;
+            } else {
+                return events.get(events.size()-1);
+            }
+        } else {
+            // Return any future time. Here use 1 day later.
+            return System.currentTimeMillis() + 86400000;
         }
     }
 
-    /**
-     * Parses an array of byDay values to return a list of days of week
-     * constants from {@link Calendar}.
-     *
-     * <p>Currently only supports byDay values for weeks.</p>
-     *
-     * @param byDay Array of byDay values
-     * @return list of days of week constants from Calendar.
-     */
-    private static @NonNull List<Integer> parseByDay(int byDay) {
-        if (byDay == 0) {
-            return Collections.emptyList();
+    public static long getNextExecutionTime(String rRule, long startTime, long lastTime, int baseCount) {
+        com.maltaisn.recurpicker.Recurrence pickerRecurrence = mRRuleFormatter.parse(rRule);
+        List<Long> events = mRecurrenceFinder.findBasedOn(pickerRecurrence,
+                startTime, lastTime, baseCount, 1, lastTime, false);
+        if (events.size() == 0) {
+            return startTime - 1;
+        } else {
+            return events.get(events.size()-1);
         }
-        List<Integer> byDaysList = new ArrayList<>(Integer.bitCount(byDay) - 1);
-        if ((byDay & com.maltaisn.recurpicker.Recurrence.SUNDAY) !=0) {
-            byDaysList.add(Calendar.SUNDAY);
-        }
-        if ((byDay & com.maltaisn.recurpicker.Recurrence.MONDAY) !=0) {
-            byDaysList.add(Calendar.MONDAY);
-        }
-        if ((byDay & com.maltaisn.recurpicker.Recurrence.TUESDAY) !=0) {
-            byDaysList.add(Calendar.TUESDAY);
-        }
-        if ((byDay & com.maltaisn.recurpicker.Recurrence.WEDNESDAY) !=0) {
-            byDaysList.add(Calendar.WEDNESDAY);
-        }
-        if ((byDay & com.maltaisn.recurpicker.Recurrence.THURSDAY) !=0) {
-            byDaysList.add(Calendar.THURSDAY);
-        }
-        if ((byDay & com.maltaisn.recurpicker.Recurrence.FRIDAY) !=0) {
-            byDaysList.add(Calendar.FRIDAY);
-        }
-        if ((byDay & com.maltaisn.recurpicker.Recurrence.SATURDAY) !=0) {
-            byDaysList.add(Calendar.SATURDAY);
-        }
-
-        return byDaysList;
     }
 }

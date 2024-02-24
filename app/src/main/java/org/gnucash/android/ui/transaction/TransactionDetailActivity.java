@@ -18,12 +18,13 @@ import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.widget.Toolbar;
 
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.maltaisn.recurpicker.format.RRuleFormatter;
+import com.maltaisn.recurpicker.format.RecurrenceFormatter;
 
 import org.gnucash.android.R;
+import org.gnucash.android.app.GnuCashApplication;
 import org.gnucash.android.databinding.ActivityTransactionDetailBinding;
 import org.gnucash.android.databinding.ItemSplitAmountInfoBinding;
-
-import org.gnucash.android.app.GnuCashApplication;
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.db.adapter.ScheduledActionDbAdapter;
 import org.gnucash.android.db.adapter.TransactionsDbAdapter;
@@ -76,6 +77,9 @@ public class TransactionDetailActivity extends PasscodeLockActivity {
     private String mTransactionUID;
     private String mAccountUID;
     private int mDetailTableRows;
+
+    private final RRuleFormatter mRRuleFormatter = new RRuleFormatter();
+    private final RecurrenceFormatter mRecurrenceFormatter = new RecurrenceFormatter(DateFormat.getInstance());
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -193,7 +197,12 @@ public class TransactionDetailActivity extends PasscodeLockActivity {
 
         if (transaction.getScheduledActionUID() != null) {
             ScheduledAction scheduledAction = ScheduledActionDbAdapter.getInstance().getRecord(transaction.getScheduledActionUID());
-            mRecurrence.setText(scheduledAction.getRepeatString());
+            String repeatString = getString(R.string.label_tap_to_create_schedule);
+            if (scheduledAction.getRecurrence() != null) {
+                repeatString = mRecurrenceFormatter.format(getApplicationContext(),
+                        mRRuleFormatter.parse(Objects.requireNonNull(scheduledAction.getRecurrence().getRrule())));
+            }
+            mRecurrence.setText(repeatString);
             mRowTrnRecurrence.setVisibility(View.VISIBLE);
         } else {
             mRowTrnRecurrence.setVisibility(View.GONE);

@@ -41,8 +41,10 @@ import org.gnucash.android.db.adapter.TransactionsDbAdapter;
 import org.gnucash.android.export.ExportAsyncTask;
 import org.gnucash.android.export.ExportParams;
 import org.gnucash.android.model.Book;
+import org.gnucash.android.model.Recurrence;
 import org.gnucash.android.model.ScheduledAction;
 import org.gnucash.android.model.Transaction;
+import org.gnucash.android.ui.util.RecurrenceParser;
 
 import java.sql.Timestamp;
 import java.util.ArrayList;
@@ -141,7 +143,6 @@ public class ScheduledActionService extends JobIntentService {
         }
 
         if (executionCount > 0) {
-            scheduledAction.setLastRun(System.currentTimeMillis());
             // Set the execution count in the object because it will be checked
             // for the next iteration in the calling loop.
             // This call is important, do not remove!!
@@ -214,13 +215,23 @@ public class ScheduledActionService extends JobIntentService {
     @SuppressWarnings("RedundantIfStatement")
     private static boolean shouldExecuteScheduledBackup(ScheduledAction scheduledAction) {
         long now = System.currentTimeMillis();
-        long endTime = scheduledAction.getEndTime();
-
-        if (endTime > 0 && endTime < now)
+        Recurrence recurrence = scheduledAction.getRecurrence();
+        if (recurrence == null) {
             return false;
+        }
+        long endTime = RecurrenceParser.getEndTime(recurrence.getRrule(), scheduledAction.getStartTime());
 
-        if (scheduledAction.computeNextTimeBasedScheduledExecutionTime() > now)
+        if (endTime > 0 && endTime < now) {
             return false;
+        }
+
+        if (RecurrenceParser.getNextExecutionTime(
+                recurrence.getRrule(),
+                scheduledAction.getStartTime(),
+                scheduledAction.getStartTime(),
+                scheduledAction.getExecutionCount()) > now) {
+            return false;
+        }
 
         return true;
     }
@@ -250,14 +261,26 @@ public class ScheduledActionService extends JobIntentService {
         //if there is an end time in the past, we execute all schedules up to the end time.
         //if the end time is in the future, we execute all schedules until now (current time)
         //if there is no end time, we execute all schedules until now
-        long endTime = scheduledAction.getEndTime() > 0 ? Math.min(scheduledAction.getEndTime(), now) : now;
+        Recurrence recurrence = scheduledAction.getRecurrence();
+        if (recurrence == null) {
+            return 0;
+        }
+        long endTime = RecurrenceParser.getEndTime(recurrence.getRrule(), scheduledAction.getStartTime());
+        endTime = (endTime > 0) ? Math.min(endTime, now) : now;
         int totalPlannedExecutions = scheduledAction.getTotalPlannedExecutionCount();
         List<Transaction> transactions = new ArrayList<>();
 
         int previousExecutionCount = scheduledAction.getExecutionCount(); // We'll modify it
         //we may be executing scheduled action significantly after scheduled time (depending on when Android fires the alarm)
         //so compute the actual transaction time from pre-known values
-        long transactionTime = scheduledAction.computeNextCountBasedScheduledExecutionTime();
+
+        int totalExecutionCount = scheduledAction.getExecutionCount();
+        long lastRunTime = scheduledAction.getLastRunTime();
+        long transactionTime = RecurrenceParser.getNextExecutionTime(
+                recurrence.getRrule(),
+                scheduledAction.getStartTime(),
+                lastRunTime,
+                totalExecutionCount);
         while (transactionTime <= endTime) {
             Transaction recurringTrxn = new Transaction(trxnTemplate, true);
             recurringTrxn.setTime(transactionTime);
@@ -268,12 +291,19 @@ public class ScheduledActionService extends JobIntentService {
             if (totalPlannedExecutions > 0 && executionCount >= totalPlannedExecutions) {
                 break; //if we hit the total planned executions set, then abort
             }
-            transactionTime = scheduledAction.computeNextCountBasedScheduledExecutionTime();
+            lastRunTime = transactionTime;
+            transactionTime = RecurrenceParser.getNextExecutionTime(
+                    recurrence.getRrule(),
+                    scheduledAction.getStartTime(),
+                    lastRunTime,
+                    totalExecutionCount + executionCount);
         }
 
         transactionsDbAdapter.bulkAddRecords(transactions, DatabaseAdapter.UpdateMethod.insert);
         // Be nice and restore the parameter's original state to avoid confusing the callers
         scheduledAction.setExecutionCount(previousExecutionCount);
+        scheduledAction.setLastRun(lastRunTime);
+
         return executionCount;
     }
 }

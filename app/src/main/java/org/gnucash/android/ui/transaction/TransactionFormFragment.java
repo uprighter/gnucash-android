@@ -411,6 +411,7 @@ public class TransactionFormFragment extends Fragment implements
             initializeViewsWithTransaction();
             mEditMode = true;
         }
+        Log.d(LOG_TAG, String.format("mEditMode=%b, mTransaction=%s.", mEditMode, mTransaction));
 
         requireActivity().getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
     }
@@ -546,8 +547,11 @@ public class TransactionFormFragment extends Fragment implements
         String scheduledActionUID = requireArguments().getString(UxArgument.SCHEDULED_ACTION_UID);
         if (scheduledActionUID != null && !scheduledActionUID.isEmpty()) {
             ScheduledAction scheduledAction = ScheduledActionDbAdapter.getInstance().getRecord(scheduledActionUID);
-            mRRule = scheduledAction.getRuleString();
-            mRecurrenceTextView.setText(scheduledAction.getRepeatString());
+            if (scheduledAction.getRecurrence() != null) {
+                mRRule = scheduledAction.getRecurrence().getRrule();
+            }
+            String repeatString = mRecurrenceFormatter.format(requireContext(), mRRuleFormatter.parse(mRRule));
+            mRecurrenceTextView.setText(repeatString);
         }
     }
 
@@ -962,7 +966,8 @@ public class TransactionFormFragment extends Fragment implements
 
         String scheduledActionUID = requireArguments().getString(UxArgument.SCHEDULED_ACTION_UID);
 
-        if (scheduledActionUID != null) { //if we are editing an existing schedule
+        if (scheduledActionUID != null) {
+            // if we are editing an existing schedule, override the UID first.
             scheduledAction.setUID(scheduledActionUID);
             long updated = scheduledActionDbAdapter.updateRecurrenceAttributes(scheduledAction);
             Log.d(LOG_TAG, String.format("%s actions updated for %s.", updated, scheduledAction));

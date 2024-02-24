@@ -54,6 +54,7 @@ import org.gnucash.android.model.AccountType;
 import org.gnucash.android.model.BaseModel;
 import org.gnucash.android.model.Commodity;
 import org.gnucash.android.model.Money;
+import org.gnucash.android.model.PeriodType;
 import org.gnucash.android.model.Recurrence;
 import org.gnucash.android.model.ScheduledAction;
 import org.gnucash.android.model.Transaction;
@@ -1373,7 +1374,7 @@ public class MigrationHelper {
                 String uid = cursor.getString(cursor.getColumnIndexOrThrow(ScheduledActionEntry.COLUMN_UID));
                 long period = cursor.getLong(cursor.getColumnIndexOrThrow("period"));
                 long startTime = cursor.getLong(cursor.getColumnIndexOrThrow(ScheduledActionEntry.COLUMN_START_TIME));
-                Recurrence recurrence = Recurrence.fromLegacyPeriod(period);
+                Recurrence recurrence = new Recurrence(PeriodType.WEEK, "", new Timestamp(0));
                 recurrence.setPeriodStart(new Timestamp(startTime));
 
                 contentValues.clear();

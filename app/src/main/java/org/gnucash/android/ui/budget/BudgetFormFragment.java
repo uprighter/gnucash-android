@@ -221,8 +221,8 @@ public class BudgetFormFragment extends Fragment
         mBudgetNameInput.setText(budget.getName());
         mDescriptionInput.setText(budget.getDescription());
 
-        mRRule = Objects.requireNonNull(budget.getRecurrence()).getRuleString();
-        mRecurrenceInput.setText(budget.getRecurrence().getRepeatString());
+        mRRule = Objects.requireNonNull(budget.getRecurrence()).getRrule();
+        mRecurrenceInput.setText(budget.getRecurrence().getRrule());
 
         mBudgetAmounts = (ArrayList<BudgetAmount>) budget.getCompactedBudgetAmounts();
         toggleAmountInputVisibility();

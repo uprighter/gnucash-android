@@ -91,12 +91,10 @@ public class DateTimePicker {
             RecurrenceListCallback, RecurrencePickerCallback {
         // Because RecurrenceListDialog could only use its parentFragment/targetFragment or
         // activity as listener, this wrapper is necessary to implement listeners here.
-        RecurrencePickerSettings settings = new RecurrencePickerSettings.Builder().build();
         long now = System.currentTimeMillis();
 
         RecurrenceListDialog listDialog;
         RecurrencePickerFragment pickerFragment;
-        FragmentManager fm;
         RRulePickerListener listener;
         private static final RRuleFormatter mRRuleFormatter = new RRuleFormatter();
 
@@ -113,6 +111,7 @@ public class DateTimePicker {
             } else {
                 this.initialRecurrence = mRRuleFormatter.parse(initialRRule);
             }
+            RecurrencePickerSettings settings = new RecurrencePickerSettings.Builder().build();
             listDialog = RecurrenceListDialog.newInstance(settings);
             pickerFragment = RecurrencePickerFragment.newInstance(settings);
         }

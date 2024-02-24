@@ -51,6 +51,9 @@ import androidx.fragment.app.ListFragment;
 import androidx.loader.app.LoaderManager;
 import androidx.loader.content.Loader;
 
+import com.maltaisn.recurpicker.format.RRuleFormatter;
+import com.maltaisn.recurpicker.format.RecurrenceFormatter;
+
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
 import org.gnucash.android.db.DatabaseCursorLoader;
@@ -103,6 +106,9 @@ public class ScheduledActionsListFragment extends ListFragment implements
                 }
             }
     );
+
+    private final RRuleFormatter mRRuleFormatter = new RRuleFormatter();
+    private final RecurrenceFormatter mRecurrenceFormatter = new RecurrenceFormatter(DateFormat.getInstance());
 
     /**
      * Callbacks for the menu items in the Context ActionBar (CAB) in action mode
@@ -483,7 +489,12 @@ public class ScheduledActionsListFragment extends ListFragment implements
                 descriptionTextView.setText(getString(R.string.label_scheduled_action_ended,
                         DateFormat.getInstance().format(new Date(scheduledAction.getLastRunTime()))));
             } else {
-                descriptionTextView.setText(scheduledAction.getRepeatString());
+                String repeatString = getString(R.string.label_tap_to_create_schedule);
+                if (scheduledAction.getRecurrence() != null) {
+                    repeatString = mRecurrenceFormatter.format(ScheduledActionsListFragment.this.requireContext(),
+                            mRRuleFormatter.parse(Objects.requireNonNull(scheduledAction.getRecurrence().getRrule())));
+                }
+                descriptionTextView.setText(repeatString);
             }
         }
     }
@@ -563,7 +574,6 @@ public class ScheduledActionsListFragment extends ListFragment implements
             view.findViewById(R.id.right_text).setVisibility(View.GONE);
 
             TextView descriptionTextView = view.findViewById(R.id.secondary_text);
-            descriptionTextView.setText(scheduledAction.getRepeatString());
             long endTime = scheduledAction.getEndTime();
             if (endTime > 0 && endTime < System.currentTimeMillis()) {
                 ((TextView) view.findViewById(R.id.primary_text))
@@ -571,7 +581,12 @@ public class ScheduledActionsListFragment extends ListFragment implements
                 descriptionTextView.setText(getString(R.string.label_scheduled_action_ended,
                         DateFormat.getInstance().format(new Date(scheduledAction.getLastRunTime()))));
             } else {
-                descriptionTextView.setText(scheduledAction.getRepeatString());
+                String repeatString = getString(R.string.label_tap_to_create_schedule);
+                if (scheduledAction.getRecurrence() != null) {
+                    repeatString = mRecurrenceFormatter.format(ScheduledActionsListFragment.this.requireContext(),
+                            mRRuleFormatter.parse(Objects.requireNonNull(scheduledAction.getRecurrence().getRrule())));
+                }
+                descriptionTextView.setText(repeatString);
             }
         }
     }

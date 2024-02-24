@@ -233,8 +233,9 @@ public class BudgetListFragment extends Fragment implements Refreshable,
             }
             holder.accountName.setText(accountString);
 
-            holder.budgetRecurrence.setText(String.format(Locale.getDefault(), "%s - %d days left", Objects.requireNonNull(budget.getRecurrence()).getRepeatString(),
-                    budget.getRecurrence().getDaysLeftInCurrentPeriod()));
+            holder.budgetRecurrence.setText(
+                    String.format(Locale.getDefault(), "%s - x days left",
+                            Objects.requireNonNull(budget.getRecurrence()).getRrule()));
 
             BigDecimal spentAmountValue = BigDecimal.ZERO;
             for (BudgetAmount budgetAmount : budget.getCompactedBudgetAmounts()) {
