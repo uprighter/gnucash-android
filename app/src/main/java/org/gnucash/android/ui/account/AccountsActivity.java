@@ -346,8 +346,8 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
             return;
         }
 
-        // Try to backup. If failed, create the backup file.
-        if (!BackupManager.backupBook(bookUID)) {
+        // If backup failed due to SecurityException, re-choose backup files.
+        if (BackupManager.getBookBackupFileUri(bookUID) == null) {
             String bookName = BooksDbAdapter.getInstance().getActiveBookDisplayName();
             createBackupFileLauncher.launch(BackupManager.createBackupFileIntent(
                     Exporter.sanitizeFilename(bookName) + "_" + getString(R.string.label_backup_filename)));

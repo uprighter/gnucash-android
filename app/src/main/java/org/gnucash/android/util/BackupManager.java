@@ -133,6 +133,7 @@ public class BackupManager {
             Log.e(LOG_TAG, "Error creating XML backup", e);
         } catch (SecurityException ex) {
             Log.e(LOG_TAG, String.format("Auto backup failed for book %s, SecurityException: ", bookUID), ex);
+            clearBookBackupFileUri(bookUID);
             FirebaseCrashlytics.getInstance().recordException(ex);
         }
         return false;
@@ -184,6 +185,14 @@ public class BackupManager {
     public static String getBookBackupFileUri(String bookUID) {
         SharedPreferences sharedPreferences = PreferenceActivity.getBookSharedPreferences(bookUID);
         return sharedPreferences.getString(KEY_BACKUP_FILE, null);
+    }
+
+    public static void clearBookBackupFileUri(String bookUID) {
+        SharedPreferences sharedPreferences = PreferenceActivity.getBookSharedPreferences(bookUID);
+        PreferenceActivity.getBookSharedPreferences(bookUID)
+                .edit()
+                .putString(BackupManager.KEY_BACKUP_FILE, null)
+                .apply();
     }
 
     /**
