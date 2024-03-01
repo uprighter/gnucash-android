@@ -376,7 +376,7 @@ public class AccountsListFragment extends Fragment implements
      */
     @Override
     public void refresh() {
-        if (mAccountSelectedListener != null) {  // Already attached.
+        if (isAdded()) {  // Ensure Fragment is attached to avoid IllegalStateException.
             LoaderManager.getInstance(this).restartLoader(0, null, this);
         }
     }
