@@ -35,6 +35,8 @@ import org.gnucash.android.app.GnuCashApplication;
 import org.gnucash.android.db.adapter.BooksDbAdapter;
 import org.gnucash.android.ui.passcode.PasscodeLockActivity;
 
+import java.lang.reflect.InvocationTargetException;
+
 /**
  * Activity for unified preferences
  */
@@ -67,8 +69,9 @@ public class PreferenceActivity extends PasscodeLockActivity implements
         Fragment fragment;
         try {
             Class<?> clazz = Class.forName(pref.getFragment());
-            fragment = (Fragment) clazz.newInstance();
-        } catch (ClassNotFoundException | InstantiationException | IllegalAccessException e) {
+            fragment = (Fragment) clazz.getDeclaredConstructor().newInstance();
+        } catch (NoSuchMethodException | InvocationTargetException | ClassNotFoundException |
+                 InstantiationException | IllegalAccessException e) {
             e.printStackTrace();
             //if we do not have a matching class, do nothing
             return false;

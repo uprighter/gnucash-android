@@ -25,7 +25,6 @@ import android.os.Bundle;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.Button;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -35,10 +34,10 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.AppCompatButton;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
-import androidx.fragment.app.FragmentManager;
-import androidx.fragment.app.FragmentStatePagerAdapter;
+import androidx.fragment.app.FragmentActivity;
 import androidx.preference.PreferenceManager;
-import androidx.viewpager.widget.ViewPager;
+import androidx.viewpager2.adapter.FragmentStateAdapter;
+import androidx.viewpager2.widget.ViewPager2;
 
 import com.tech.freak.wizardpager.model.AbstractWizardModel;
 import com.tech.freak.wizardpager.model.ModelCallbacks;
@@ -64,7 +63,7 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
         PageFragmentCallbacks, ReviewFragment.Callbacks, ModelCallbacks {
     public static final String LOG_TAG = FirstRunWizardActivity.class.getName();
 
-    ViewPager mPager;
+    ViewPager2 mPager;
     AppCompatButton mNextButton;
     Button mPrevButton;
     StepPagerStrip mStepPagerStrip;
@@ -76,7 +75,6 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
     private AbstractWizardModel mWizardModel;
 
     private boolean mConsumePageSelectedEvent;
-
 
     private List<Page> mCurrentPageSequence;
     private String mAccountOptions;
@@ -107,11 +105,11 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
 
         setTitle(getString(R.string.title_setup_gnucash));
 
-        mPagerAdapter = new MyPagerAdapter(getSupportFragmentManager());
+        mPagerAdapter = new MyPagerAdapter(this);
         mPager.setAdapter(mPagerAdapter);
         mStepPagerStrip
                 .setOnPageSelectedListener(position -> {
-                    position = Math.min(mPagerAdapter.getCount() - 1,
+                    position = Math.min(mPagerAdapter.getItemCount() - 1,
                             position);
                     if (mPager.getCurrentItem() != position) {
                         mPager.setCurrentItem(position);
@@ -119,7 +117,7 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
                 });
 
 
-        mPager.setOnPageChangeListener(new ViewPager.SimpleOnPageChangeListener() {
+        mPager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
             @Override
             public void onPageSelected(int position) {
                 mStepPagerStrip.setCurrentPage(position);
@@ -167,7 +165,7 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
                 createAccountsAndFinish();
             } else {
                 if (mEditingAfterReview) {
-                    mPager.setCurrentItem(mPagerAdapter.getCount() - 1);
+                    mPager.setCurrentItem(mPagerAdapter.getItemCount() - 1);
                 } else {
                     mPager.setCurrentItem(mPager.getCurrentItem() + 1);
                 }
@@ -178,8 +176,8 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
         TypedValue v = new TypedValue();
         getTheme().resolveAttribute(android.R.attr.textAppearanceMedium, v,
                 true);
-        mPrevButton.setTextAppearance(this, v.resourceId);
-        mNextButton.setTextAppearance(this, v.resourceId);
+        mPrevButton.setTextAppearance(v.resourceId);
+        mNextButton.setTextAppearance(v.resourceId);
 
         mPrevButton.setOnClickListener(view -> mPager.setCurrentItem(mPager.getCurrentItem() - 1));
 
@@ -244,8 +242,8 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
             mNextButton.setText(R.string.btn_wizard_finish);
 
             mNextButton.setBackgroundDrawable(
-                    new ColorDrawable(ContextCompat.getColor(this, R.color.theme_accent)));
-            mNextButton.setTextColor(ContextCompat.getColor(this, android.R.color.white));
+                    new ColorDrawable(ContextCompat.getColor(this, android.R.color.transparent)));
+            mNextButton.setTextColor(ContextCompat.getColor(this, R.color.theme_accent));
         } else {
             mNextButton.setText(mEditingAfterReview ? R.string.review
                     : R.string.btn_wizard_next);
@@ -333,47 +331,29 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
         return false;
     }
 
-    public class MyPagerAdapter extends FragmentStatePagerAdapter {
+    public class MyPagerAdapter extends FragmentStateAdapter {
         private int mCutOffPage;
-        private Fragment mPrimaryItem;
 
-        public MyPagerAdapter(FragmentManager fm) {
-            super(fm);
+        public MyPagerAdapter(FragmentActivity fa) {
+            super(fa);
         }
 
-        @NonNull
         @Override
-        public Fragment getItem(int i) {
-            if (i >= mCurrentPageSequence.size()) {
+        @NonNull
+        public Fragment createFragment(int position) {
+            if (position >= mCurrentPageSequence.size()) {
                 return new ReviewFragment();
             }
 
-            return mCurrentPageSequence.get(i).createFragment();
+            return mCurrentPageSequence.get(position).createFragment();
         }
 
         @Override
-        public int getItemPosition(@NonNull Object object) {
-            // TODO: be smarter about this
-            if (object == mPrimaryItem) {
-                // Re-use the current fragment (its position never changes)
-                return POSITION_UNCHANGED;
-            }
-
-            return POSITION_NONE;
-        }
-
-        @Override
-        public void setPrimaryItem(@NonNull ViewGroup container, int position,
-                                   @NonNull Object object) {
-            super.setPrimaryItem(container, position, object);
-            mPrimaryItem = (Fragment) object;
-        }
-
-        @Override
-        public int getCount() {
+        public int getItemCount() {
             return Math.min(mCutOffPage + 1, mCurrentPageSequence == null ? 1
                     : mCurrentPageSequence.size() + 1);
         }
+
 
         public void setCutOffPage(int cutOffPage) {
             if (cutOffPage < 0) {

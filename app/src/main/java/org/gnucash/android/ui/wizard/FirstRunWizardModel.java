@@ -70,6 +70,7 @@ public class FirstRunWizardModel extends AbstractWizardModel {
                 new SingleFixedChoicePage(this, mContext.getString(R.string.wizard_title_feedback_options))
                         .setChoices(mContext.getString(R.string.wizard_option_auto_send_crash_reports),
                                 mContext.getString(R.string.wizard_option_disable_crash_reports))
+                        .setValue(mContext.getString(R.string.wizard_option_auto_send_crash_reports))
                         .setRequired(true)
         );
     }

@@ -20,6 +20,7 @@ package org.gnucash.android.ui.account;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.Editor;
@@ -349,8 +350,18 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
         // If backup failed due to SecurityException, re-choose backup files.
         if (BackupManager.getBookBackupFileUri(bookUID) == null) {
             String bookName = BooksDbAdapter.getInstance().getActiveBookDisplayName();
-            createBackupFileLauncher.launch(BackupManager.createBackupFileIntent(
-                    Exporter.sanitizeFilename(bookName) + "_" + getString(R.string.label_backup_filename)));
+            new AlertDialog.Builder(this)
+                    .setTitle("Select backup file for current book.")
+                    .setMessage("This is used for auto-backup. If not set, it will ask everytime you open this.")
+                    .setIcon(android.R.drawable.ic_dialog_alert)
+                    .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            createBackupFileLauncher.launch(BackupManager.createBackupFileIntent(
+                                    Exporter.sanitizeFilename(bookName) + "_" + getString(R.string.label_backup_filename)));
+                        }
+                    })
+                    .setNegativeButton(android.R.string.no, null).show();
         }
 
         if (hasNewFeatures()) {

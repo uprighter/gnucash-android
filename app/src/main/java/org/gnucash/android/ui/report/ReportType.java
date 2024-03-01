@@ -27,6 +27,7 @@ import org.gnucash.android.ui.report.linechart.CashFlowLineChartFragment;
 import org.gnucash.android.ui.report.piechart.PieChartFragment;
 import org.gnucash.android.ui.report.sheet.BalanceSheetFragment;
 
+import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -74,8 +75,9 @@ public enum ReportType {
     public BaseReportFragment getFragment(String name) {
         BaseReportFragment fragment = null;
         try {
-            fragment = (BaseReportFragment) mReportTypeMap.get(name).newInstance();
-        } catch (InstantiationException | IllegalAccessException e) {
+            fragment = (BaseReportFragment) mReportTypeMap.get(name).getDeclaredConstructor().newInstance();
+        } catch (NoSuchMethodException | InvocationTargetException | InstantiationException |
+                 IllegalAccessException e) {
             e.printStackTrace();
         }
         return fragment;
