@@ -100,20 +100,23 @@ public class TransactionsListFragment extends Fragment implements
     private TransactionRecyclerAdapter mTransactionRecyclerAdapter;
     private EmptyRecyclerView mRecyclerView;
 
-    private final ActivityResultLauncher<Intent> launcher = registerForActivityResult(
-            new ActivityResultContracts.StartActivityForResult(),
-            result -> {
-                Log.d(LOG_TAG, "launch intent: result = " + result);
-                if (result.getResultCode() == Activity.RESULT_CANCELED) {
-                    return;
-                }
-                refresh();
-            }
-    );
+    private ActivityResultLauncher<Intent> launcher;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        launcher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                result -> {
+                    Log.d(LOG_TAG, "launch intent: result = " + result);
+                    if (result.getResultCode() == Activity.RESULT_CANCELED) {
+                        return;
+                    }
+                    refresh();
+                }
+        );
+
         setHasOptionsMenu(true);
         Bundle args = requireArguments();
         mAccountUID = args.getString(UxArgument.SELECTED_ACCOUNT_UID);
@@ -261,7 +264,7 @@ public class TransactionsListFragment extends Fragment implements
         final String fragmentResultRequestKey = "delete_transaction_" + transactionId;
         int titleId = R.string.msg_delete_transaction_confirmation;
         int messageId = transactionId == 0 ? R.string.msg_delete_all_transactions_confirmation : R.string.msg_delete_transaction_confirmation;
-        new AlertDialog.Builder(getActivity())
+        new AlertDialog.Builder(requireActivity())
                 .setIcon(android.R.drawable.ic_delete)
                 .setTitle(titleId).setMessage(messageId)
                 .setPositiveButton(R.string.alert_dialog_ok_delete,
@@ -455,10 +458,16 @@ public class TransactionsListFragment extends Fragment implements
             public boolean onMenuItemClick(MenuItem item) {
                 if (item.getItemId() == R.id.context_menu_delete) {
                     return handleMenuDeleteTransaction(transactionId);
-                } else if (item.getItemId() == R.id.context_menu_duplicate_transaction) {
+                } else if (item.getItemId() == R.id.context_menu_duplicate_transaction_to_date) {
                     Transaction transaction = mTransactionsDbAdapter.getRecord(transactionId);
                     Transaction duplicate = new Transaction(transaction, true);
                     duplicate.setTime(System.currentTimeMillis());
+                    mTransactionsDbAdapter.addRecord(duplicate, DatabaseAdapter.UpdateMethod.insert);
+                    refresh();
+                    return true;
+                } else if (item.getItemId() == R.id.context_menu_duplicate_transaction) {
+                    Transaction transaction = mTransactionsDbAdapter.getRecord(transactionId);
+                    Transaction duplicate = new Transaction(transaction, true);
                     mTransactionsDbAdapter.addRecord(duplicate, DatabaseAdapter.UpdateMethod.insert);
                     refresh();
                     return true;
