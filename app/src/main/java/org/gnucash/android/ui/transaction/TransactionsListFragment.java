@@ -16,13 +16,14 @@
 
 package org.gnucash.android.ui.transaction;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.database.Cursor;
 import android.os.Bundle;
-import android.text.TextUtils;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -32,19 +33,21 @@ import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.PopupMenu;
 import androidx.fragment.app.Fragment;
-import androidx.fragment.app.FragmentManager;
-import androidx.fragment.app.FragmentResultListener;
 import androidx.loader.app.LoaderManager;
 import androidx.loader.content.Loader;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.viewbinding.ViewBinding;
 
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
@@ -67,11 +70,12 @@ import org.gnucash.android.ui.homescreen.WidgetConfigurationActivity;
 import org.gnucash.android.ui.settings.PreferenceActivity;
 import org.gnucash.android.ui.transaction.dialog.BulkMoveDialogFragment;
 import org.gnucash.android.ui.util.CursorRecyclerAdapter;
+import org.gnucash.android.ui.util.widget.EmptyRecyclerView;
 import org.gnucash.android.util.BackupManager;
 
+import java.util.ArrayList;
 import java.util.List;
-
-import timber.log.Timber;
+import java.util.Objects;
 
 /**
  * List Fragment for displaying list of transactions for an account
@@ -79,7 +83,14 @@ import timber.log.Timber;
  * @author Ngewi Fet <ngewif@gmail.com>
  */
 public class TransactionsListFragment extends Fragment implements
-    Refreshable, LoaderManager.LoaderCallbacks<Cursor>, FragmentResultListener {
+        Refreshable, LoaderManager.LoaderCallbacks<Cursor> {
+
+    /**
+     * Logging tag
+     */
+    protected static final String LOG_TAG = TransactionsListFragment.class.getName();
+
+    private FragmentTransactionsListBinding mBinding;
 
     private TransactionsDbAdapter mTransactionsDbAdapter;
     private String mAccountUID;
@@ -87,60 +98,83 @@ public class TransactionsListFragment extends Fragment implements
     private boolean mUseCompactView = false;
 
     private TransactionRecyclerAdapter mTransactionRecyclerAdapter;
+    private EmptyRecyclerView mRecyclerView;
 
-    private FragmentTransactionsListBinding mBinding;
+    private ActivityResultLauncher<Intent> launcher;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        launcher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                result -> {
+                    Log.d(LOG_TAG, "launch intent: result = " + result);
+                    if (result.getResultCode() == Activity.RESULT_CANCELED) {
+                        return;
+                    }
+                    refresh();
+                }
+        );
+
         setHasOptionsMenu(true);
-        Bundle args = getArguments();
+        Bundle args = requireArguments();
         mAccountUID = args.getString(UxArgument.SELECTED_ACCOUNT_UID);
 
         mUseCompactView = PreferenceActivity.getActiveBookSharedPreferences()
-                .getBoolean(getActivity().getString(R.string.key_use_compact_list), !GnuCashApplication.isDoubleEntryEnabled());
+                .getBoolean(requireActivity().getString(R.string.key_use_compact_list), !GnuCashApplication.isDoubleEntryEnabled());
         //if there was a local override of the global setting, respect it
-        if (savedInstanceState != null)
+        if (savedInstanceState != null) {
             mUseCompactView = savedInstanceState.getBoolean(getString(R.string.key_use_compact_list), mUseCompactView);
+        }
 
         mTransactionsDbAdapter = TransactionsDbAdapter.getInstance();
     }
 
     @Override
-    public void onSaveInstanceState(Bundle outState) {
+    public void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
         outState.putBoolean(getString(R.string.key_use_compact_list), mUseCompactView);
     }
 
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container,
-                             Bundle savedInstanceState) {
+    public View onCreateView(
+            @NonNull LayoutInflater inflater,
+            @Nullable ViewGroup container,
+            @Nullable Bundle savedInstanceState) {
         mBinding = FragmentTransactionsListBinding.inflate(inflater, container, false);
-        View view = mBinding.getRoot();
+        mRecyclerView = mBinding.transactionRecyclerView;
 
-        mBinding.transactionRecyclerView.setHasFixedSize(true);
+        mRecyclerView.setHasFixedSize(true);
+        mRecyclerView.setEmptyView(mBinding.emptyView);
+
         if (getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE) {
             GridLayoutManager gridLayoutManager = new GridLayoutManager(getActivity(), 2);
-            mBinding.transactionRecyclerView.setLayoutManager(gridLayoutManager);
+            mRecyclerView.setLayoutManager(gridLayoutManager);
         } else {
             LinearLayoutManager mLayoutManager = new LinearLayoutManager(getActivity());
-            mBinding.transactionRecyclerView.setLayoutManager(mLayoutManager);
+            mRecyclerView.setLayoutManager(mLayoutManager);
         }
-        mBinding.transactionRecyclerView.setEmptyView(view.findViewById(R.id.empty_view));
 
-        return view;
+        return mBinding.getRoot();
     }
 
     @Override
-    public void onActivityCreated(Bundle savedInstanceState) {
-        super.onActivityCreated(savedInstanceState);
+    public void onDestroy() {
+        super.onDestroy();
+        mBinding = null;
+    }
 
-        ActionBar aBar = ((AppCompatActivity) getActivity()).getSupportActionBar();
-        aBar.setDisplayShowTitleEnabled(false);
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+
+        ActionBar aBar = ((AppCompatActivity) requireActivity()).getSupportActionBar();
+        Objects.requireNonNull(aBar).setDisplayShowTitleEnabled(false);
         aBar.setDisplayHomeAsUpEnabled(true);
 
         mTransactionRecyclerAdapter = new TransactionRecyclerAdapter(null);
-        mBinding.transactionRecyclerView.setAdapter(mTransactionRecyclerAdapter);
+        mRecyclerView.setAdapter(mTransactionRecyclerAdapter);
 
         setHasOptionsMenu(true);
     }
@@ -161,27 +195,25 @@ public class TransactionsListFragment extends Fragment implements
      */
     @Override
     public void refresh() {
-        getLoaderManager().restartLoader(0, null, this);
+        LoaderManager.getInstance(this).restartLoader(0, null, this);
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        ((TransactionsActivity) getActivity()).updateNavigationSelection();
+        ((TransactionsActivity) requireActivity()).updateNavigationSelection();
         refresh();
     }
 
     public void onListItemClick(long id) {
-        Intent intent = new Intent(getActivity(), TransactionDetailActivity.class);
-        intent.putExtra(UxArgument.SELECTED_TRANSACTION_UID, mTransactionsDbAdapter.getUID(id));
-        intent.putExtra(UxArgument.SELECTED_ACCOUNT_UID, mAccountUID);
-        startActivity(intent);
-//		mTransactionEditListener.editTransaction(mTransactionsDbAdapter.getUID(id));
+        Intent transactionDetailActivityIntent = new Intent(getActivity(), TransactionDetailActivity.class);
+        transactionDetailActivityIntent.putExtra(UxArgument.SELECTED_TRANSACTION_UID, mTransactionsDbAdapter.getUID(id));
+        transactionDetailActivityIntent.putExtra(UxArgument.SELECTED_ACCOUNT_UID, mAccountUID);
+        launcher.launch(transactionDetailActivityIntent);
     }
 
     @Override
     public void onCreateOptionsMenu(@NonNull Menu menu, @NonNull MenuInflater inflater) {
-        super.onCreateOptionsMenu(menu, inflater);
         inflater.inflate(R.menu.transactions_list_actions, menu);
     }
 
@@ -194,43 +226,82 @@ public class TransactionsListFragment extends Fragment implements
     }
 
     @Override
-    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
-        switch (item.getItemId()) {
-            case R.id.menu_compact_trn_view:
-                item.setChecked(!item.isChecked());
-                mUseCompactView = !mUseCompactView;
-                refresh();
-                return true;
-            default:
-                return super.onOptionsItemSelected(item);
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == R.id.menu_compact_trn_view) {
+            item.setChecked(!item.isChecked());
+            mUseCompactView = !mUseCompactView;
+            refresh();
+            return true;
+        } else {
+            return super.onOptionsItemSelected(item);
         }
     }
 
     @Override
+    @NonNull
     public Loader<Cursor> onCreateLoader(int arg0, Bundle arg1) {
-        Timber.d("Creating transactions loader");
+        Log.d(LOG_TAG, "Creating transactions loader");
         return new TransactionsCursorLoader(getActivity(), mAccountUID);
     }
 
+    @SuppressLint("NotifyDataSetChanged")
     @Override
-    public void onLoadFinished(Loader<Cursor> loader, Cursor cursor) {
-        Timber.d("Transactions loader finished. Swapping in cursor");
+    public void onLoadFinished(@NonNull Loader<Cursor> loader, Cursor cursor) {
+        Log.d(LOG_TAG, "Transactions loader finished. Swapping in cursor");
         mTransactionRecyclerAdapter.swapCursor(cursor);
         mTransactionRecyclerAdapter.notifyDataSetChanged();
     }
 
     @Override
-    public void onLoaderReset(Loader<Cursor> loader) {
-        Timber.d("Resetting transactions loader");
+    public void onLoaderReset(@NonNull Loader<Cursor> loader) {
+        Log.d(LOG_TAG, "Resetting transactions loader");
         mTransactionRecyclerAdapter.swapCursor(null);
     }
 
-    @Override
-    public void onFragmentResult(@NonNull String requestKey, @NonNull Bundle result) {
-        if (BulkMoveDialogFragment.TAG.equals(requestKey)) {
-            boolean refresh = result.getBoolean(Refreshable.EXTRA_REFRESH);
-            if (refresh) refresh();
-        }
+    private boolean handleMenuDeleteTransaction(final long transactionId) {
+        BackupManager.backupActiveBook(); //create backup before deleting anything.
+
+        final String fragmentResultRequestKey = "delete_transaction_" + transactionId;
+        int titleId = R.string.msg_delete_transaction_confirmation;
+        int messageId = transactionId == 0 ? R.string.msg_delete_all_transactions_confirmation : R.string.msg_delete_transaction_confirmation;
+        new AlertDialog.Builder(getActivity())
+                .setIcon(android.R.drawable.ic_delete)
+                .setTitle(titleId).setMessage(messageId)
+                .setPositiveButton(R.string.alert_dialog_ok_delete,
+                        (dialog, whichButton) -> {
+                            // Notify listeners.
+                            getParentFragmentManager().setFragmentResult(fragmentResultRequestKey, new Bundle());
+                        }
+                )
+                .setNegativeButton(R.string.alert_dialog_cancel,
+                        (dialog, whichButton) -> dialog.dismiss()
+                )
+                .create().show();
+
+        getParentFragmentManager().setFragmentResultListener(
+                fragmentResultRequestKey, TransactionsListFragment.this, (_requestKey, _bundle) -> {
+                    Log.d(LOG_TAG, "handleMenuDeleteTransaction " + _requestKey + ", " + _bundle);
+                    if (transactionId == 0) {
+                        List<Transaction> openingBalances = new ArrayList<>();
+                        boolean preserveOpeningBalances = GnuCashApplication.shouldSaveOpeningBalances(false);
+                        if (preserveOpeningBalances) {
+                            openingBalances = AccountsDbAdapter.getInstance().getAllOpeningBalanceTransactions();
+                        }
+
+                        mTransactionsDbAdapter.deleteAllRecords();
+
+                        if (preserveOpeningBalances) {
+                            mTransactionsDbAdapter.bulkAddRecords(openingBalances, DatabaseAdapter.UpdateMethod.insert);
+                        }
+                    } else {
+                        mTransactionsDbAdapter.deleteRecord(transactionId);
+                    }
+
+                    WidgetConfigurationActivity.updateAllWidgets(getActivity());
+                    refresh();
+                });
+
+        return true;
     }
 
     /**
@@ -266,14 +337,15 @@ public class TransactionsListFragment extends Fragment implements
         }
 
         @Override
-        public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+        @NonNull
+        public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            Log.d(LOG_TAG, "onCreateViewHolder, viewType: " + viewType);
             if (viewType == ITEM_TYPE_COMPACT) {
-                CardviewCompactTransactionBinding binding = CardviewCompactTransactionBinding.inflate(LayoutInflater.from(parent.getContext()), parent, false);
-                return new ViewHolder(binding);
-            } else {
-                CardviewTransactionBinding binding = CardviewTransactionBinding.inflate(LayoutInflater.from(parent.getContext()), parent, false);
-                return new ViewHolder(binding);
+                return new ViewHolder(CardviewCompactTransactionBinding.inflate(
+                        LayoutInflater.from(parent.getContext()), parent, false));
             }
+            return new ViewHolder(CardviewTransactionBinding.inflate(
+                    LayoutInflater.from(parent.getContext()), parent, false));
         }
 
         @Override
@@ -296,52 +368,41 @@ public class TransactionsListFragment extends Fragment implements
             String dateText = TransactionsActivity.getPrettyDateFormat(getActivity(), dateMillis);
 
             final long id = holder.transactionId;
-            holder.itemView.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    onListItemClick(id);
-                }
-            });
+            holder.itemView.setOnClickListener(v -> onListItemClick(id));
 
             if (mUseCompactView) {
                 holder.secondaryText.setText(dateText);
             } else {
-
                 List<Split> splits = SplitsDbAdapter.getInstance().getSplitsForTransaction(transactionUID);
                 String text = "";
-                String error = null;
 
-                if (splits.size() == 2) {
-                    if (splits.get(0).isPairOf(splits.get(1))) {
-                        for (Split split : splits) {
-                            if (!split.getAccountUID().equals(mAccountUID)) {
-                                text = AccountsDbAdapter.getInstance().getFullyQualifiedAccountName(split.getAccountUID());
-                                break;
-                            }
+                if (splits.size() == 2 && splits.get(0).isPairOf(splits.get(1))) {
+                    for (Split split : splits) {
+                        if (!mAccountUID.equals(split.getAccountUID())) {
+                            text = AccountsDbAdapter.getInstance().getFullyQualifiedAccountName(split.getAccountUID());
+                            break;
                         }
                     }
-                    if (TextUtils.isEmpty(text)) {
-                        text = getString(R.string.label_split_count, splits.size());
-                        error = getString(R.string.imbalance_account_name);
-                    }
                 }
+
                 if (splits.size() > 2) {
-                    text = getString(R.string.label_split_count, splits.size());
+                    text = splits.size() + " splits";
                 }
                 holder.secondaryText.setText(text);
-                holder.secondaryText.setError(error);
-                holder.transactionDate.setText(dateText);
 
-                holder.editTransaction.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        Intent intent = new Intent(getActivity(), FormActivity.class);
-                        intent.putExtra(UxArgument.FORM_TYPE, FormActivity.FormType.TRANSACTION.name());
-                        intent.putExtra(UxArgument.SELECTED_TRANSACTION_UID, transactionUID);
-                        intent.putExtra(UxArgument.SELECTED_ACCOUNT_UID, mAccountUID);
-                        startActivity(intent);
-                    }
-                });
+                if (holder.transactionDate != null) {
+                    holder.transactionDate.setText(dateText);
+                }
+
+                if (holder.editTransaction != null) {
+                    holder.editTransaction.setOnClickListener(v -> {
+                        Intent formActivityIntent = new Intent(getActivity(), FormActivity.class);
+                        formActivityIntent.putExtra(UxArgument.FORM_TYPE, FormActivity.FormType.TRANSACTION.name());
+                        formActivityIntent.putExtra(UxArgument.SELECTED_TRANSACTION_UID, transactionUID);
+                        formActivityIntent.putExtra(UxArgument.SELECTED_ACCOUNT_UID, mAccountUID);
+                        launcher.launch(formActivityIntent);
+                    });
+                }
             }
         }
 
@@ -359,30 +420,33 @@ public class TransactionsListFragment extends Fragment implements
 
             long transactionId;
 
-            public ViewHolder(CardviewCompactTransactionBinding binding) {
-                super(binding.getRoot());
-                primaryText = binding.listItem2Lines.primaryText;
-                secondaryText = binding.listItem2Lines.secondaryText;
-                transactionAmount = binding.transactionAmount;
-                optionsMenu = binding.optionsMenu;
-                setup();
-            }
+            public ViewHolder(ViewBinding viewBinding) {
+                super(viewBinding.getRoot());
+//                Log.d(LOG_TAG, "ViewHolder, viewBinding: " + viewBinding);
 
-            public ViewHolder(CardviewTransactionBinding binding) {
-                super(binding.getRoot());
-                primaryText = binding.listItem2Lines.primaryText;
-                secondaryText = binding.listItem2Lines.secondaryText;
-                transactionAmount = binding.transactionAmount;
-                optionsMenu = binding.optionsMenu;
-                transactionDate = binding.transactionDate;
-                editTransaction = binding.editTransaction;
-                setup();
-            }
+                if (mUseCompactView) {
+                    CardviewCompactTransactionBinding cardviewBinding = (CardviewCompactTransactionBinding) viewBinding;
 
-            private void setup() {
+                    primaryText = cardviewBinding.listItemTwoLines.primaryText;
+                    secondaryText = cardviewBinding.listItemTwoLines.secondaryText;
+                    transactionAmount = cardviewBinding.transactionAmount;
+                    optionsMenu = cardviewBinding.optionsMenu;
+                } else {
+                    CardviewTransactionBinding cardviewBinding = (CardviewTransactionBinding) viewBinding;
+
+                    primaryText = cardviewBinding.listItemTwoLines.primaryText;
+                    secondaryText = cardviewBinding.listItemTwoLines.secondaryText;
+                    transactionAmount = cardviewBinding.transactionAmount;
+                    optionsMenu = cardviewBinding.optionsMenu;
+
+                    //these views are not used in the compact view, hence the nullability
+                    transactionDate = cardviewBinding.transactionDate;
+                    editTransaction = cardviewBinding.editTransaction;
+                }
+
                 primaryText.setTextSize(18);
                 optionsMenu.setOnClickListener(v -> {
-                    PopupMenu popup = new PopupMenu(getActivity(), v);
+                    PopupMenu popup = new PopupMenu(requireActivity(), v);
                     popup.setOnMenuItemClickListener(ViewHolder.this);
                     MenuInflater inflater = popup.getMenuInflater();
                     inflater.inflate(R.menu.transactions_context_menu, popup.getMenu());
@@ -391,57 +455,39 @@ public class TransactionsListFragment extends Fragment implements
             }
 
             @Override
-            public boolean onMenuItemClick(@NonNull MenuItem item) {
-                switch (item.getItemId()) {
-                    case R.id.context_menu_delete:
-                        deleteTransaction(transactionId);
-                        return true;
+            public boolean onMenuItemClick(MenuItem item) {
+                if (item.getItemId() == R.id.context_menu_delete) {
+                    return handleMenuDeleteTransaction(transactionId);
+                } else if (item.getItemId() == R.id.context_menu_duplicate_transaction_to_date) {
+                    Transaction transaction = mTransactionsDbAdapter.getRecord(transactionId);
+                    Transaction duplicate = new Transaction(transaction, true);
+                    duplicate.setTime(System.currentTimeMillis());
+                    mTransactionsDbAdapter.addRecord(duplicate, DatabaseAdapter.UpdateMethod.insert);
+                    refresh();
+                    return true;
+                } else if (item.getItemId() == R.id.context_menu_duplicate_transaction) {
+                    Transaction transaction = mTransactionsDbAdapter.getRecord(transactionId);
+                    Transaction duplicate = new Transaction(transaction, true);
+                    mTransactionsDbAdapter.addRecord(duplicate, DatabaseAdapter.UpdateMethod.insert);
+                    refresh();
+                    return true;
+                } else if (item.getItemId() == R.id.context_menu_move_transaction) {
+                    long[] ids = new long[]{transactionId};
+                    BulkMoveDialogFragment fragment = BulkMoveDialogFragment.newInstance(ids, mAccountUID);
 
-                    case R.id.context_menu_duplicate_transaction:
-                        duplicateTransaction(transactionId);
-                        return true;
+                    Log.d(LOG_TAG, "context_menu_move_transaction_" + mAccountUID);
+                    getParentFragmentManager().setFragmentResultListener(
+                            fragment.getRequestKey(mAccountUID), TransactionsListFragment.this, (requestKey, bundle) -> {
+                                Log.d(LOG_TAG, "onFragmentResult " + requestKey + ", " + bundle);
+                                refresh();
+                            });
+                    fragment.show(getParentFragmentManager(), "bulk_move_transactions");
+                    return true;
 
-                    case R.id.context_menu_move_transaction:
-                        moveTransaction(transactionId);
-                        return true;
-
-                    default:
-                        return false;
-
+                } else {
+                    return false;
                 }
             }
         }
-    }
-
-    private void deleteTransaction(long transactionId) {
-        final Activity activity = requireActivity();
-        if (GnuCashApplication.shouldBackupTransactions(activity)) {
-            BackupManager.backupActiveBookAsync(activity, result -> {
-                mTransactionsDbAdapter.deleteRecord(transactionId);
-                WidgetConfigurationActivity.updateAllWidgets(activity);
-                refresh();
-                return null;
-            });
-        } else {
-            mTransactionsDbAdapter.deleteRecord(transactionId);
-            WidgetConfigurationActivity.updateAllWidgets(activity);
-            refresh();
-        }
-    }
-
-    private void duplicateTransaction(long transactionId) {
-        Transaction transaction = mTransactionsDbAdapter.getRecord(transactionId);
-        Transaction duplicate = new Transaction(transaction, true);
-        duplicate.setTime(System.currentTimeMillis());
-        mTransactionsDbAdapter.addRecord(duplicate, DatabaseAdapter.UpdateMethod.insert);
-        refresh();
-    }
-
-    private void moveTransaction(long transactionId) {
-        long[] ids = new long[]{transactionId};
-        FragmentManager fm = getParentFragmentManager();
-        fm.setFragmentResultListener(BulkMoveDialogFragment.TAG, TransactionsListFragment.this, TransactionsListFragment.this);
-        BulkMoveDialogFragment fragment = BulkMoveDialogFragment.newInstance(ids, mAccountUID);
-        fragment.show(fm, BulkMoveDialogFragment.TAG);
     }
 }
