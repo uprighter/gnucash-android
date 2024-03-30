@@ -22,7 +22,6 @@ import java.util.Objects;
 public class SplitEntryViewModel extends BaseObservable {
     public static final String LOG_TAG = SplitEntryViewModel.class.getName();
 
-
     // Enabled 2-way binding.
     private String inputSplitMemo = "";
     private String inputSplitAmount = "";
@@ -36,7 +35,7 @@ public class SplitEntryViewModel extends BaseObservable {
     private final AccountsDbAdapter mAccountsDbAdapter;
     private final SimpleCursorAdapter mCursorAdapter;
     private final String mDefaultCurrencySymbol;
-    private final Split mSplit;
+    private Split mSplit;
 
     private CalculatorEditText mSplitAmountEditText;
     private TransactionTypeSwitch mSplitTypeSwitch;
@@ -52,7 +51,7 @@ public class SplitEntryViewModel extends BaseObservable {
         this.mSplit = split;
     }
 
-    public void bind(
+    public void bindWithView(
             CalculatorEditText splitAmountEditText,
             TransactionTypeSwitch splitTypeSwitch) {
         this.mSplitAmountEditText = splitAmountEditText;
@@ -60,6 +59,7 @@ public class SplitEntryViewModel extends BaseObservable {
     }
 
     public void init() {
+//        Log.d(LOG_TAG, "init, mSplit=" + mSplit);
         if (mSplit != null) {
             setSplitCurrencySymbol(Objects.requireNonNull(Objects.requireNonNull(mSplit.getValue()).getCommodity()).getSymbol());
             setSplitUid(mSplit.getUID());
@@ -81,7 +81,13 @@ public class SplitEntryViewModel extends BaseObservable {
         }
     }
 
+    public void setSplit(Split split) {
+        Log.d(LOG_TAG, "setSplit, mSplit=" + mSplit);
+        mSplit = split;
+    }
+
     public Split getSplit() {
+//        Log.d(LOG_TAG, "getSplit, mSplit=" + mSplit);
         return mSplit;
     }
 
@@ -96,7 +102,7 @@ public class SplitEntryViewModel extends BaseObservable {
     @Override
     @NonNull
     public String toString() {
-        return String.format(Locale.getDefault(), "ViewModel(%s, %s, %b, %d).", inputSplitAmount, inputSplitMemo, splitTypeChecked, inputAccountPos);
+        return String.format(Locale.getDefault(), "ViewModel(%s, %s, %b, %s).", inputSplitAmount, inputSplitMemo, splitTypeChecked, mSplit);
     }
 
     @Bindable
@@ -121,7 +127,7 @@ public class SplitEntryViewModel extends BaseObservable {
 
     @Bindable
     public int getInputAccountPos() {
-        Log.d(LOG_TAG, "getInputAccountPos, old value " + this.inputAccountPos);
+//        Log.d(LOG_TAG, "getInputAccountPos, old value " + this.inputAccountPos);
         return inputAccountPos;
     }
 

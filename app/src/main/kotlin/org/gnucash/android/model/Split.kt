@@ -127,6 +127,9 @@ class Split : BaseModel, Parcelable {
      *
      * The value is in the currency of the containing transaction.
      * It's stored unsigned.
+     * Example: you buy something worth $100 with both USD ($70) and CNY ($30),
+     * then `value` of the 2 splits are 70 and 30 respectively, and
+     * the `quantity` of the 2 splits are 70 and ~210.
      *
      * @param value Money value of this split
      * @see .setQuantity
