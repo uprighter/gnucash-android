@@ -174,11 +174,6 @@
         <item>MUTUAL FUND</item>
         <item>TRADING</item>
     </string-array>
-    <string-array name="export_formats">
-        <item>QIF</item>
-        <item>OFX</item>
-        <item>XML</item>
-    </string-array>
     <!-- Default title for color picker dialog [CHAR LIMIT=30] -->
     <string name="color_picker_default_title">Select a Color</string>
     <!-- Content description for a color square. -->
@@ -448,8 +443,6 @@
     <string name="btn_restore">Restore</string>
     <string name="title_no_backups_found">No backups found</string>
     <string name="msg_no_backups_to_restore_from">There are no existing backup files to restore from</string>
-    <!-- This is the filename for default backups. So use only simple characters and no spaces. Do not change the extension -->
-    <string name="label_backup_filename">gnucash_android_backup.gnca</string>
     <string name="label_select_destination_after_export">Select the destination after export is complete</string>
     <string name="label_dropbox_export_destination">Export to \'/Apps/GnuCash Android/\' folder on Dropbox</string>
     <string name="title_section_preferences">Preferences</string>

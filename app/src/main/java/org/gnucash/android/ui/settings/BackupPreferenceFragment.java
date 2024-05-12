@@ -17,16 +17,20 @@
 package org.gnucash.android.ui.settings;
 
 import static org.gnucash.android.app.IntentExtKt.takePersistableUriPermission;
+import static org.gnucash.android.util.ContentExtKt.getDocumentName;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentSender;
 import android.content.SharedPreferences;
+import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
+import android.provider.DocumentsContract;
 import android.text.TextUtils;
 import android.widget.ArrayAdapter;
 import android.widget.Toast;
@@ -102,7 +106,6 @@ public class BackupPreferenceFragment extends PreferenceFragmentCompat implement
      */
     public static GoogleApiClient mGoogleApiClient;
 
-
     @Override
     public void onCreatePreferences(Bundle bundle, String s) {
         addPreferencesFromResource(R.xml.fragment_backup_preferences);
@@ -159,9 +162,9 @@ public class BackupPreferenceFragment extends PreferenceFragmentCompat implement
 
         pref = findPreference(getString(R.string.key_backup_location));
         pref.setOnPreferenceClickListener(this);
-        String defaultBackupLocation = BackupManager.getBookBackupFileUri(BooksDbAdapter.getInstance().getActiveBookUID());
+        Uri defaultBackupLocation = BackupManager.getBookBackupFileUri(BooksDbAdapter.getInstance().getActiveBookUID());
         if (defaultBackupLocation != null) {
-            pref.setSummary(Uri.parse(defaultBackupLocation).getAuthority());
+            pref.setSummary(getDocumentName(defaultBackupLocation, pref.getContext()));
         }
 
         pref = findPreference(getString(R.string.key_dropbox_sync));
@@ -182,11 +185,13 @@ public class BackupPreferenceFragment extends PreferenceFragmentCompat implement
         }
 
         if (key.equals(getString(R.string.key_backup_location))) {
-            Intent createIntent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
-            createIntent.setType("*/*");
-            createIntent.addCategory(Intent.CATEGORY_OPENABLE);
             String bookName = BooksDbAdapter.getInstance().getActiveBookDisplayName();
-            createIntent.putExtra(Intent.EXTRA_TITLE, Exporter.sanitizeFilename(bookName) + "_" + getString(R.string.label_backup_filename));
+            String fileName = Exporter.sanitizeFilename(bookName) + "_" + getString(R.string.label_backup_filename);
+
+            Intent createIntent = new Intent(Intent.ACTION_CREATE_DOCUMENT)
+                .setType(BackupManager.MIME_TYPE)
+                .addCategory(Intent.CATEGORY_OPENABLE)
+                .putExtra(Intent.EXTRA_TITLE, fileName);
             startActivityForResult(createIntent, REQUEST_BACKUP_FILE);
         }
 
@@ -380,7 +385,7 @@ public class BackupPreferenceFragment extends PreferenceFragmentCompat implement
         Timber.i("Opening GnuCash XML backups for restore");
         final String bookUID = BooksDbAdapter.getInstance().getActiveBookUID();
 
-        final String defaultBackupFile = BackupManager.getBookBackupFileUri(bookUID);
+        final Uri defaultBackupFile = BackupManager.getBookBackupFileUri(bookUID);
         if (defaultBackupFile != null) {
             AlertDialog.Builder builder = new AlertDialog.Builder(getActivity())
                     .setTitle(R.string.title_confirm_restore_backup)
@@ -393,8 +398,8 @@ public class BackupPreferenceFragment extends PreferenceFragmentCompat implement
                     })
                     .setPositiveButton(R.string.btn_restore, new DialogInterface.OnClickListener() {
                         @Override
-                        public void onClick(DialogInterface dialogInterface, int i) {
-                            new ImportAsyncTask(getActivity()).execute(Uri.parse(defaultBackupFile));
+                        public void onClick(DialogInterface dialog, int which) {
+                            new ImportAsyncTask(getActivity()).execute(defaultBackupFile);
                         }
                     });
             builder.create().show();
@@ -479,7 +484,7 @@ public class BackupPreferenceFragment extends PreferenceFragmentCompat implement
                             .apply();
 
                     Preference pref = findPreference(getString(R.string.key_backup_location));
-                    pref.setSummary(backupFileUri.getAuthority());
+                    pref.setSummary(getDocumentName(backupFileUri, pref.getContext()));
                 }
                 break;
         }

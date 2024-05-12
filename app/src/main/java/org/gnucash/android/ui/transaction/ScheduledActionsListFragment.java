@@ -16,7 +16,10 @@
 
 package org.gnucash.android.ui.transaction;
 
+import static org.gnucash.android.util.ContentExtKt.getDocumentName;
+
 import android.app.Activity;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Resources;
@@ -25,6 +28,7 @@ import android.graphics.Rect;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.DocumentsContract;
 import android.util.SparseBooleanArray;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -572,11 +576,15 @@ public class ScheduledActionsListFragment extends ListFragment implements
             ExportParams params = ExportParams.parseCsv(scheduledAction.getTag());
             String exportDestination = params.getExportTarget().getDescription();
             if (params.getExportTarget() == ExportParams.ExportTarget.URI) {
-                exportDestination = exportDestination + " (" + params.getExportLocation().getHost() + ")";
+                exportDestination = exportDestination + " (" + getDocumentName(params.getExportLocation(), context) + ")";
             }
-            primaryTextView.setText(params.getExportFormat().name() + " "
-                    + scheduledAction.getActionType().name().toLowerCase() + " to "
-                    + exportDestination);
+            String description = context.getString(
+                R.string.schedule_export_desription,
+                params.getExportFormat().name(),
+                context.getString(scheduledAction.getActionType().labelId),
+                exportDestination
+            );
+            primaryTextView.setText(description);
 
             view.findViewById(R.id.right_text).setVisibility(View.GONE);
 
@@ -640,6 +648,5 @@ public class ScheduledActionsListFragment extends ListFragment implements
             return c;
         }
     }
-
 }
 
