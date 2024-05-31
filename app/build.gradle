@@ -159,17 +159,17 @@ android {
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
     implementation(
-            'androidx.appcompat:appcompat:1.6.1',
+            'androidx.appcompat:appcompat:1.7.0',
             'androidx.cardview:cardview:1.0.0',
             'androidx.drawerlayout:drawerlayout:1.2.0',
             'androidx.preference:preference:1.2.1',
             'androidx.recyclerview:recyclerview:1.3.2',
-            'com.google.android.material:material:1.11.0',
+            'com.google.android.material:material:1.12.0',
     )
 
-    implementation platform('com.google.firebase:firebase-bom:32.7.0')
-    implementation 'com.google.firebase:firebase-analytics:21.5.0'
-    implementation 'com.google.firebase:firebase-crashlytics:18.6.0'
+    implementation platform('com.google.firebase:firebase-bom:33.1.0')
+    implementation 'com.google.firebase:firebase-analytics:22.0.1'
+    implementation 'com.google.firebase:firebase-crashlytics:19.0.1'
     implementation 'com.google.android.gms:play-services-drive:17.0.0'
 
     implementation 'net.objecthunter:exp4j:0.4.8'
@@ -192,12 +192,12 @@ dependencies {
 def androidEspressoVersion = "3.5.1"
 dependencies {
     //the following are only added so that the app and test version both us the same versions
-    androidTestImplementation 'com.google.android.material:material:1.11.0'
+    androidTestImplementation 'com.google.android.material:material:1.12.0'
 
     androidTestImplementation 'androidx.test:runner:1.5.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test:rules:1.5.0'
-    androidTestImplementation 'androidx.test.uiautomator:uiautomator:2.2.0'
+    androidTestImplementation 'androidx.test.uiautomator:uiautomator:2.3.0'
 
     androidTestImplementation 'androidx.test.espresso:espresso-core:' + androidEspressoVersion
     androidTestImplementation 'androidx.test.espresso:espresso-intents:' + androidEspressoVersion
