@@ -29,6 +29,7 @@ import static org.gnucash.android.db.DatabaseSchema.TransactionEntry;
 
 import android.content.Context;
 import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteException;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.widget.Toast;
 
@@ -41,6 +42,7 @@ import org.xml.sax.SAXException;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.sql.SQLDataException;
 
 import javax.xml.parsers.ParserConfigurationException;
 
@@ -310,7 +312,6 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         db.execSQL(BUDGETS_TABLE_CREATE);
         db.execSQL(BUDGET_AMOUNTS_TABLE_CREATE);
 
-
         String createAccountUidIndex = "CREATE UNIQUE INDEX '" + AccountEntry.INDEX_UID + "' ON "
                 + AccountEntry.TABLE_NAME + "(" + AccountEntry.COLUMN_UID + ")";
 
@@ -351,8 +352,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         try {
             MigrationHelper.importCommodities(db);
         } catch (SAXException | ParserConfigurationException | IOException e) {
-            Timber.e(e, "Error loading currencies into the database");
-            throw new RuntimeException(e);
+            String msg = "Error loading currencies into the database";
+            Timber.e(e, msg);
+            throw new SQLiteException(msg, e);
         }
     }
 
