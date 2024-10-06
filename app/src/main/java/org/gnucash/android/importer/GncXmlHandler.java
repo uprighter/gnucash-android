@@ -632,6 +632,21 @@ public class GncXmlHandler extends DefaultHandler {
             case GncXmlHelper.TAG_TRN_SPLIT:
                 mTransaction.addSplit(mSplit);
                 break;
+            case GncXmlHelper.TAG_TRANSACTION:
+                mTransaction.setTemplate(mInTemplates);
+                Split imbSplit = mTransaction.createAutoBalanceSplit();
+                if (imbSplit != null) {
+                    mAutoBalanceSplits.add(imbSplit);
+                }
+                if (mInTemplates) {
+                    if (!mIgnoreTemplateTransaction)
+                        mTemplateTransactions.add(mTransaction);
+                } else {
+                    mTransactionList.add(mTransaction);
+                }
+                mIgnoreTemplateTransaction = true;
+                mTransaction = null;
+                break;
             case GncXmlHelper.TAG_TEMPLATE_TRANSACTIONS:
                 mInTemplates = false;
                 break;
