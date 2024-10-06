@@ -54,6 +54,8 @@ import org.gnucash.android.ui.settings.PreferenceActivity;
 import org.gnucash.android.ui.transaction.ScheduledActionsActivity;
 import org.gnucash.android.util.BookUtils;
 
+import java.util.Objects;
+
 
 /**
  * Base activity implementing the navigation drawer, to be extended by all activities requiring one.
@@ -87,16 +89,7 @@ public abstract class BaseDrawerActivity extends PasscodeLockActivity implements
 
     protected ActionBarDrawerToggle mDrawerToggle;
 
-
-    private final ActivityResultLauncher<Intent> openLauncher = registerForActivityResult(
-            new ActivityResultContracts.StartActivityForResult(),
-            result -> {
-                Log.d(LOG_TAG, "launch intent: result = " + result);
-                if (result.getResultCode() == Activity.RESULT_CANCELED) {
-                    Log.d(LOG_TAG, "intent cancelled.");
-                }
-            }
-    );
+    private ActivityResultLauncher<Intent> openLauncher;
 
     private class DrawerItemClickListener implements NavigationView.OnNavigationItemSelectedListener {
 
@@ -113,6 +106,8 @@ public abstract class BaseDrawerActivity extends PasscodeLockActivity implements
         super.onCreate(savedInstanceState);
         ViewBinding viewBinding = bindViews();
         setContentView(viewBinding.getRoot());
+
+        initLauncher();
 
         //if a parameter was passed to open an account within a specific book, then switch
         String bookUID = getIntent().getStringExtra(UxArgument.BOOK_UID);
@@ -137,6 +132,23 @@ public abstract class BaseDrawerActivity extends PasscodeLockActivity implements
         mBookNameTextView.setOnClickListener(this::onClickBook);
         updateActiveBookName();
         setUpNavigationDrawer();
+    }
+
+    private void initLauncher() {
+        openLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                result -> {
+                    Log.d(LOG_TAG, "launch intent: result = " + result);
+                    if (result.getResultCode() == Activity.RESULT_CANCELED) {
+                        Log.d(LOG_TAG, "intent cancelled.");
+                    } else {
+                        Intent intent = result.getData();
+                        final int takeFlags = (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION) & Objects.requireNonNull(intent).getFlags();
+                        AccountsActivity.importXmlFileFromIntent(this, result.getData().getData(), null);
+                        getContentResolver().takePersistableUriPermission(Objects.requireNonNull(intent.getData()), takeFlags);
+                    }
+                }
+        );
     }
 
     @Override

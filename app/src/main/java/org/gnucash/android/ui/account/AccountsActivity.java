@@ -20,7 +20,6 @@ package org.gnucash.android.ui.account;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.Editor;
@@ -134,35 +133,8 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
 
     private AccountViewPagerAdapter mPagerAdapter;
 
-    private final ActivityResultLauncher<Intent> addAccountLauncher = registerForActivityResult(
-            new ActivityResultContracts.StartActivityForResult(),
-            result -> {
-                Log.d(LOG_TAG, "launch intent: result = " + result);
-                if (result.getResultCode() == Activity.RESULT_CANCELED) {
-                    Log.d(LOG_TAG, "intent cancelled.");
-                }
-            }
-    );
-    private final ActivityResultLauncher<Intent> createBackupFileLauncher = registerForActivityResult(
-            new ActivityResultContracts.StartActivityForResult(),
-            result -> {
-                Log.d(LOG_TAG, "launch createBackupFileIntent: result = " + result);
-                if (result.getResultCode() == Activity.RESULT_OK) {
-                    Intent data = result.getData();
-                    if (data == null) {
-                        Log.d(LOG_TAG, "data is null!");
-                        return;
-                    }
-
-                    Uri backupFileUri = data.getData();
-                    if (backupFileUri == null) {
-                        Log.d(LOG_TAG, "backupFileUri is null!");
-                        return;
-                    }
-                    BackupManager.putBookBackupFileUri(getApplicationContext(), null, backupFileUri);
-                }
-            }
-    );
+    private ActivityResultLauncher<Intent> addAccountLauncher ;
+    private  ActivityResultLauncher<Intent> createBackupFileLauncher;
 
     /**
      * Adapter for managing the sub-account and transaction fragment pages in the accounts view
@@ -231,6 +203,8 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        initLauncher();
+
         final Intent intent = getIntent();
         handleOpenFileIntent(intent);
 
@@ -283,6 +257,38 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
             addAccountIntent.putExtra(UxArgument.FORM_TYPE, FormActivity.FormType.ACCOUNT.name());
             addAccountLauncher.launch(addAccountIntent);
         });
+    }
+
+    private void initLauncher() {
+        addAccountLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                result -> {
+                    Log.d(LOG_TAG, "launch intent: result = " + result);
+                    if (result.getResultCode() == Activity.RESULT_CANCELED) {
+                        Log.d(LOG_TAG, "intent cancelled.");
+                    }
+                }
+        );
+        createBackupFileLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                result -> {
+                    Log.d(LOG_TAG, "launch createBackupFileIntent: result = " + result);
+                    if (result.getResultCode() == Activity.RESULT_OK) {
+                        Intent data = result.getData();
+                        if (data == null) {
+                            Log.d(LOG_TAG, "data is null!");
+                            return;
+                        }
+
+                        Uri backupFileUri = data.getData();
+                        if (backupFileUri == null) {
+                            Log.d(LOG_TAG, "backupFileUri is null!");
+                            return;
+                        }
+                        BackupManager.putBookBackupFileUri(getApplicationContext(), null, backupFileUri);
+                    }
+                }
+        );
     }
 
     /**
@@ -354,14 +360,9 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
                     .setTitle("Select backup file for current book.")
                     .setMessage("This is used for auto-backup. If not set, it will ask everytime you open this.")
                     .setIcon(android.R.drawable.ic_dialog_alert)
-                    .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
-                        @Override
-                        public void onClick(DialogInterface dialog, int which) {
-                            createBackupFileLauncher.launch(BackupManager.createBackupFileIntent(
-                                    Exporter.sanitizeFilename(bookName) + "_" + getString(R.string.label_backup_filename)));
-                        }
-                    })
-                    .setNegativeButton(android.R.string.no, null).show();
+                    .setPositiveButton(android.R.string.ok, (dialog, which) -> createBackupFileLauncher.launch(BackupManager.createBackupFileIntent(
+                            Exporter.sanitizeFilename(bookName) + "_" + getString(R.string.label_backup_filename))))
+                    .setNegativeButton(android.R.string.cancel, null).show();
         }
 
         if (hasNewFeatures()) {
