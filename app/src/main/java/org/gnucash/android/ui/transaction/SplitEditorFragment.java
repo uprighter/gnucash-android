@@ -495,7 +495,7 @@ public class SplitEditorFragment extends Fragment {
             }
             //TODO: also check that multi-currency splits have a conversion amount present
         }
-        if (mImbalance.equals(BigDecimal.ZERO)) {
+        if (!mImbalance.equals(BigDecimal.ZERO)) {
             Log.d(LOG_TAG, String.format("canSave returns false, mImbalance=%s", mImbalance));
             return false;
         }
