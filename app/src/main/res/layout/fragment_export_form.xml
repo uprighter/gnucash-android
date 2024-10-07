@@ -46,6 +46,7 @@
 
             <org.gnucash.android.ui.util.widget.ReselectSpinner
                 android:id="@+id/spinner_export_destination"
+                android:contentDescription="@string/label_export_destination"
                 android:layout_marginStart="15dp"
                 android:layout_height="?android:attr/listPreferredItemHeight"
                 android:layout_width="match_parent" />
@@ -242,19 +243,18 @@
 
             <TextView
                 android:id="@+id/input_recurrence"
+                style="@style/Dropdown.TextView"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:minHeight="40dp"
                 android:gravity="center"
-                android:text="@string/label_tap_to_create_schedule"
-                style="@style/Dropdown.TextView" />
+                android:minHeight="48dp"
+                android:text="@string/label_tap_to_create_schedule" />
 
         </LinearLayout>
 
         <FrameLayout
             android:id="@+id/picker_fragment_container"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            />
+            android:layout_height="wrap_content" />
     </LinearLayout>
 </ScrollView>
