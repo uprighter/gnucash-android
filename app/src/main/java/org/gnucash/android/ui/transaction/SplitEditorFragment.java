@@ -166,20 +166,23 @@ public class SplitEditorFragment extends Fragment {
         mSplitEntryViewModelList = new ArrayList<>();
         List<Split> splitList = requireArguments().getParcelableArrayList(UxArgument.SPLIT_LIST, Split.class);
         assert splitList != null;
+        Log.d(LOG_TAG, "onViewCreated passed splitList len: " + splitList.size());
+        assert !splitList.isEmpty();
+        loadSplitViews(splitList);
 
-        if (!splitList.isEmpty()) {
-            //aha! there are some splits. Let's load those instead
-            loadSplitViews(splitList);
-//            mImbalanceWatcher.afterTextChanged(null);
-        } else {
-            final String currencyCode = mAccountsDbAdapter.getAccountCurrencyCode(mAccountUID);
-            Split split = new Split(new Money(mBaseAmount, Commodity.getInstance(currencyCode)), mAccountUID);
-            AccountType accountType = mAccountsDbAdapter.getAccountType(mAccountUID);
-            TransactionType transactionType = Transaction.getTypeForBalance(accountType, mBaseAmount.signum() < 0);
-            split.setType(transactionType);
-            addSplitView(split);
-            TransactionsActivity.displayBalance(mImbalanceTextView, new Money(mBaseAmount.negate(), mCommodity));
-        }
+//        if (!splitList.isEmpty()) {
+//            //aha! there are some splits. Let's load those instead
+//            loadSplitViews(splitList);
+////            mImbalanceWatcher.afterTextChanged(null);
+//        } else {
+//            final String currencyCode = mAccountsDbAdapter.getAccountCurrencyCode(mAccountUID);
+//            Split split = new Split(new Money(mBaseAmount, Commodity.getInstance(currencyCode)), mAccountUID);
+//            AccountType accountType = mAccountsDbAdapter.getAccountType(mAccountUID);
+//            TransactionType transactionType = Transaction.getTypeForBalance(accountType, mBaseAmount.signum() < 0);
+//            split.setType(transactionType);
+//            addSplitView(split);
+//            TransactionsActivity.displayBalance(mImbalanceTextView, new Money(mBaseAmount.negate(), mCommodity));
+//        }
 
         // Add drag-to-reorder feature.
         ItemTouchHelper touchHelper = new ItemTouchHelper(new ItemTouchHelper.Callback() {
@@ -259,24 +262,43 @@ public class SplitEditorFragment extends Fragment {
     }
 
     private void loadSplitViews(List<Split> splitList) {
+        int basePos = 0;
+        int splitPos = 0;
         for (Split split : splitList) {
-            addSplitView(split);
+            if (mAccountUID.equals(split.getAccountUID())) {
+                basePos = splitPos;
+            }
+            addSplitView(split, false);
+            splitPos ++;
+        }
+        Log.d(LOG_TAG, "loadSplitViews, basePos = " + basePos + ", mAccountUID=" + mAccountUID + ", mBaseAmount = " + mBaseAmount);
+        mRecyclerView.scrollToPosition(basePos);
+        mRecyclerViewAdaptor.notifyItemChanged(basePos);
+        SplitEntryViewHolder viewHolder = (SplitEntryViewHolder) mSplitEntryViewModelList.get(basePos).getViewHolder();
+        if (viewHolder != null) {
+            viewHolder.requestFocus();
         }
     }
 
+    private void addSplitView(Split split) {
+        addSplitView(split, true);
+    }
     /**
      * Add a split view and initialize it with <code>split</code>
      *
      * @param split Split to initialize the contents to
+     * @param scrollToEnd whether scroll recyclerView to the end pos
      */
-    private void addSplitView(Split split) {
+    private void addSplitView(Split split, boolean scrollToEnd) {
         Log.d(LOG_TAG, String.format("addSplitView: %s.", split));
         SplitEntryViewModel viewModel = new SplitEntryViewModel(
                 mAccountsDbAdapter, mCursorAdapter, mCommodity.getSymbol(), split);
         mSplitEntryViewModelList.add(viewModel);
         int lastPos = mSplitEntryViewModelList.size() - 1;
         mRecyclerViewAdaptor.notifyItemInserted(lastPos);
-        mRecyclerView.scrollToPosition(lastPos);
+        if (scrollToEnd) {
+            mRecyclerView.scrollToPosition(lastPos);
+        }
 
 //        Log.d(LOG_TAG, mSplitEntryViewModelList.size() + " splits, after added " + split);
     }
@@ -370,6 +392,10 @@ public class SplitEditorFragment extends Fragment {
             mViewBinding.executePendingBindings();
         }
 
+        public void requestFocus() {
+            splitAmountEditText.requestFocus();
+        }
+
         public void setListeners() {
             dragButton.setOnClickListener((View view) -> {
                 // Hide the calculator keyboard to drag item up or down more easily.
@@ -402,7 +428,7 @@ public class SplitEditorFragment extends Fragment {
                 mViewModel.setSplitType(mImbalance.signum() > 0 ? TransactionType.DEBIT : TransactionType.CREDIT);
                 mViewModel.setInputSplitAmount(mImbalance.abs());
 
-                splitAmountEditText.requestFocus();
+                requestFocus();
                 mImbalanceWatcher.afterTextChanged(null);
             });
 
@@ -415,7 +441,7 @@ public class SplitEditorFragment extends Fragment {
                 SplitEntryViewModel aboveViewModel = mSplitEntryViewModelList.get(clickedPosition - 1);
                 mViewModel.setInputSplitAmount(aboveViewModel.getInputSplitAmount());
 
-                splitAmountEditText.requestFocus();
+                requestFocus();
                 mImbalanceWatcher.afterTextChanged(null);
             });
 
@@ -428,7 +454,7 @@ public class SplitEditorFragment extends Fragment {
                 SplitEntryViewModel belowViewModel = mSplitEntryViewModelList.get(clickedPosition + 1);
                 mViewModel.setInputSplitAmount(belowViewModel.getInputSplitAmount());
 
-                splitAmountEditText.requestFocus();
+                requestFocus();
                 mImbalanceWatcher.afterTextChanged(null);
             });
 
@@ -527,13 +553,13 @@ public class SplitEditorFragment extends Fragment {
     private ArrayList<Split> extractSplitsFromView() {
         ArrayList<Split> splitList = new ArrayList<>();
         for (SplitEntryViewModel splitEntryViewModel : mSplitEntryViewModelList) {
-            SplitEntryViewHolder viewHolder = (SplitEntryViewHolder) splitEntryViewModel.getViewHolder();
             Split storedSplit = splitEntryViewModel.getSplit();
             if (storedSplit == null) {
                 Log.e(LOG_TAG, String.format("extractSplitsFromView: viewModel has no storedSplit are null: %s.", splitEntryViewModel));
                 continue;
             }
             splitList.add(storedSplit);
+//            SplitEntryViewHolder viewHolder = (SplitEntryViewHolder) splitEntryViewModel.getViewHolder();
 //            if (viewHolder == null || viewHolder.splitAmountEditText.getValue() == null) {
 //                Split storedSplit = splitEntryViewModel.getSplit();
 //                if (storedSplit == null) {
@@ -628,11 +654,7 @@ public class SplitEditorFragment extends Fragment {
                             }
                             split.setMemo(viewModel.getInputSplitMemo());
                             split.setType(viewHolder.splitTypeSwitch.getTransactionType());
-                            if (viewHolder.quantity != null) {
-                                split.setQuantity(viewHolder.quantity.abs());
-                            } else {
-                                split.setQuantity(valueAmount.abs());
-                            }
+                            split.setQuantity(Objects.requireNonNullElse(viewHolder.quantity, valueAmount).abs());
                         } catch (ArithmeticException e) {
                             Log.e(LOG_TAG, String.format("possible transient expression error, ignore: %s.", e.getMessage()));
                             return;
