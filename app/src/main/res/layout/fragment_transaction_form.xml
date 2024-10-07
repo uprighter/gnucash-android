@@ -54,7 +54,7 @@
 
             <View
                 style="@style/Divider"
-                android:layout_marginLeft="0dp" />
+                android:layout_marginStart="0dp" />
 
             <TableRow style="@style/FormRow">
 
@@ -84,7 +84,7 @@
                     android:id="@+id/btn_split_editor"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:contentDescription="Open split editor"
+                    android:contentDescription="@string/title_split_editor"
                     android:src="@drawable/content_split_holo_light" />
 
                 <org.gnucash.android.ui.util.widget.TransactionTypeSwitch
@@ -109,6 +109,7 @@
 
                 <ImageView
                     style="@style/FormIcon"
+                    android:contentDescription="@string/label_account_name"
                     android:src="@drawable/ic_action_forward" />
 
                 <Spinner
@@ -124,6 +125,7 @@
 
                 <ImageView
                     style="@style/FormIcon"
+                    android:contentDescription="transaction_time"
                     android:src="@drawable/ic_action_time" />
 
                 <TextView
@@ -147,6 +149,7 @@
 
                 <ImageView
                     style="@style/FormIcon"
+                    android:contentDescription="@string/hint_split_memo"
                     android:src="@drawable/ic_action_sort_by_size" />
 
                 <EditText
@@ -154,6 +157,7 @@
                     android:layout_width="0dp"
                     android:layout_weight="5"
                     android:layout_height="wrap_content"
+                    android:autofillHints=""
                     android:singleLine="false"
                     android:background="@android:color/transparent"
                     android:hint="@string/label_transaction_description"
@@ -163,20 +167,19 @@
             <View style="@style/Divider" />
 
             <TableRow style="@style/FormRow">
-
                 <ImageView
                     style="@style/FormIcon"
+                    android:contentDescription="@string/label_recurring_transaction"
                     android:src="@drawable/ic_action_rotate_right" />
-
                 <TextView
                     android:id="@+id/input_recurrence"
+                    android:enabled="false"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="5"
                     android:gravity="center"
                     android:text="@string/label_tap_to_create_schedule"
                     style="@style/Dropdown.TextView" />
-
             </TableRow>
 
             <CheckBox

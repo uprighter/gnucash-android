@@ -229,28 +229,22 @@
             android:textAppearance="?android:attr/textAppearanceMedium"
             android:text="@string/option_delete_after_export" />
 
-        <LinearLayout
+        <TableRow
             android:id="@+id/recurrence_options"
             style="@style/FormRow">
-
-            <TextView
-                android:id="@+id/label_recurring_transaction"
-                android:text="@string/label_recurring_transaction"
-                android:layout_marginStart="8dp"
-                android:layout_height="wrap_content"
-                android:layout_width="wrap_content"
-                style="@style/TextAppearance.EditTransaction_Small" />
-
+            <ImageView
+                style="@style/FormIcon"
+                android:contentDescription="@string/label_recurring_transaction"
+                android:src="@drawable/ic_action_rotate_right" />
             <TextView
                 android:id="@+id/input_recurrence"
                 style="@style/Dropdown.TextView"
-                android:layout_width="match_parent"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_weight="5"
                 android:gravity="center"
-                android:minHeight="48dp"
                 android:text="@string/label_tap_to_create_schedule" />
-
-        </LinearLayout>
+        </TableRow>
 
         <FrameLayout
             android:id="@+id/picker_fragment_container"
