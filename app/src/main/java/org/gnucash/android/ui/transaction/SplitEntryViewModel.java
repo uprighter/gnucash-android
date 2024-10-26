@@ -49,6 +49,13 @@ public class SplitEntryViewModel extends BaseObservable {
         this.mCursorAdapter = cursorAdapter;
         this.mDefaultCurrencySymbol = currencySymbol;
         this.mSplit = split;
+        if (mSplit != null) {
+            setSplitCurrencySymbol(Objects.requireNonNull(Objects.requireNonNull(mSplit.getValue()).getCommodity()).getSymbol());
+            setSplitUid(mSplit.getUID());
+        } else {
+            setSplitCurrencySymbol(mDefaultCurrencySymbol);
+            setSplitUid(BaseModel.generateUID());
+        }
     }
 
     public void bindWithView(
@@ -61,9 +68,6 @@ public class SplitEntryViewModel extends BaseObservable {
     public void init() {
 //        Log.d(LOG_TAG, "init, mSplit=" + mSplit);
         if (mSplit != null) {
-            setSplitCurrencySymbol(Objects.requireNonNull(Objects.requireNonNull(mSplit.getValue()).getCommodity()).getSymbol());
-            setSplitUid(mSplit.getUID());
-
             String splitAccountUID = mSplit.getAccountUID();
             assert splitAccountUID != null;
             mSplitTypeSwitch.setAccountType(mAccountsDbAdapter.getAccountType(splitAccountUID));
@@ -72,12 +76,6 @@ public class SplitEntryViewModel extends BaseObservable {
             setInputAccountPos(accountPos);
             setInputSplitMemo(mSplit.getMemo());
             setInputSplitAmount(mSplit.getValue().asBigDecimal());
-        } else {
-            setSplitCurrencySymbol(mDefaultCurrencySymbol);
-            setSplitUid(BaseModel.generateUID());
-
-            // requestFocus for newly added split.
-            mSplitAmountEditText.requestFocus();
         }
     }
 

@@ -334,6 +334,12 @@ public class SplitEditorFragment extends Fragment {
         }
 
         @Override
+        public long getItemId(int position) {
+            SplitEntryViewModel viewModel = mSplitEntryViewModelList.get(position);
+            return viewModel.getSplitUid().hashCode();
+        }
+
+        @Override
         public int getItemCount() {
             return mSplitEntryViewModelList.size();
         }
