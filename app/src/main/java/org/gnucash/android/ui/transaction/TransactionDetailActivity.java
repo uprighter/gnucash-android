@@ -127,7 +127,7 @@ public class TransactionDetailActivity extends PasscodeLockActivity {
         }
 
 
-        String timeAndDate = DateTimeFormat.fullDate().print(transaction.getTimeMillis());
+        String timeAndDate = DateTimeFormat.longDateTime().print(transaction.getTimeMillis());
         mBinding.trnTimeAndDate.setText(timeAndDate);
 
         if (transaction.getScheduledActionUID() != null) {
