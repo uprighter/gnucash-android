@@ -46,7 +46,6 @@ import androidx.fragment.app.FragmentPagerAdapter;
 import androidx.preference.PreferenceManager;
 
 import com.google.android.material.tabs.TabLayout;
-import com.kobakei.ratethisapp.RateThisApp;
 
 import org.gnucash.android.BuildConfig;
 import org.gnucash.android.R;
@@ -121,10 +120,10 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
      */
     private SparseArray<Refreshable> mFragmentPageReferenceMap = new SparseArray<>();
 
-    /**
-     * Configuration for rating the app
-     */
-    public static RateThisApp.Config rateAppConfig = new RateThisApp.Config(14, 100);
+//    /**
+//     * Configuration for rating the app
+//     */
+//    public static RateThisApp.Config rateAppConfig = new RateThisApp.Config(14, 100);
     private AccountViewPagerAdapter mPagerAdapter;
 
     private ActivityAccountsBinding mBinding;
@@ -262,9 +261,9 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
         super.onStart();
 
         if (BuildConfig.CAN_REQUEST_RATING) {
-            RateThisApp.init(rateAppConfig);
-            RateThisApp.onStart(this);
-            RateThisApp.showRateDialogIfNeeded(this);
+//            RateThisApp.init(rateAppConfig);
+//            RateThisApp.onStart(this);
+//            RateThisApp.showRateDialogIfNeeded(this);
         }
     }
 

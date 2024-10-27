@@ -31,8 +31,6 @@ import androidx.annotation.NonNull;
 import androidx.preference.PreferenceManager;
 
 import com.google.firebase.FirebaseApp;
-import com.uservoice.uservoicesdk.Config;
-import com.uservoice.uservoicesdk.UserVoice;
 
 import org.gnucash.android.BuildConfig;
 import org.gnucash.android.R;
@@ -474,15 +472,15 @@ public class GnuCashApplication extends Application {
      * <p>Allows users to contact with us and access help topics.</p>
      */
     private void setUpUserVoice() {
-        // Set this up once when your application launches
-        Config config = new Config("gnucash.uservoice.com");
-        config.setTopicId(107400);
-        config.setForumId(320493);
-        config.putUserTrait("app_version_name", BuildConfig.VERSION_NAME);
-        config.putUserTrait("app_version_code", BuildConfig.VERSION_CODE);
-        config.putUserTrait("android_version", Build.VERSION.RELEASE);
-        // config.identifyUser("USER_ID", "User Name", "email@example.com");
-        UserVoice.init(config, this);
+//        // Set this up once when your application launches
+//        Config config = new Config("gnucash.uservoice.com");
+//        config.setTopicId(107400);
+//        config.setForumId(320493);
+//        config.putUserTrait("app_version_name", BuildConfig.VERSION_NAME);
+//        config.putUserTrait("app_version_code", BuildConfig.VERSION_CODE);
+//        config.putUserTrait("android_version", Build.VERSION.RELEASE);
+//        // config.identifyUser("USER_ID", "User Name", "email@example.com");
+//        UserVoice.init(config, this);
     }
 
     /**
