@@ -23,8 +23,8 @@
         app:showAsAction="always"
         android:orderInCategory="1" />
     <item
-        android:id="@+id/context_menu_duplicate_transaction_to_date"
-        android:title="@string/menu_duplicate_transaction_to_date"
+        android:id="@+id/context_menu_duplicate_transaction_to_now"
+        android:title="@string/menu_duplicate_transaction_to_now"
         app:showAsAction="always"
         android:orderInCategory="2" />
     <item

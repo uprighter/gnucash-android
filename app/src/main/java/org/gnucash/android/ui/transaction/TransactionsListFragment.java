@@ -23,6 +23,7 @@ import android.content.Intent;
 import android.content.res.Configuration;
 import android.database.Cursor;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -42,6 +43,8 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.PopupMenu;
 import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentManager;
+import androidx.fragment.app.FragmentResultListener;
 import androidx.loader.app.LoaderManager;
 import androidx.loader.content.Loader;
 import androidx.recyclerview.widget.GridLayoutManager;
@@ -83,7 +86,7 @@ import java.util.Objects;
  * @author Ngewi Fet <ngewif@gmail.com>
  */
 public class TransactionsListFragment extends Fragment implements
-        Refreshable, LoaderManager.LoaderCallbacks<Cursor> {
+    Refreshable, LoaderManager.LoaderCallbacks<Cursor>, FragmentResultListener {
 
     /**
      * Logging tag
@@ -258,6 +261,14 @@ public class TransactionsListFragment extends Fragment implements
         mTransactionRecyclerAdapter.swapCursor(null);
     }
 
+    @Override
+    public void onFragmentResult(@NonNull String requestKey, @NonNull Bundle result) {
+        if (BulkMoveDialogFragment.TAG.equals(requestKey)) {
+            boolean refresh = result.getBoolean(Refreshable.EXTRA_REFRESH);
+            if (refresh) refresh();
+        }
+    }
+
     private boolean handleMenuDeleteTransaction(final long transactionId) {
         BackupManager.backupActiveBook(); //create backup before deleting anything.
 
@@ -375,21 +386,27 @@ public class TransactionsListFragment extends Fragment implements
             } else {
                 List<Split> splits = SplitsDbAdapter.getInstance().getSplitsForTransaction(transactionUID);
                 String text = "";
+                String error = null;
 
-                if (splits.size() == 2 && splits.get(0).isPairOf(splits.get(1))) {
-                    for (Split split : splits) {
-                        if (!mAccountUID.equals(split.getAccountUID())) {
-                            text = AccountsDbAdapter.getInstance().getFullyQualifiedAccountName(split.getAccountUID());
-                            break;
+                if (splits.size() == 2) {
+                    if (splits.get(0).isPairOf(splits.get(1))) {
+                        for (Split split : splits) {
+                            if (!mAccountUID.equals(split.getAccountUID())) {
+                                text = AccountsDbAdapter.getInstance().getFullyQualifiedAccountName(split.getAccountUID());
+                                break;
+                            }
                         }
                     }
+                    if (TextUtils.isEmpty(text)) {
+                        text = getString(R.string.label_split_count, splits.size());
+                        error = getString(R.string.imbalance_account_name);
+                    }
                 }
-
                 if (splits.size() > 2) {
-                    text = splits.size() + " splits";
+                    text = getString(R.string.label_split_count, splits.size());
                 }
                 holder.secondaryText.setText(text);
-
+                holder.secondaryText.setError(error);
                 if (holder.transactionDate != null) {
                     holder.transactionDate.setText(dateText);
                 }
@@ -427,15 +444,15 @@ public class TransactionsListFragment extends Fragment implements
                 if (mUseCompactView) {
                     CardviewCompactTransactionBinding cardviewBinding = (CardviewCompactTransactionBinding) viewBinding;
 
-                    primaryText = cardviewBinding.listItemTwoLines.primaryText;
-                    secondaryText = cardviewBinding.listItemTwoLines.secondaryText;
+                    primaryText = cardviewBinding.listItem2Lines.primaryText;
+                    secondaryText = cardviewBinding.listItem2Lines.secondaryText;
                     transactionAmount = cardviewBinding.transactionAmount;
                     optionsMenu = cardviewBinding.optionsMenu;
                 } else {
                     CardviewTransactionBinding cardviewBinding = (CardviewTransactionBinding) viewBinding;
 
-                    primaryText = cardviewBinding.listItemTwoLines.primaryText;
-                    secondaryText = cardviewBinding.listItemTwoLines.secondaryText;
+                    primaryText = cardviewBinding.listItem2Lines.primaryText;
+                    secondaryText = cardviewBinding.listItem2Lines.secondaryText;
                     transactionAmount = cardviewBinding.transactionAmount;
                     optionsMenu = cardviewBinding.optionsMenu;
 
@@ -454,40 +471,64 @@ public class TransactionsListFragment extends Fragment implements
                 });
             }
 
+
             @Override
-            public boolean onMenuItemClick(MenuItem item) {
-                if (item.getItemId() == R.id.context_menu_delete) {
-                    return handleMenuDeleteTransaction(transactionId);
-                } else if (item.getItemId() == R.id.context_menu_duplicate_transaction_to_date) {
-                    Transaction transaction = mTransactionsDbAdapter.getRecord(transactionId);
-                    Transaction duplicate = new Transaction(transaction, true);
-                    duplicate.setTime(System.currentTimeMillis());
-                    mTransactionsDbAdapter.addRecord(duplicate, DatabaseAdapter.UpdateMethod.insert);
-                    refresh();
-                    return true;
-                } else if (item.getItemId() == R.id.context_menu_duplicate_transaction) {
-                    Transaction transaction = mTransactionsDbAdapter.getRecord(transactionId);
-                    Transaction duplicate = new Transaction(transaction, true);
-                    mTransactionsDbAdapter.addRecord(duplicate, DatabaseAdapter.UpdateMethod.insert);
-                    refresh();
-                    return true;
-                } else if (item.getItemId() == R.id.context_menu_move_transaction) {
-                    long[] ids = new long[]{transactionId};
-                    BulkMoveDialogFragment fragment = BulkMoveDialogFragment.newInstance(ids, mAccountUID);
+            public boolean onMenuItemClick(@NonNull MenuItem item) {
+                switch (item.getItemId()) {
+                    case R.id.context_menu_delete:
+                        deleteTransaction(transactionId);
+                        return true;
+                    case R.id.context_menu_duplicate_transaction_to_now:
+                        duplicateTransaction(transactionId, true);
+                        return true;
 
-                    Log.d(LOG_TAG, "context_menu_move_transaction_" + mAccountUID);
-                    getParentFragmentManager().setFragmentResultListener(
-                            fragment.getRequestKey(mAccountUID), TransactionsListFragment.this, (requestKey, bundle) -> {
-                                Log.d(LOG_TAG, "onFragmentResult " + requestKey + ", " + bundle);
-                                refresh();
-                            });
-                    fragment.show(getParentFragmentManager(), "bulk_move_transactions");
-                    return true;
+                    case R.id.context_menu_duplicate_transaction:
+                        duplicateTransaction(transactionId, false);
+                        return true;
 
-                } else {
-                    return false;
+                    case R.id.context_menu_move_transaction:
+                        moveTransaction(transactionId);
+                        return true;
+
+                    default:
+                        return false;
+
                 }
             }
         }
+    }
+
+    private void deleteTransaction(long transactionId) {
+        final Activity activity = requireActivity();
+        if (GnuCashApplication.shouldBackupTransactions(activity)) {
+            BackupManager.backupActiveBookAsync(activity, result -> {
+                mTransactionsDbAdapter.deleteRecord(transactionId);
+                WidgetConfigurationActivity.updateAllWidgets(activity);
+                refresh();
+                return null;
+            });
+        } else {
+            mTransactionsDbAdapter.deleteRecord(transactionId);
+            WidgetConfigurationActivity.updateAllWidgets(activity);
+            refresh();
+        }
+    }
+
+    private void duplicateTransaction(long transactionId, boolean toNow) {
+        Transaction transaction = mTransactionsDbAdapter.getRecord(transactionId);
+        Transaction duplicate = new Transaction(transaction, true);
+        if(toNow) {
+            duplicate.setTime(System.currentTimeMillis());
+        }
+        mTransactionsDbAdapter.addRecord(duplicate, DatabaseAdapter.UpdateMethod.insert);
+        refresh();
+    }
+
+    private void moveTransaction(long transactionId) {
+        long[] ids = new long[]{transactionId};
+        FragmentManager fm = getParentFragmentManager();
+        fm.setFragmentResultListener(BulkMoveDialogFragment.TAG, TransactionsListFragment.this, TransactionsListFragment.this);
+        BulkMoveDialogFragment fragment = BulkMoveDialogFragment.newInstance(ids, mAccountUID);
+        fragment.show(fm, BulkMoveDialogFragment.TAG);
     }
 }
