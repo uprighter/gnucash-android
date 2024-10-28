@@ -59,8 +59,6 @@ import androidx.test.rule.ActivityTestRule;
 import androidx.test.rule.GrantPermissionRule;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 
-import com.kobakei.ratethisapp.RateThisApp;
-
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
 import org.gnucash.android.db.DatabaseHelper;
@@ -173,7 +171,6 @@ public class AccountsActivityTest {
      * @param context Application context
      */
     public static void preventFirstRunDialogs(Context context) {
-        AccountsActivity.rateAppConfig = new RateThisApp.Config(10000, 10000);
         Editor editor = PreferenceManager.getDefaultSharedPreferences(context).edit();
 
         //do not show first run dialog

@@ -23,8 +23,6 @@ import android.text.InputType;
 import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.util.AttributeSet;
-import android.view.MotionEvent;
-import android.view.View;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -91,24 +89,22 @@ public class CalculatorEditText extends AppCompatEditText {
      * @param attrs   View attributes
      */
     private void init(Context context, AttributeSet attrs) {
-        TypedArray a = context.getTheme().obtainStyledAttributes(
+        try (TypedArray a = context.getTheme().obtainStyledAttributes(
                 attrs,
                 R.styleable.CalculatorEditText,
-                0, 0);
-
-        try {
+                0, 0)) {
             mCalculatorKeysLayout = a.getResourceId(R.styleable.CalculatorEditText_keyboardKeysLayout, R.xml.calculator_keyboard);
-        } finally {
-            a.recycle();
         }
 
         addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+
             }
 
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
+
             }
 
             @Override
@@ -117,41 +113,30 @@ public class CalculatorEditText extends AppCompatEditText {
             }
         });
 
-        setOnFocusChangeListener(new View.OnFocusChangeListener() {
-            @Override
-            public void onFocusChange(View v, boolean hasFocus) {
-                if (hasFocus) {
-                    setSelection(getText().length());
-                } else {
-                    evaluate();
-                }
+        setOnFocusChangeListener((v, hasFocus) -> {
+            if (hasFocus) {
+                setSelection(getText().length());
+            } else {
+                evaluate();
             }
         });
     }
 
     public void bindListeners(final CalculatorKeyboard calculatorKeyboard) {
         mCalculatorKeyboard = calculatorKeyboard;
-        setOnFocusChangeListener(new View.OnFocusChangeListener() {
-            @Override
-            public void onFocusChange(View v, boolean hasFocus) {
-                if (hasFocus) {
-                    setSelection(getText().length());
-                    calculatorKeyboard.showCustomKeyboard(v);
-                } else {
-                    calculatorKeyboard.hideCustomKeyboard();
-                    evaluate();
-                }
+        setOnFocusChangeListener((v, hasFocus) -> {
+            if (hasFocus) {
+                setSelection(getText().length());
+                mCalculatorKeyboard.showCustomKeyboard(v);
+            } else {
+                mCalculatorKeyboard.hideCustomKeyboard();
+                evaluate();
             }
         });
 
-        setOnClickListener(new OnClickListener() {
-            // NOTE By setting the on click listener we can show the custom keyboard again,
-            // by tapping on an edit box that already had focus (but that had the keyboard hidden).
-            @Override
-            public void onClick(View v) {
-                calculatorKeyboard.showCustomKeyboard(v);
-            }
-        });
+        // NOTE By setting the on click listener we can show the custom keyboard again,
+// by tapping on an edit box that already had focus (but that had the keyboard hidden).
+        setOnClickListener(v -> mCalculatorKeyboard.showCustomKeyboard(v));
 
         // Disable spell check (hex strings look like words to Android)
         setInputType(getInputType() | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
@@ -161,13 +146,10 @@ public class CalculatorEditText extends AppCompatEditText {
 
         // Although this handler doesn't make sense, if removed, the standard keyboard
         // shows up in addition to the calculator one when the EditText gets a touch event.
-        setOnTouchListener(new OnTouchListener() {
-            @Override
-            public boolean onTouch(View v, MotionEvent event) {
-                // XXX: Use dispatchTouchEvent()?
-                onTouchEvent(event);
-                return false;
-            }
+        setOnTouchListener((v, event) -> {
+            // XXX: Use dispatchTouchEvent()?
+            onTouchEvent(event);
+            return false;
         });
 
         Context context = getContext();
@@ -358,8 +340,17 @@ public class CalculatorEditText extends AppCompatEditText {
         if (isOriginal) {
             originalText = resultString;
         }
-
         setText(resultString);
         setSelection(resultString.length());
+    }
+
+    /**
+     * Set the text to {@code amountString} and move the cursor to the end.</p>
+     *
+     * @param amountString String amount
+     */
+    public void setValue(String amountString) {
+        super.setText(amountString);
+        setSelection(amountString.length());
     }
 }

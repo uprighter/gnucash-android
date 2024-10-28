@@ -425,7 +425,7 @@ public class TransactionsActivityTest {
         Espresso.closeSoftKeyboard();
         onView(withId(R.id.btn_split_editor)).perform(click());
 
-        onView(withId(R.id.split_list_layout)).check(matches(allOf(isDisplayed(), hasDescendant(withId(R.id.input_split_amount)))));
+        onView(withId(R.id.split_list_recycler)).check(matches(allOf(isDisplayed(), hasDescendant(withId(R.id.input_split_amount)))));
 
         onView(allOf(withId(R.id.input_split_amount), withText("-499"))).perform(clearText());
         onView(allOf(withId(R.id.input_split_amount), withText(""))).perform(typeText("400"));

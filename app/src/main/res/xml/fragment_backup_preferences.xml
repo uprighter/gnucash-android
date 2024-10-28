@@ -58,6 +58,7 @@
             android:entryValues="@array/key_export_format_values"
             android:entries="@array/export_formats"
             android:key="@string/key_default_export_format"
+            android:defaultValue="XML"
             android:summary="@string/summary_default_export_format" />
         <androidx.preference.EditTextPreference
             android:title="@string/title_default_export_email"
@@ -67,10 +68,12 @@
         <androidx.preference.SwitchPreferenceCompat
             android:summary="@string/hint_export_choice"
             android:key="@string/key_export_all_transactions"
+            android:defaultValue="true"
             android:title="@string/title_export_all_transactions" />
         <androidx.preference.SwitchPreferenceCompat
             android:summary="@string/hint_delete_after_export"
             android:key="@string/key_delete_transactions_after_export"
+            android:defaultValue="false"
             android:title="@string/title_always_delete_exported_transactions" />
         <androidx.preference.SwitchPreferenceCompat
             android:key="@string/key_xml_ofx_header"
