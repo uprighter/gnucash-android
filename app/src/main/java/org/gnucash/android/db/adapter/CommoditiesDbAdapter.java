@@ -119,8 +119,7 @@ public class CommoditiesDbAdapter extends DatabaseAdapter<Commodity> {
 
     @Override
     public Cursor fetchAllRecords() {
-        return mDb.query(mTableName, null, null, null, null, null,
-            CommodityEntry.COLUMN_FULLNAME + " ASC");
+        return fetchAllRecords(CommodityEntry.COLUMN_FULLNAME + " ASC");
     }
 
     /**
@@ -130,8 +129,7 @@ public class CommoditiesDbAdapter extends DatabaseAdapter<Commodity> {
      * @return Cursor holding all commodity records
      */
     public Cursor fetchAllRecords(String orderBy) {
-        return mDb.query(mTableName, null, null, null, null, null,
-            orderBy);
+        return mDb.query(mTableName, null, null, null, null, null, orderBy);
     }
 
     /**
