@@ -199,5 +199,7 @@ class Commodity(
                 else -> CommoditiesDbAdapter.getInstance().getCommodity(currencyCode)
             }
         }
+
+        const val LABEL_SEPARATOR = " \u2014 "
     }
 }
