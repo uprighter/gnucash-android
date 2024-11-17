@@ -248,10 +248,8 @@ public class SplitEditorFragment extends Fragment {
         Timber.tag(LOG_TAG).d("loadSplitViews, basePos = " + basePos + ", mAccountUID=" + mAccountUID + ", mBaseAmount = " + mBaseAmount);
         mRecyclerView.scrollToPosition(basePos);
         mRecyclerViewAdaptor.notifyItemChanged(basePos);
-        SplitEntryViewHolder viewHolder = (SplitEntryViewHolder) mSplitEntryViewModelList.get(basePos).getViewHolder();
-        if (viewHolder != null) {
-            viewHolder.requestFocus();
-        }
+        SplitEntryViewModel viewModel = mSplitEntryViewModelList.get(basePos);
+        viewModel.requestFocus();
     }
 
     @Override
@@ -424,10 +422,6 @@ public class SplitEditorFragment extends Fragment {
             mViewBinding.executePendingBindings();
         }
 
-        public void requestFocus() {
-            splitAmountEditText.requestFocus();
-        }
-
         public void startWatchingImbalance() {
             splitAmountEditText.addTextChangedListener(mImbalanceWatcher);
             splitTypeSwitch.addOnCheckedChangeListener((CompoundButton buttonView, boolean isChecked) -> {
@@ -481,7 +475,7 @@ public class SplitEditorFragment extends Fragment {
                 mViewModel.setSplitType(mImbalance.signum() > 0 ? TransactionType.DEBIT : TransactionType.CREDIT);
                 mViewModel.setInputSplitAmount(mImbalance.abs());
 
-                requestFocus();
+                mViewModel.requestFocus();
                 mImbalanceWatcher.afterTextChanged(null);
             });
 
@@ -494,7 +488,7 @@ public class SplitEditorFragment extends Fragment {
                 SplitEntryViewModel aboveViewModel = mSplitEntryViewModelList.get(clickedPosition - 1);
                 mViewModel.setInputSplitAmount(aboveViewModel.getInputSplitAmount());
 
-                requestFocus();
+               mViewModel.requestFocus();
                 mImbalanceWatcher.afterTextChanged(null);
             });
 
@@ -507,7 +501,7 @@ public class SplitEditorFragment extends Fragment {
                 SplitEntryViewModel belowViewModel = mSplitEntryViewModelList.get(clickedPosition + 1);
                 mViewModel.setInputSplitAmount(belowViewModel.getInputSplitAmount());
 
-                requestFocus();
+                mViewModel.requestFocus();
                 mImbalanceWatcher.afterTextChanged(null);
             });
 
