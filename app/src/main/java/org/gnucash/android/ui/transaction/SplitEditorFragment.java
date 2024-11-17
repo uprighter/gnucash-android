@@ -23,6 +23,7 @@ import android.inputmethodservice.KeyboardView;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -297,6 +298,8 @@ public class SplitEditorFragment extends Fragment {
         mRecyclerViewAdaptor.notifyItemInserted(lastPos);
         if (scrollToEnd) {
             mRecyclerView.scrollToPosition(lastPos);
+            Log.d(LOG_TAG, "addSplitView: viewHolder=" + viewModel.getViewHolder());
+            viewModel.requestFocus();
         }
 
 //        Timber.tag(LOG_TAG).d(mSplitEntryViewModelList.size() + " splits, after added " + split);

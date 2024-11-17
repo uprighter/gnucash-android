@@ -39,7 +39,8 @@ public class SplitEntryViewModel extends BaseObservable {
     private final String mDefaultCurrencySymbol;
     private Split mSplit;
 
-    private CalculatorEditText mSplitAmountEditText;
+    private CalculatorEditText mSplitAmountEditText = null;
+    private boolean mFocusRequested = false;
     private TransactionTypeSwitch mSplitTypeSwitch;
     private Object mViewHolder;
 
@@ -65,6 +66,16 @@ public class SplitEntryViewModel extends BaseObservable {
             TransactionTypeSwitch splitTypeSwitch) {
         this.mSplitAmountEditText = splitAmountEditText;
         this.mSplitTypeSwitch = splitTypeSwitch;
+        if (mFocusRequested) {
+            mSplitAmountEditText.requestFocus();
+        }
+    }
+    public void requestFocus() {
+        if (mSplitAmountEditText != null) {
+            mSplitAmountEditText.requestFocus();
+        } else {
+            mFocusRequested = true;
+        }
     }
 
     public void init() {
