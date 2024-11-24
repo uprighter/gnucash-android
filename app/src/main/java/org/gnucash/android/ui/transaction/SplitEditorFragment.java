@@ -63,7 +63,6 @@ import org.gnucash.android.ui.common.FormActivity;
 import org.gnucash.android.ui.common.UxArgument;
 import org.gnucash.android.ui.transaction.dialog.TransferFundsDialogFragment;
 import org.gnucash.android.ui.util.widget.CalculatorEditText;
-import org.gnucash.android.ui.util.widget.CalculatorKeyboard;
 import org.gnucash.android.ui.util.widget.TransactionTypeSwitch;
 import org.gnucash.android.util.AmountParser;
 import org.gnucash.android.util.QualifiedAccountNameCursorAdapter;
@@ -98,8 +97,6 @@ public class SplitEditorFragment extends Fragment {
     private Commodity mCommodity;
 
     private BigDecimal mBaseAmount = BigDecimal.ZERO;
-
-    private CalculatorKeyboard mCalculatorKeyboard;
 
     private TextView mImbalanceTextView;
     private BigDecimal mImbalance = BigDecimal.ZERO;
@@ -168,7 +165,6 @@ public class SplitEditorFragment extends Fragment {
         actionBar.setTitle(R.string.title_split_editor);
         setHasOptionsMenu(true);
 
-        mCalculatorKeyboard = new CalculatorKeyboard(requireActivity(), mKeyboardView, R.xml.calculator_keyboard);
         mSplitEntryViewModelList = new ArrayList<>();
 
         //we are editing splits for a new transaction.
@@ -229,7 +225,6 @@ public class SplitEditorFragment extends Fragment {
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
-        mCalculatorKeyboard = new CalculatorKeyboard(requireActivity(), mKeyboardView, R.xml.calculator_keyboard);
     }
 
     private void loadSplitViews(List<Split> splitList) {
@@ -440,12 +435,12 @@ public class SplitEditorFragment extends Fragment {
         }
 
         public void setListeners() {
+            splitAmountEditText.bindListeners(mKeyboardView);
+
             dragButton.setOnClickListener((View view) -> {
                 // Hide the calculator keyboard to drag item up or down more easily.
-                mCalculatorKeyboard.hideCustomKeyboard();
+                splitAmountEditText.getCalculatorKeyboard().hideCustomKeyboard();
             });
-
-            splitAmountEditText.bindListeners(mCalculatorKeyboard);
 
             removeSplitButton.setOnClickListener((View view) -> {
                 int clickedPosition = SplitEntryViewHolder.this.getAbsoluteAdapterPosition();
