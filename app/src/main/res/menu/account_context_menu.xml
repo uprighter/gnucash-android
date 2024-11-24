@@ -31,4 +31,11 @@
         app:showAsAction="always"
         android:orderInCategory="2" />
 
+    <item
+        android:id="@+id/context_menu_duplicate_accounts"
+        android:icon="@drawable/ic_edit_white"
+        android:title="@string/title_duplicate_accounts"
+        app:showAsAction="always"
+        android:orderInCategory="3" />
+
 </menu>

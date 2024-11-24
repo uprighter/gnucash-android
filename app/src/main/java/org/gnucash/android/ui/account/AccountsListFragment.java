@@ -26,8 +26,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.database.Cursor;
-import android.graphics.Color;
-import android.os.AsyncTask;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
@@ -39,6 +37,7 @@ import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.PopupMenu;
 import androidx.appcompat.widget.SearchView;
@@ -61,6 +60,7 @@ import org.gnucash.android.db.DatabaseCursorLoader;
 import org.gnucash.android.db.DatabaseSchema;
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.db.adapter.BudgetsDbAdapter;
+import org.gnucash.android.db.adapter.DatabaseAdapter;
 import org.gnucash.android.model.Account;
 import org.gnucash.android.model.Budget;
 import org.gnucash.android.model.Money;
@@ -86,6 +86,8 @@ public class AccountsListFragment extends Fragment implements
     SearchView.OnQueryTextListener,
     SearchView.OnCloseListener,
     FragmentResultListener {
+
+    protected static final String LOG_TAG = AccountsListFragment.class.getName();
 
     AccountRecyclerAdapter mAccountRecyclerAdapter;
 
@@ -254,6 +256,63 @@ public class AccountsListFragment extends Fragment implements
                 refresh();
                 return null;
             });
+        }
+    }
+
+    /**
+     * Duplicate the account with UID <code>rowId</code> and all its sub-accounts.
+     * It shows the confirmation dialog if the account has sub-accounts,
+     * else duplicates the account immediately.
+     *
+     * @param accountUID The UID of the account
+     */
+    private void tryDuplicateAccounts(String accountUID) {
+        BackupManager.backupActiveBook();
+        Account account = mAccountsDbAdapter.getRecord(accountUID);
+        if (mAccountsDbAdapter.getSubAccountCount(account.getUID()) > 0) {
+            // Ask for confirmation if it has sub-accounts.
+
+            final String requestKey = "duplicate_account_" + accountUID;
+            int titleId = R.string.msg_duplicate_all_accounts_confirmation;
+            new AlertDialog.Builder(getActivity())
+                    .setIcon(R.drawable.abc_ic_menu_copy_mtrl_am_alpha)
+                    .setTitle(titleId)
+                    .setPositiveButton(R.string.btn_save,
+                            (dialog, whichButton) -> {
+                                // Notify listeners.
+                                getParentFragmentManager().setFragmentResult(requestKey, new Bundle());
+                            }
+                    )
+                    .setNegativeButton(R.string.btn_cancel,
+                            (dialog, whichButton) -> dialog.dismiss()
+                    )
+                    .create().show();
+            getParentFragmentManager().setFragmentResultListener(
+                    requestKey, this, (_requestKey, _bundle) -> {
+                        Timber.tag(LOG_TAG).d("duplicateAccounts " + _requestKey + ", " + _bundle);
+                        doDuplicateAccounts(account);
+                    });
+        } else {
+            doDuplicateAccounts(account);
+        }
+    }
+
+    private void doDuplicateAccounts(Account account) {
+        recursivelyDuplicateAccounts(account, account.getName() + "_2", account.getParentUID());
+        refresh();
+    }
+
+    private void recursivelyDuplicateAccounts(Account account, String newName, String parentAccountUID) {
+        Account duplicate = new Account(newName);
+        duplicate.setParentUID(parentAccountUID);
+        mAccountsDbAdapter.addRecord(duplicate, DatabaseAdapter.UpdateMethod.insert);
+        if (mAccountsDbAdapter.getSubAccountCount(account.getUID()) > 0) {
+            // Recursively duplicates its sub-accounts.
+            List<String> subAccountUIDs = mAccountsDbAdapter.getDescendantAccountUIDs(account.getUID(), null, null);
+            for (String subAccountUID : subAccountUIDs) {
+                Account subAccount = mAccountsDbAdapter.getRecord(subAccountUID);
+                recursivelyDuplicateAccounts(subAccount, subAccount.getName(), duplicate.getUID());
+            }
         }
     }
 
@@ -618,6 +677,10 @@ public class AccountsListFragment extends Fragment implements
 
                     case R.id.context_menu_delete:
                         tryDeleteAccount(accountUID);
+                        return true;
+
+                    case R.id.context_menu_duplicate_accounts:
+                        tryDuplicateAccounts(accountUID);
                         return true;
 
                     default:

@@ -16,6 +16,7 @@
 
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <string name="title_create_account">Create Account</string>
+    <string name="title_duplicate_accounts" translatable="false">Duplicate Accounts</string>
     <string name="title_edit_account">Edit Account</string>
     <string name="description_add_transaction_icon">Add a new transaction to an account</string>
     <string name="description_view_account_icon">View account details</string>
@@ -100,6 +101,7 @@
         <item>CREDIT</item>
         <item>DEBIT</item>
     </string-array>
+    <string name="msg_duplicate_all_accounts_confirmation" translatable="false">Are you sure you want to duplicate ALL sub-accounts?</string>
     <string name="msg_delete_all_transactions_confirmation">Are you sure you want to delete ALL transactions?</string>
     <string name="msg_delete_transaction_confirmation">Are you sure you want to delete this transaction?</string>
     <string name="title_export_preference_category">Export</string>
