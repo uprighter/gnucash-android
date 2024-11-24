@@ -23,7 +23,6 @@ import android.inputmethodservice.KeyboardView;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -56,11 +55,9 @@ import org.gnucash.android.db.DatabaseSchema;
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.db.adapter.CommoditiesDbAdapter;
 import org.gnucash.android.model.AccountType;
-import org.gnucash.android.model.BaseModel;
 import org.gnucash.android.model.Commodity;
 import org.gnucash.android.model.Money;
 import org.gnucash.android.model.Split;
-import org.gnucash.android.model.Transaction;
 import org.gnucash.android.model.TransactionType;
 import org.gnucash.android.ui.common.FormActivity;
 import org.gnucash.android.ui.common.UxArgument;
@@ -157,7 +154,7 @@ public class SplitEditorFragment extends Fragment {
 
     @Override
     public void onDestroyView() {
-        Timber.tag(LOG_TAG).d("onDestroyView: binding = " + mBinding);
+        Timber.tag(LOG_TAG).d("onDestroyView: binding = %s", mBinding);
         super.onDestroyView();
         mBinding = null;
     }
@@ -182,7 +179,7 @@ public class SplitEditorFragment extends Fragment {
 
         initAdaptersAndArgs();
 
-        Timber.tag(LOG_TAG).d("onViewCreated passed splitList len: " + splitList.size());
+        Timber.tag(LOG_TAG).d("onViewCreated passed splitList len: %s", splitList.size());
         assert !splitList.isEmpty();
         loadSplitViews(splitList);
 
@@ -271,16 +268,13 @@ public class SplitEditorFragment extends Fragment {
             saveSplits();
             return true;
         } else if (item.getItemId() == R.id.menu_add_split) {
-            addSplitView(null);
+            addSplitView(null, true);
             return true;
         } else {
             return super.onOptionsItemSelected(item);
         }
     }
 
-    private void addSplitView(Split split) {
-        addSplitView(split, true);
-    }
     /**
      * Add a split view and initialize it with <code>split</code>
      *
@@ -288,7 +282,7 @@ public class SplitEditorFragment extends Fragment {
      * @param scrollToEnd whether scroll recyclerView to the end pos
      */
     private void addSplitView(Split split, boolean scrollToEnd) {
-        Timber.tag(LOG_TAG).d(String.format("addSplitView: %s.", split));
+        Timber.tag(LOG_TAG).d("addSplitView: %s.", split);
         SplitEntryViewModel viewModel = new SplitEntryViewModel(
                 mAccountsDbAdapter, mCursorAdapter, mCommodity.getSymbol(), split);
         mSplitEntryViewModelList.add(viewModel);
@@ -296,7 +290,7 @@ public class SplitEditorFragment extends Fragment {
         mRecyclerViewAdaptor.notifyItemInserted(lastPos);
         if (scrollToEnd) {
             mRecyclerView.scrollToPosition(lastPos);
-            Log.d(LOG_TAG, "addSplitView: viewHolder=" + viewModel.getViewHolder());
+            Timber.tag(LOG_TAG).d("addSplitView: viewHolder=%s", viewModel.getViewHolder());
             viewModel.requestFocus();
         }
 
@@ -329,14 +323,14 @@ public class SplitEditorFragment extends Fragment {
         public @NonNull SplitEntryViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             ItemSplitEntryBinding binding = ItemSplitEntryBinding.inflate(
                     LayoutInflater.from(parent.getContext()), parent, false);
-            Timber.tag(LOG_TAG).d("onCreateViewHolder, binding: " + binding);
+            Timber.tag(LOG_TAG).d("onCreateViewHolder, binding: %s", binding);
             return new SplitEntryViewHolder(binding);
         }
 
         @Override
         public void onBindViewHolder(@NonNull SplitEntryViewHolder splitEntryViewHolder, int position) {
             Timber.tag(LOG_TAG).d("onBindViewHolder at position " + position + " for binding " + splitEntryViewHolder.mViewBinding);
-            Timber.tag(LOG_TAG).d("onBindViewHolder viewModel: " + mSplitEntryViewModelList.get(position));
+            Timber.tag(LOG_TAG).d("onBindViewHolder viewModel: %s", mSplitEntryViewModelList.get(position));
 
             SplitEntryViewModel viewModel = mSplitEntryViewModelList.get(position);
             splitEntryViewHolder.bindWith(viewModel);
@@ -432,7 +426,7 @@ public class SplitEditorFragment extends Fragment {
 
         @Override
         public void transferComplete(Money amount) {
-            Timber.tag(LOG_TAG).d(String.format("transferComplete: %s.", amount));
+            Timber.tag(LOG_TAG).d("transferComplete: %s.", amount);
             mCurrencyConversionDone = true;
             quantity = amount;
 
@@ -552,14 +546,14 @@ public class SplitEditorFragment extends Fragment {
         for (SplitEntryViewModel viewModel : mSplitEntryViewModelList) {
             SplitEntryViewHolder viewHolder = (SplitEntryViewHolder) viewModel.getViewHolder();
             if (viewHolder != null && viewHolder.splitAmountEditText.getValue() == null) {
-                Timber.tag(LOG_TAG).d(String.format("canSave returns false, splitAmountEditText has invalid value: %s", viewHolder.splitAmountEditText.getText()));
+                Timber.tag(LOG_TAG).d("canSave returns false, splitAmountEditText has invalid value: %s", viewHolder.splitAmountEditText.getText());
                 // split amount input is invalid.
                 return false;
             }
             //TODO: also check that multi-currency splits have a conversion amount present
         }
         if (mImbalance.compareTo(BigDecimal.ZERO) != 0) {
-            Timber.tag(LOG_TAG).d(String.format("canSave returns false, mImbalance=%s, %d", mImbalance, mImbalance.compareTo(BigDecimal.ZERO)));
+            Timber.tag(LOG_TAG).d("canSave returns false, mImbalance=%s, %d", mImbalance, mImbalance.compareTo(BigDecimal.ZERO));
             return false;
         }
         return true;
@@ -598,7 +592,7 @@ public class SplitEditorFragment extends Fragment {
         for (SplitEntryViewModel splitEntryViewModel : mSplitEntryViewModelList) {
             Split storedSplit = splitEntryViewModel.getSplit();
             if (storedSplit == null) {
-                Timber.tag(LOG_TAG).e(String.format("extractSplitsFromView: viewModel has no storedSplit are null: %s.", splitEntryViewModel));
+                Timber.tag(LOG_TAG).e("extractSplitsFromView: viewModel has no storedSplit are null: %s.", splitEntryViewModel);
                 continue;
             }
             splitList.add(storedSplit);
@@ -646,8 +640,8 @@ public class SplitEditorFragment extends Fragment {
 
         @Override
         public void afterTextChanged(Editable _editable) {
-            Timber.tag(LOG_TAG).d(String.format("afterTextChanged: %s.", _editable));
-            Timber.tag(LOG_TAG).d(String.format("afterTextChanged: %s.", Thread.currentThread().getStackTrace()[3]));
+            Timber.tag(LOG_TAG).d("afterTextChanged: %s.", _editable);
+            Timber.tag(LOG_TAG).d("afterTextChanged: %s.", Thread.currentThread().getStackTrace()[3]);
             synchronized (SplitEditorFragment.this) {
                 BigDecimal imbalance = BigDecimal.ZERO;
                 for (SplitEntryViewModel viewModel : mSplitEntryViewModelList) {
@@ -655,7 +649,7 @@ public class SplitEditorFragment extends Fragment {
                     if (viewHolder == null) {
                         Split split = viewModel.getSplit();
                         if (split == null) {
-                            Timber.tag(LOG_TAG).e(String.format("afterTextChanged: both viewHolder and storedSplit are null: %s.", viewModel));
+                            Timber.tag(LOG_TAG).e("afterTextChanged: both viewHolder and storedSplit are null: %s.", viewModel);
                             continue;
                         }
                         BigDecimal amount = Objects.requireNonNull(split.getValue()).abs().asBigDecimal();
@@ -686,7 +680,7 @@ public class SplitEditorFragment extends Fragment {
                             String accountUID = mAccountsDbAdapter.getUID(viewHolder.accountsSpinner.getSelectedItemId());
                             Split split = viewModel.getSplit();
                             if (split == null) {
-                                Timber.tag(LOG_TAG).e("afterTextChanged: viewModel has no Split: " + viewModel);
+                                Timber.tag(LOG_TAG).e("afterTextChanged: viewModel has no Split: %s", viewModel);
                                 split = new Split(valueAmount, accountUID);
                                 split.setUID(viewModel.getSplitUid().trim());
                                 viewModel.setSplit(split);
@@ -698,7 +692,7 @@ public class SplitEditorFragment extends Fragment {
                             split.setType(viewHolder.splitTypeSwitch.getTransactionType());
                             split.setQuantity(Objects.requireNonNullElse(viewHolder.quantity, valueAmount).abs());
                         } catch (ArithmeticException e) {
-                            Timber.tag(LOG_TAG).e(String.format("possible transient expression error, ignore: %s.", e.getMessage()));
+                            Timber.tag(LOG_TAG).e("possible transient expression error, ignore: %s.", e.getMessage());
                             return;
                         }
                     }
@@ -731,7 +725,7 @@ public class SplitEditorFragment extends Fragment {
 
         @Override
         public void onItemSelected(AdapterView<?> parentView, View selectedItemView, int position, long id) {
-            Timber.tag(LOG_TAG).d(String.format("onItemSelected: %d.", position));
+            Timber.tag(LOG_TAG).d("onItemSelected: %d.", position);
             AccountType accountType = mAccountsDbAdapter.getAccountType(id);
             mTypeToggleButton.setAccountType(accountType);
             mViewModel.setSplitTypeChecked(mTypeToggleButton.isChecked());

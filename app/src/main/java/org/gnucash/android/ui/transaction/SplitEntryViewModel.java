@@ -1,6 +1,5 @@
 package org.gnucash.android.ui.transaction;
 
-import android.util.Log;
 import android.widget.Spinner;
 
 import androidx.annotation.NonNull;
@@ -20,6 +19,8 @@ import org.gnucash.android.ui.util.widget.TransactionTypeSwitch;
 import java.math.BigDecimal;
 import java.util.Locale;
 import java.util.Objects;
+
+import timber.log.Timber;
 
 public class SplitEntryViewModel extends BaseObservable {
     public static final String LOG_TAG = SplitEntryViewModel.class.getName();
@@ -79,7 +80,7 @@ public class SplitEntryViewModel extends BaseObservable {
     }
 
     public void init() {
-//        Log.d(LOG_TAG, "init, mSplit=" + mSplit);
+        Timber.tag(LOG_TAG).d("init, mSplit=%s", mSplit);
         if (mSplit != null) {
             String splitAccountUID = mSplit.getAccountUID();
             assert splitAccountUID != null;
@@ -93,12 +94,12 @@ public class SplitEntryViewModel extends BaseObservable {
     }
 
     public void setSplit(Split split) {
-        Log.d(LOG_TAG, "setSplit, mSplit=" + mSplit);
+        Timber.tag(LOG_TAG).d("setSplit, mSplit=%s", mSplit);
         mSplit = split;
     }
 
     public Split getSplit() {
-//        Log.d(LOG_TAG, "getSplit, mSplit=" + mSplit);
+//        Timber.tag(LOG_TAG).d("getSplit, mSplit=%s", mSplit);
         return mSplit;
     }
 
@@ -138,7 +139,7 @@ public class SplitEntryViewModel extends BaseObservable {
 
     @Bindable
     public int getInputAccountPos() {
-//        Log.d(LOG_TAG, "getInputAccountPos, old value " + this.inputAccountPos);
+//        Timber.tag(LOG_TAG).d("getInputAccountPos, old value %s", this.inputAccountPos);
         return inputAccountPos;
     }
 
