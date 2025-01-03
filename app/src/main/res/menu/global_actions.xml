@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?><!--
+<!--
  Copyright (c) 2012 Ngewi Fet <ngewif@gmail.com>
  
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,12 +16,5 @@
 
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
-
-    <item
-        android:id="@+id/menu_search"
-        android:title="@string/menu_search_accounts"
-        android:icon="@drawable/ic_search_white"
-        app:showAsAction="collapseActionView|ifRoom"
-        app:actionViewClass="androidx.appcompat.widget.SearchView" />
 
 </menu>

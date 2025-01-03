@@ -93,6 +93,7 @@ public class ImportAsyncTask extends AsyncTask<Uri, Void, String> {
             bookUID = book.getUID();
         } catch (final Throwable e) {
             Timber.e(e, "Error importing: %s", uri);
+            //TODO delete the partial book at `uri`
             return null;
         }
 
@@ -100,15 +101,17 @@ public class ImportAsyncTask extends AsyncTask<Uri, Void, String> {
         contentValues.put(DatabaseSchema.BookEntry.COLUMN_SOURCE_URI, uri.toString());
 
         String displayName = book.getDisplayName();
-        if (TextUtils.isEmpty(displayName)) {
-            displayName = ContentExtKt.getDocumentName(uri, mContext);
-            // Remove short file type extension, e.g. ".xml" or ".gnca".
-            int indexFileType = displayName.lastIndexOf('.');
-            if ((indexFileType > 0) && (indexFileType + 5 >= displayName.length())) {
-                displayName = displayName.substring(0, indexFileType);
+        String name = ContentExtKt.getDocumentName(uri, mContext);
+        if (!TextUtils.isEmpty(name)) {
+            // Remove short file type extension, e.g. ".xml" or ".gnucash" or ".gnca.gz"
+            int indexFileType = name.indexOf('.');
+            if (indexFileType > 0) {
+                name = name.substring(0, indexFileType);
             }
-            contentValues.put(DatabaseSchema.BookEntry.COLUMN_DISPLAY_NAME, displayName);
+            displayName = name;
+            book.setDisplayName(displayName);
         }
+        contentValues.put(DatabaseSchema.BookEntry.COLUMN_DISPLAY_NAME, displayName);
         BooksDbAdapter.getInstance().updateRecord(bookUID, contentValues);
 
         //set the preferences to their default values

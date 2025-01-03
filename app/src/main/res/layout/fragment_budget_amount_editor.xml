@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?><!--
+<!--
  Copyright (c) 2015 Ngewi Fet <ngewif@gmail.com>
 
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,9 +15,9 @@
 -->
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    android:animateLayoutChanges="true"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:animateLayoutChanges="true"
     tools:context=".ui.common.FormActivity">
 
     <ScrollView
@@ -32,14 +32,7 @@
             android:orientation="vertical" />
     </ScrollView>
 
-    <android.inputmethodservice.KeyboardView
+    <include
         android:id="@+id/calculator_keyboard"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_alignParentBottom="true"
-        android:layout_alignParentLeft="true"
-        android:layout_alignParentRight="true"
-        android:focusable="true"
-        android:focusableInTouchMode="true"
-        android:visibility="gone" />
+        layout="@layout/kbd_calculator" />
 </RelativeLayout>

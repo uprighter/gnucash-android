@@ -15,6 +15,9 @@
  */
 package org.gnucash.android.ui.report.sheet;
 
+import static org.gnucash.android.ui.util.TextViewExtKt.displayBalance;
+
+import android.content.Context;
 import android.database.Cursor;
 import android.graphics.Typeface;
 import android.os.Bundle;
@@ -26,18 +29,17 @@ import android.view.ViewGroup;
 import android.widget.TableLayout;
 import android.widget.TextView;
 
+import androidx.annotation.ColorInt;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import org.gnucash.android.R;
 import org.gnucash.android.databinding.FragmentTextReportBinding;
 import org.gnucash.android.db.DatabaseSchema;
-import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.model.AccountType;
 import org.gnucash.android.model.Money;
 import org.gnucash.android.ui.report.BaseReportFragment;
 import org.gnucash.android.ui.report.ReportType;
-import org.gnucash.android.ui.transaction.TransactionsActivity;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -49,7 +51,6 @@ import java.util.List;
  * @author Ngewi Fet <ngewif@gmail.com>
  */
 public class BalanceSheetFragment extends BaseReportFragment {
-    AccountsDbAdapter mAccountsDbAdapter = AccountsDbAdapter.getInstance();
 
     private Money mAssetsBalance;
     private Money mLiabilitiesBalance;
@@ -58,10 +59,13 @@ public class BalanceSheetFragment extends BaseReportFragment {
     private List<AccountType> mEquityAccountTypes;
 
     private FragmentTextReportBinding mBinding;
+    @ColorInt
+    private int colorBalanceZero;
 
     @Override
     public View inflateView(LayoutInflater inflater, ViewGroup container) {
         mBinding = FragmentTextReportBinding.inflate(inflater, container, false);
+        colorBalanceZero = mBinding.totalLiabilityAndEquity.getCurrentTextColor();
         return mBinding.getRoot();
     }
 
@@ -97,7 +101,7 @@ public class BalanceSheetFragment extends BaseReportFragment {
     }
 
     @Override
-    protected void generateReport() {
+    protected void generateReport(@NonNull Context context) {
         mAssetsBalance = mAccountsDbAdapter.getAccountBalance(mAssetAccountTypes, -1, System.currentTimeMillis());
         mLiabilitiesBalance = mAccountsDbAdapter.getAccountBalance(mLiabilityAccountTypes, -1, System.currentTimeMillis());
     }
@@ -108,7 +112,7 @@ public class BalanceSheetFragment extends BaseReportFragment {
         loadAccountViews(mLiabilityAccountTypes, mBinding.tableLiabilities);
         loadAccountViews(mEquityAccountTypes, mBinding.tableEquity);
 
-        TransactionsActivity.displayBalance(mBinding.totalLiabilityAndEquity, mAssetsBalance.minus(mLiabilitiesBalance));
+        displayBalance(mBinding.totalLiabilityAndEquity, mAssetsBalance.minus(mLiabilitiesBalance), colorBalanceZero);
     }
 
     @Override
@@ -130,15 +134,20 @@ public class BalanceSheetFragment extends BaseReportFragment {
                         + " IN ( '" + TextUtils.join("' , '", accountTypes) + "' ) AND "
                         + DatabaseSchema.AccountEntry.COLUMN_PLACEHOLDER + " = 0",
                 null, DatabaseSchema.AccountEntry.COLUMN_FULL_NAME + " ASC");
+        final int columnIndexUID = cursor.getColumnIndexOrThrow(DatabaseSchema.AccountEntry.COLUMN_UID);
+        final int columnIndexName = cursor.getColumnIndexOrThrow(DatabaseSchema.AccountEntry.COLUMN_NAME);
 
         while (cursor.moveToNext()) {
-            String accountUID = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseSchema.AccountEntry.COLUMN_UID));
-            String name = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseSchema.AccountEntry.COLUMN_NAME));
+            String accountUID = cursor.getString(columnIndexUID);
+            String name = cursor.getString(columnIndexName);
             Money balance = mAccountsDbAdapter.getAccountBalance(accountUID);
+            if (balance.isAmountZero()) continue;
+            // TODO alternate light and dark rows
             View view = inflater.inflate(R.layout.row_balance_sheet, tableLayout, false);
             ((TextView) view.findViewById(R.id.account_name)).setText(name);
             TextView balanceTextView = (TextView) view.findViewById(R.id.account_balance);
-            TransactionsActivity.displayBalance(balanceTextView, balance);
+            @ColorInt int colorBalanceZero = balanceTextView.getCurrentTextColor();
+            displayBalance(balanceTextView, balance, colorBalanceZero);
             tableLayout.addView(view);
         }
         cursor.close();
@@ -154,7 +163,8 @@ public class BalanceSheetFragment extends BaseReportFragment {
         TextView accountBalance = (TextView) totalView.findViewById(R.id.account_balance);
         accountBalance.setTextSize(16);
         accountBalance.setTypeface(null, Typeface.BOLD);
-        TransactionsActivity.displayBalance(accountBalance, mAccountsDbAdapter.getAccountBalance(accountTypes, -1, System.currentTimeMillis()));
+        @ColorInt int colorBalanceZero = accountBalance.getCurrentTextColor();
+        displayBalance(accountBalance, mAccountsDbAdapter.getAccountBalance(accountTypes, -1, System.currentTimeMillis()), colorBalanceZero);
 
         tableLayout.addView(totalView);
     }

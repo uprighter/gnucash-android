@@ -24,6 +24,10 @@ import java.util.UUID
  * All other models should extend this base model.
  */
 abstract class BaseModel {
+    /** Database record id. */
+    @JvmField
+    var id: Long = 0
+
     /**
      * Unique identifier of this model instance.
      *
@@ -60,13 +64,13 @@ abstract class BaseModel {
          * A new GUID can be generated with a call to [generateUID] (and it will if the field was not
          * previously initialized).
          *
-         * @return [uID] String unique ID
+         * @return [UID] String unique ID
          */
         get() {
             if (_uid == null) {
                 _uid = generateUID()
             }
-            return _uid
+            return _uid!!
         }
         /**
          * Sets the unique string identifier for this model instance.
@@ -94,6 +98,7 @@ abstract class BaseModel {
     }
 
     companion object {
+        private val regexDash = "-".toRegex()
         /**
          * Method for generating the Global Unique ID for the model object
          *
@@ -101,7 +106,7 @@ abstract class BaseModel {
          */
         @JvmStatic
         fun generateUID(): String {
-            return UUID.randomUUID().toString().replace("-".toRegex(), "")
+            return UUID.randomUUID().toString().replace(regexDash, "")
         }
     }
 }

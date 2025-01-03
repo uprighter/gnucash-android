@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?><!--
+<!--
  Copyright (c) 2012 Ngewi Fet <ngewif@gmail.com>
  
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,6 +20,7 @@
     <dimen name="text_size_medium">16sp</dimen>
     <dimen name="edge_padding">12dp</dimen>
     <dimen name="widget_margin">2dp</dimen>
+    <dimen name="widget_button_size">@dimen/bp_material_button_height</dimen>
     <dimen name="form_row_bottom_margin">10dp</dimen>
     <dimen name="strip_width">5dp</dimen>
     <dimen name="color_swatch_large">64dip</dimen>
@@ -33,4 +34,6 @@
     <dimen name="passcode_btn_margin">10dp</dimen>
     <dimen name="elevation_default">10dp</dimen>
 
+    <dimen name="kbd_key_height">48dp</dimen>
+    <dimen name="kbd_key_radius">25dp</dimen>
 </resources>

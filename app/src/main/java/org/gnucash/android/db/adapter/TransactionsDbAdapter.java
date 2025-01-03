@@ -293,7 +293,6 @@ public class TransactionsDbAdapter extends DatabaseAdapter<Transaction> {
         String[] projectionIn = new String[]{TransactionEntry.TABLE_NAME + ".*",
                 ScheduledActionEntry.TABLE_NAME + "." + ScheduledActionEntry.COLUMN_UID + " AS " + "origin_scheduled_action_uid"};
         String sortOrder = TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_DESCRIPTION + " ASC";
-//        queryBuilder.setDistinct(true);
 
         return queryBuilder.query(mDb, projectionIn, null, null, null, null, sortOrder);
     }
@@ -322,17 +321,9 @@ public class TransactionsDbAdapter extends DatabaseAdapter<Transaction> {
      *
      * @return List of all transactions
      */
+    @Deprecated
     public List<Transaction> getAllTransactions() {
-        Cursor cursor = fetchAllRecords();
-        List<Transaction> transactions = new ArrayList<Transaction>();
-        try {
-            while (cursor.moveToNext()) {
-                transactions.add(buildModelInstance(cursor));
-            }
-        } finally {
-            cursor.close();
-        }
-        return transactions;
+        return getAllRecords();
     }
 
     public Cursor fetchTransactionsWithSplits(String[] columns, @Nullable String where, @Nullable String[] whereArgs, @Nullable String orderBy) {
@@ -354,8 +345,8 @@ public class TransactionsDbAdapter extends DatabaseAdapter<Transaction> {
         SQLiteQueryBuilder queryBuilder = new SQLiteQueryBuilder();
         queryBuilder.setTables(TransactionEntry.TABLE_NAME);
         String startTimeString = TimestampHelper.getUtcStringFromTimestamp(timestamp);
-        return queryBuilder.query(mDb, null, TransactionEntry.COLUMN_MODIFIED_AT + " >= \"" + startTimeString + "\"",
-                null, null, null, TransactionEntry.COLUMN_TIMESTAMP + " ASC", null);
+        return queryBuilder.query(mDb, null, TransactionEntry.COLUMN_MODIFIED_AT + " >= ?",
+                new String[]{startTimeString}, null, null, TransactionEntry.COLUMN_TIMESTAMP + " ASC", null);
     }
 
     public Cursor fetchTransactionsWithSplitsWithTransactionAccount(String[] columns, String where, String[] whereArgs, String orderBy) {
@@ -383,10 +374,7 @@ public class TransactionsDbAdapter extends DatabaseAdapter<Transaction> {
      * @return Number of transactions
      */
     public long getRecordsCount() {
-        String sql = "SELECT COUNT(*) FROM " + TransactionEntry.TABLE_NAME +
-            " WHERE " + TransactionEntry.COLUMN_TEMPLATE + " =0";
-        SQLiteStatement statement = mDb.compileStatement(sql);
-        return statement.simpleQueryForLong();
+        return DatabaseUtils.queryNumEntries(mDb, TransactionEntry.TABLE_NAME, TransactionEntry.COLUMN_TEMPLATE + "=0");
     }
 
     /**
@@ -502,10 +490,7 @@ public class TransactionsDbAdapter extends DatabaseAdapter<Transaction> {
      * @return Number of template transactions
      */
     public long getTemplateTransactionsCount() {
-        String sql = "SELECT COUNT(*) FROM " + TransactionEntry.TABLE_NAME
-                + " WHERE " + TransactionEntry.COLUMN_TEMPLATE + "=1";
-        SQLiteStatement statement = mDb.compileStatement(sql);
-        return statement.simpleQueryForLong();
+        return DatabaseUtils.queryNumEntries(mDb, TransactionEntry.TABLE_NAME, TransactionEntry.COLUMN_TEMPLATE + "=1");
     }
 
     /**
@@ -530,12 +515,14 @@ public class TransactionsDbAdapter extends DatabaseAdapter<Transaction> {
      * @return Number of splits belonging to the transaction
      */
     public long getSplitCount(@NonNull String transactionUID) {
-        if (transactionUID == null)
+        if (TextUtils.isEmpty(transactionUID))
             return 0;
-        String sql = "SELECT COUNT(*) FROM " + SplitEntry.TABLE_NAME
-                + " WHERE " + SplitEntry.COLUMN_TRANSACTION_UID + "= '" + transactionUID + "'";
-        SQLiteStatement statement = mDb.compileStatement(sql);
-        return statement.simpleQueryForLong();
+        return DatabaseUtils.queryNumEntries(
+            mDb,
+            SplitEntry.TABLE_NAME,
+            SplitEntry.COLUMN_TRANSACTION_UID + "=?",
+            new String[]{transactionUID}
+        );
     }
 
     /**

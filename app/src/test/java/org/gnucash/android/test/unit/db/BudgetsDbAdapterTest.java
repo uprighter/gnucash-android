@@ -26,17 +26,14 @@ import org.gnucash.android.db.adapter.RecurrenceDbAdapter;
 import org.gnucash.android.model.Account;
 import org.gnucash.android.model.Budget;
 import org.gnucash.android.model.BudgetAmount;
+import org.gnucash.android.model.Commodity;
 import org.gnucash.android.model.Money;
 import org.gnucash.android.model.PeriodType;
 import org.gnucash.android.model.Recurrence;
-import org.gnucash.android.test.unit.testutil.ShadowCrashlytics;
-import org.gnucash.android.test.unit.testutil.ShadowUserVoice;
+import org.gnucash.android.test.unit.GnuCashTest;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.robolectric.RobolectricTestRunner;
-import org.robolectric.annotation.Config;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -44,10 +41,7 @@ import java.util.List;
 /**
  * Tests for the budgets database adapter
  */
-@RunWith(RobolectricTestRunner.class)
-//package is required so that resources can be found in dev mode
-@Config(sdk = 21, shadows = {ShadowCrashlytics.class, ShadowUserVoice.class})
-public class BudgetsDbAdapterTest {
+public class BudgetsDbAdapterTest extends GnuCashTest {
 
     private BudgetsDbAdapter mBudgetsDbAdapter;
     private RecurrenceDbAdapter mRecurrenceDbAdapter;
@@ -82,10 +76,11 @@ public class BudgetsDbAdapterTest {
         assertThat(mBudgetsDbAdapter.getRecordsCount()).isZero();
         assertThat(mBudgetAmountsDbAdapter.getRecordsCount()).isZero();
         assertThat(mRecurrenceDbAdapter.getRecordsCount()).isZero();
+        String defaucltCurrencyCode = Commodity.DEFAULT_COMMODITY.getCurrencyCode();
 
         Budget budget = new Budget("Test");
         budget.addBudgetAmount(new BudgetAmount(Money.getZeroInstance(), mAccount.getUID()));
-        budget.addBudgetAmount(new BudgetAmount(new Money("10", Money.DEFAULT_CURRENCY_CODE), mSecondAccount.getUID()));
+        budget.addBudgetAmount(new BudgetAmount(new Money("10", defaucltCurrencyCode), mSecondAccount.getUID()));
         Recurrence recurrence = new Recurrence(PeriodType.MONTH);
         budget.setRecurrence(recurrence);
 
@@ -95,7 +90,7 @@ public class BudgetsDbAdapterTest {
         assertThat(mRecurrenceDbAdapter.getRecordsCount()).isEqualTo(1);
 
         budget.getBudgetAmounts().clear();
-        BudgetAmount budgetAmount = new BudgetAmount(new Money("5", Money.DEFAULT_CURRENCY_CODE), mAccount.getUID());
+        BudgetAmount budgetAmount = new BudgetAmount(new Money("5", defaucltCurrencyCode), mAccount.getUID());
         budget.addBudgetAmount(budgetAmount);
         mBudgetsDbAdapter.addRecord(budget);
 
@@ -139,9 +134,10 @@ public class BudgetsDbAdapterTest {
         budget.addBudgetAmount(new BudgetAmount(Money.getZeroInstance(), mAccount.getUID()));
         budgets.add(budget);
 
+        String defaultCurrencyCode = Commodity.DEFAULT_COMMODITY.getCurrencyCode();
         budget = new Budget("Random", new Recurrence(PeriodType.WEEK));
-        budget.addBudgetAmount(new BudgetAmount(new Money("10.50", Money.DEFAULT_CURRENCY_CODE), mAccount.getUID()));
-        budget.addBudgetAmount(new BudgetAmount(new Money("32.35", Money.DEFAULT_CURRENCY_CODE), mSecondAccount.getUID()));
+        budget.addBudgetAmount(new BudgetAmount(new Money("10.50", defaultCurrencyCode), mAccount.getUID()));
+        budget.addBudgetAmount(new BudgetAmount(new Money("32.35", defaultCurrencyCode), mSecondAccount.getUID()));
 
         budgets.add(budget);
         return budgets;

@@ -123,7 +123,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             + ");" + createUpdatedAtTrigger(SplitEntry.TABLE_NAME);
 
 
-    public static final String SCHEDULED_ACTIONS_TABLE_CREATE = "CREATE TABLE " + ScheduledActionEntry.TABLE_NAME + " ("
+    private static final String SCHEDULED_ACTIONS_TABLE_CREATE = "CREATE TABLE " + ScheduledActionEntry.TABLE_NAME + " ("
             + ScheduledActionEntry._ID + " integer primary key autoincrement, "
             + ScheduledActionEntry.COLUMN_UID + " varchar(255) not null UNIQUE, "
             + ScheduledActionEntry.COLUMN_ACTION_UID + " varchar(255) not null, "
@@ -146,16 +146,17 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             + "FOREIGN KEY (" + ScheduledActionEntry.COLUMN_RECURRENCE_UID + ") REFERENCES " + RecurrenceEntry.TABLE_NAME + " (" + RecurrenceEntry.COLUMN_UID + ") "
             + ");" + createUpdatedAtTrigger(ScheduledActionEntry.TABLE_NAME);
 
-    public static final String COMMODITIES_TABLE_CREATE = "CREATE TABLE " + DatabaseSchema.CommodityEntry.TABLE_NAME + " ("
+    private static final String COMMODITIES_TABLE_CREATE = "CREATE TABLE " + DatabaseSchema.CommodityEntry.TABLE_NAME + " ("
             + CommodityEntry._ID + " integer primary key autoincrement, "
             + CommodityEntry.COLUMN_UID + " varchar(255) not null UNIQUE, "
-            + CommodityEntry.COLUMN_NAMESPACE + " varchar(255) not null default " + Commodity.Namespace.ISO4217.name() + ", "
+            + CommodityEntry.COLUMN_NAMESPACE + " varchar(255) not null default '" + Commodity.COMMODITY_CURRENCY + "', "
             + CommodityEntry.COLUMN_FULLNAME + " varchar(255) not null, "
             + CommodityEntry.COLUMN_MNEMONIC + " varchar(255) not null, "
             + CommodityEntry.COLUMN_LOCAL_SYMBOL + " varchar(255) not null default '', "
             + CommodityEntry.COLUMN_CUSIP + " varchar(255), "
             + CommodityEntry.COLUMN_SMALLEST_FRACTION + " integer not null, "
-            + CommodityEntry.COLUMN_QUOTE_FLAG + " integer not null, "
+            + CommodityEntry.COLUMN_QUOTE_SOURCE + " varchar(255), "
+            + CommodityEntry.COLUMN_QUOTE_TZ + " varchar(100), "
             + CommodityEntry.COLUMN_CREATED_AT + " TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, "
             + CommodityEntry.COLUMN_MODIFIED_AT + " TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP "
             + ");" + createUpdatedAtTrigger(CommodityEntry.TABLE_NAME);
@@ -260,7 +261,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     }
 
     @Override
-    public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {}
+    public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+        MigrationHelper.migrate(db, oldVersion, newVersion);
+    }
 
 
     /**

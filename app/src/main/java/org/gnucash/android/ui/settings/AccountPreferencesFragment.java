@@ -20,10 +20,12 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.database.Cursor;
 import android.os.Bundle;
+import android.view.View;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.preference.ListPreference;
@@ -32,13 +34,13 @@ import androidx.preference.PreferenceFragmentCompat;
 
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
-import org.gnucash.android.db.DatabaseSchema;
 import org.gnucash.android.db.adapter.BooksDbAdapter;
 import org.gnucash.android.db.adapter.CommoditiesDbAdapter;
 import org.gnucash.android.export.ExportAsyncTask;
 import org.gnucash.android.export.ExportFormat;
 import org.gnucash.android.export.ExportParams;
 import org.gnucash.android.export.Exporter;
+import org.gnucash.android.model.Commodity;
 import org.gnucash.android.model.Money;
 import org.gnucash.android.ui.account.AccountsActivity;
 import org.gnucash.android.ui.settings.dialog.DeleteAllAccountsConfirmationDialog;
@@ -72,17 +74,21 @@ public class AccountPreferencesFragment extends PreferenceFragmentCompat impleme
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        ActionBar actionBar = ((AppCompatActivity) getActivity()).getSupportActionBar();
-        actionBar.setTitle(R.string.title_account_preferences);
-
-        Cursor cursor = CommoditiesDbAdapter.getInstance().fetchAllRecords(DatabaseSchema.CommodityEntry.COLUMN_MNEMONIC + " ASC");
-        while (cursor.moveToNext()) {
-            String code = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseSchema.CommodityEntry.COLUMN_MNEMONIC));
-            String name = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseSchema.CommodityEntry.COLUMN_FULLNAME));
-            mCurrencyEntries.add(code + " - " + name);
+        List<Commodity> commodities = CommoditiesDbAdapter.getInstance().getAllRecords();
+        for (Commodity commodity : commodities) {
+            String code = commodity.getCurrencyCode();
+            String name = commodity.getFullname();
+            mCurrencyEntries.add(commodity.formatListItem());
             mCurrencyEntryValues.add(code);
         }
-        cursor.close();
+    }
+
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        ActionBar actionBar = ((AppCompatActivity) requireActivity()).getSupportActionBar();
+        assert actionBar != null;
+        actionBar.setTitle(R.string.title_account_preferences);
     }
 
     @Override
@@ -122,11 +128,11 @@ public class AccountPreferencesFragment extends PreferenceFragmentCompat impleme
                 new AlertDialog.Builder(getActivity())
                         .setTitle(R.string.title_create_default_accounts)
                         .setMessage(R.string.msg_confirm_create_default_accounts_setting)
-                        .setIcon(R.drawable.ic_warning_black)
+                        .setIcon(R.drawable.ic_warning)
                         .setPositiveButton(R.string.btn_create_accounts, new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialogInterface, int which) {
-                                AccountsActivity.createDefaultAccounts(Money.DEFAULT_CURRENCY_CODE, getActivity());
+                                AccountsActivity.createDefaultAccounts(Commodity.DEFAULT_COMMODITY.getCurrencyCode(), getActivity());
                             }
                         })
                         .setNegativeButton(R.string.btn_cancel, new DialogInterface.OnClickListener() {

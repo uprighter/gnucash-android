@@ -1,4 +1,3 @@
-<?xml version="1.0" encoding="utf-8"?>
 <!--
 Copyright (c) 2015 Ngewi Fet <ngewif@gmail.com>
 
@@ -17,14 +16,14 @@ limitations under the License.
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
-        android:id="@+id/menu_add_split"
-        android:icon="@drawable/ic_add_white"
+        android:id="@+id/menu_add"
+        android:icon="@drawable/ic_add"
         android:title="@string/btn_add_split"
         app:showAsAction="always" />
 
     <item
         android:id="@+id/menu_save"
-        android:icon="@drawable/ic_check_white"
+        android:icon="@drawable/ic_check"
         android:title="@string/btn_save"
         app:showAsAction="always|withText" />
 </menu>

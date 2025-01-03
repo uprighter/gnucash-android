@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?><!--
+<!--
  Copyright (c) 2013 Ngewi Fet <ngewif@gmail.com>
 
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,20 +16,20 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
-        android:id="@+id/menu_favorite_account"
-        android:icon="@drawable/ic_favorite_white"
+        android:id="@+id/menu_favorite"
+        android:icon="@drawable/ic_favorite"
         android:title="@string/menu_title_favorite"
         app:showAsAction="ifRoom" />
 
     <item
-        android:id="@+id/menu_edit_account"
-        android:icon="@drawable/ic_edit_white"
+        android:id="@+id/menu_edit"
+        android:icon="@drawable/ic_edit"
         android:title="@string/title_edit_account"
         app:showAsAction="never|withText" />
 
     <item
-        android:id="@+id/menu_delete_account"
-        android:icon="@drawable/ic_delete_white"
+        android:id="@+id/menu_delete"
+        android:icon="@drawable/ic_delete"
         android:title="@string/title_delete_account"
         app:showAsAction="never" />
 </menu>

@@ -18,6 +18,7 @@ package org.gnucash.android.db.adapter;
 
 import android.content.ContentValues;
 import android.database.Cursor;
+import android.database.DatabaseUtils;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteStatement;
 import android.text.TextUtils;
@@ -223,20 +224,24 @@ public abstract class DatabaseAdapter<Model extends BaseModel> implements Closea
      */
     public void addRecord(@NonNull final Model model, UpdateMethod updateMethod) {
         Timber.d("Adding %s record to database: ", model.getClass().getSimpleName());
+        final SQLiteStatement statement;
         switch (updateMethod) {
             case insert:
-                synchronized (getInsertStatement()) {
-                    setBindings(getInsertStatement(), model).execute();
+                statement = getInsertStatement();
+                synchronized (statement) {
+                    setBindings(statement, model).execute();
                 }
                 break;
             case update:
-                synchronized (getUpdateStatement()) {
-                    setBindings(getUpdateStatement(), model).execute();
+                statement = getUpdateStatement();
+                synchronized (statement) {
+                    setBindings(statement, model).execute();
                 }
                 break;
             default:
-                synchronized (getReplaceStatement()) {
-                    setBindings(getReplaceStatement(), model).execute();
+                statement = getReplaceStatement();
+                synchronized (statement) {
+                    setBindings(statement, model).execute();
                 }
                 break;
         }
@@ -436,8 +441,10 @@ public abstract class DatabaseAdapter<Model extends BaseModel> implements Closea
         List<Model> modelRecords = new ArrayList<>();
         Cursor c = fetchAllRecords();
         try {
-            while (c.moveToNext()) {
-                modelRecords.add(buildModelInstance(c));
+            if (c.moveToFirst()) {
+                do {
+                    modelRecords.add(buildModelInstance(c));
+                } while (c.moveToNext());
             }
         } finally {
             c.close();
@@ -470,10 +477,12 @@ public abstract class DatabaseAdapter<Model extends BaseModel> implements Closea
      * @param model  Model instance to be initialized
      */
     protected void populateBaseModelAttributes(Cursor cursor, BaseModel model) {
+        long id = cursor.getLong(cursor.getColumnIndexOrThrow(CommonColumns.COLUMN_ID));
         String uid = cursor.getString(cursor.getColumnIndexOrThrow(CommonColumns.COLUMN_UID));
         String created = cursor.getString(cursor.getColumnIndexOrThrow(CommonColumns.COLUMN_CREATED_AT));
         String modified = cursor.getString(cursor.getColumnIndexOrThrow(CommonColumns.COLUMN_MODIFIED_AT));
 
+        model.id = id;
         model.setUID(uid);
         model.setCreatedTimestamp(TimestampHelper.getTimestampFromUtcString(created));
         model.setModifiedTimestamp(TimestampHelper.getTimestampFromUtcString(modified));
@@ -710,6 +719,10 @@ public abstract class DatabaseAdapter<Model extends BaseModel> implements Closea
         return mDb.update(mTableName, contentValues, CommonColumns.COLUMN_UID + "=?", new String[]{uid});
     }
 
+    public void updateRecord(Model model) {
+        addRecord(model, UpdateMethod.update);
+    }
+
     /**
      * Updates all records which match the {@code where} clause with the {@code newValue} for the column
      *
@@ -756,6 +769,20 @@ public abstract class DatabaseAdapter<Model extends BaseModel> implements Closea
     }
 
     /**
+     * Returns an attribute from a specific column in the database for a specific record.
+     * <p>The attribute is returned as a string which can then be converted to another type if
+     * the caller was expecting something other type </p>
+     *
+     * @param model the record with a GUID.
+     * @param columnName Name of the column to be retrieved
+     * @return String value of the column entry
+     * @throws IllegalArgumentException if either the {@code recordUID} or {@code columnName} do not exist in the database
+     */
+    public String getAttribute(@NonNull Model model, @NonNull String columnName) {
+        return getAttribute(mTableName, getUID(model), columnName);
+    }
+
+    /**
      * Returns an attribute from a specific column in the database for a specific record and specific table.
      * <p>The attribute is returned as a string which can then be converted to another type if
      * the caller was expecting something other type </p>
@@ -792,9 +819,7 @@ public abstract class DatabaseAdapter<Model extends BaseModel> implements Closea
      * @return Total number of records in the database
      */
     public long getRecordsCount() {
-        String sql = "SELECT COUNT(*) FROM " + mTableName;
-        SQLiteStatement statement = mDb.compileStatement(sql);
-        return statement.simpleQueryForLong();
+        return DatabaseUtils.queryNumEntries(mDb, mTableName);
     }
 
     /**
@@ -853,5 +878,16 @@ public abstract class DatabaseAdapter<Model extends BaseModel> implements Closea
         if (mDb.isOpen()) {
             mDb.close();
         }
+    }
+
+    public void closeQuietly() {
+        try {
+            close();
+        } catch (IOException ignore) {
+        }
+    }
+
+    public String getUID(Model model) {
+        return model.getUID();
     }
 }

@@ -25,6 +25,7 @@ import static org.gnucash.android.util.ColorExtKt.parseColor;
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
+import android.database.DatabaseUtils;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteStatement;
 import android.text.TextUtils;
@@ -32,7 +33,7 @@ import android.text.TextUtils;
 import androidx.annotation.ColorInt;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.core.content.res.ResourcesCompat;
+import androidx.core.content.ContextCompat;
 
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
@@ -79,11 +80,13 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
     /**
      * Transactions database adapter for manipulating transactions associated with accounts
      */
+    @NonNull
     private final TransactionsDbAdapter mTransactionsAdapter;
 
     /**
      * Commodities database adapter for commodity manipulation
      */
+    @NonNull
     private final CommoditiesDbAdapter mCommoditiesDbAdapter;
 
     /**
@@ -91,7 +94,7 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
      *
      * @param db SQliteDatabase instance
      */
-    public AccountsDbAdapter(SQLiteDatabase db, TransactionsDbAdapter transactionsDbAdapter) {
+    public AccountsDbAdapter(@NonNull SQLiteDatabase db, @NonNull TransactionsDbAdapter transactionsDbAdapter) {
         super(db, AccountEntry.TABLE_NAME, new String[]{
                 AccountEntry.COLUMN_NAME,
                 AccountEntry.COLUMN_DESCRIPTION,
@@ -120,24 +123,7 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
      * @param db Database to create an adapter for
      */
     public AccountsDbAdapter(SQLiteDatabase db) {
-        super(db, AccountEntry.TABLE_NAME, new String[]{
-                AccountEntry.COLUMN_NAME,
-                AccountEntry.COLUMN_DESCRIPTION,
-                AccountEntry.COLUMN_TYPE,
-                AccountEntry.COLUMN_CURRENCY,
-                AccountEntry.COLUMN_COLOR_CODE,
-                AccountEntry.COLUMN_FAVORITE,
-                AccountEntry.COLUMN_FULL_NAME,
-                AccountEntry.COLUMN_PLACEHOLDER,
-                AccountEntry.COLUMN_CREATED_AT,
-                AccountEntry.COLUMN_HIDDEN,
-                AccountEntry.COLUMN_COMMODITY_UID,
-                AccountEntry.COLUMN_PARENT_ACCOUNT_UID,
-                AccountEntry.COLUMN_DEFAULT_TRANSFER_ACCOUNT_UID
-        });
-
-        mTransactionsAdapter = new TransactionsDbAdapter(db, new SplitsDbAdapter(db));
-        mCommoditiesDbAdapter = new CommoditiesDbAdapter(db);
+        this(db, new TransactionsDbAdapter(db, new SplitsDbAdapter(db)));
     }
 
     /**
@@ -440,7 +426,7 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
      * @param c Cursor pointing to account record in database
      * @return {@link Account} object constructed from database record
      */
-    private Account buildSimpleAccountInstance(Cursor c) {
+    public Account buildSimpleAccountInstance(Cursor c) {
         Account account = new Account(c.getString(c.getColumnIndexOrThrow(AccountEntry.COLUMN_NAME)));
         populateBaseModelAttributes(c, account);
 
@@ -496,6 +482,28 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
                 new String[]{AccountEntry._ID, AccountEntry.COLUMN_COLOR_CODE},
                 AccountEntry._ID + "=" + accountId,
                 null, null, null, null);
+        try {
+            if (c.moveToFirst()) {
+                return c.getString(c.getColumnIndexOrThrow(AccountEntry.COLUMN_COLOR_CODE));
+            } else {
+                return null;
+            }
+        } finally {
+            c.close();
+        }
+    }
+
+    /**
+     * Returns the color code for the account in format #rrggbb
+     *
+     * @param accountUID UID of the account
+     * @return String color code of account or null if none
+     */
+    public String getAccountColorCode(String accountUID) {
+        Cursor c = mDb.query(AccountEntry.TABLE_NAME,
+                new String[]{AccountEntry._ID, AccountEntry.COLUMN_COLOR_CODE},
+                AccountEntry.COLUMN_UID + "=?",
+                new String[]{accountUID}, null, null, null);
         try {
             if (c.moveToFirst()) {
                 return c.getString(c.getColumnIndexOrThrow(AccountEntry.COLUMN_COLOR_CODE));
@@ -862,9 +870,7 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
 
         Timber.d("all account list : %d", accountsList.size());
         SplitsDbAdapter splitsDbAdapter = mTransactionsAdapter.getSplitDbAdapter();
-        return (startTimestamp == -1 && endTimestamp == -1)
-                ? splitsDbAdapter.computeSplitBalance(accountsList, currencyCode, hasDebitNormalBalance)
-                : splitsDbAdapter.computeSplitBalance(accountsList, currencyCode, hasDebitNormalBalance, startTimestamp, endTimestamp);
+        return splitsDbAdapter.computeSplitBalance(accountsList, currencyCode, hasDebitNormalBalance, startTimestamp, endTimestamp);
 
     }
 
@@ -1046,15 +1052,12 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
      * @return Number of sub accounts
      */
     public int getSubAccountCount(String accountUID) {
-        //TODO: at some point when API level 11 and above only is supported, use DatabaseUtils.queryNumEntries
-
-        String queryCount = "SELECT COUNT(*) FROM " + AccountEntry.TABLE_NAME + " WHERE "
-                + AccountEntry.COLUMN_PARENT_ACCOUNT_UID + " = ?";
-        Cursor cursor = mDb.rawQuery(queryCount, new String[]{accountUID});
-        cursor.moveToFirst();
-        int count = cursor.getInt(0);
-        cursor.close();
-        return count;
+        return (int) DatabaseUtils.queryNumEntries(
+            mDb,
+            AccountEntry.TABLE_NAME,
+            AccountEntry.COLUMN_PARENT_ACCOUNT_UID + " = ?",
+            new String[]{accountUID}
+        );
     }
 
     /**
@@ -1263,7 +1266,7 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
 
         String parentAccountUID = accountUID;
         while (parentAccountUID != null) {
-            String colorCode = accountsDbAdapter.getAccountColorCode(accountsDbAdapter.getID(parentAccountUID));
+            String colorCode = accountsDbAdapter.getAccountColorCode(parentAccountUID);
             if (!TextUtils.isEmpty(colorCode)) {
                 Integer color = parseColor(colorCode);
                 if (color != null) {
@@ -1274,7 +1277,7 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
         }
 
         Context context = GnuCashApplication.getAppContext();
-        return ResourcesCompat.getColor(context.getResources(), R.color.theme_primary, null);
+        return ContextCompat.getColor(context, R.color.theme_primary);
     }
 
     /**

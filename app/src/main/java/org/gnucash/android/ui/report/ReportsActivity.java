@@ -17,12 +17,12 @@
 
 package org.gnucash.android.ui.report;
 
-import static org.gnucash.android.util.ColorExtKt.parseColor;
 import static java.lang.Math.max;
 import static java.lang.Math.min;
 
 import android.app.DatePickerDialog;
 import android.graphics.drawable.ColorDrawable;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -49,6 +49,7 @@ import org.gnucash.android.ui.common.Refreshable;
 import org.gnucash.android.ui.util.dialog.DateRangePickerDialogFragment;
 import org.joda.time.LocalDate;
 
+import java.util.Date;
 import java.util.List;
 
 import timber.log.Timber;
@@ -66,16 +67,9 @@ public class ReportsActivity extends BaseDrawerActivity implements AdapterView.O
     DatePickerDialog.OnDateSetListener, DateRangePickerDialogFragment.OnDateRangeSetListener,
     Refreshable {
 
-    public static final int[] COLORS = {
-        parseColor("#17ee4e"), parseColor("#cc1f09"), parseColor("#3940f7"),
-        parseColor("#f9cd04"), parseColor("#5f33a8"), parseColor("#e005b6"),
-        parseColor("#17d6ed"), parseColor("#e4a9a2"), parseColor("#8fe6cd"),
-        parseColor("#8b48fb"), parseColor("#343a36"), parseColor("#6decb1"),
-        parseColor("#f0f8ff"), parseColor("#5c3378"), parseColor("#a6dcfd"),
-        parseColor("#ba037c"), parseColor("#708809"), parseColor("#32072c"),
-        parseColor("#fddef8"), parseColor("#fa0e6e"), parseColor("#d9e7b5")
-    };
-    private static final String STATE_REPORT_TYPE = "STATE_REPORT_TYPE";
+    private static final String STATE_REPORT_TYPE = "report_type";
+    private static final String STATE_REPORT_START = "report_start";
+    private static final String STATE_REPORT_END = "report_end";
 
     private TransactionsDbAdapter mTransactionsDbAdapter;
     private AccountType mAccountType = AccountType.EXPENSE;
@@ -84,8 +78,8 @@ public class ReportsActivity extends BaseDrawerActivity implements AdapterView.O
     public enum GroupInterval {WEEK, MONTH, QUARTER, YEAR, ALL}
 
     // default time range is the last 3 months
-    private LocalDate mReportPeriodStart = new LocalDate().minusMonths(2).dayOfMonth().withMinimumValue();
-    private LocalDate mReportPeriodEnd = new LocalDate().plusDays(1);
+    private LocalDate mReportPeriodStart = LocalDate.now().minusMonths(2).dayOfMonth().withMinimumValue();
+    private LocalDate mReportPeriodEnd = LocalDate.now().plusDays(1);
 
     private GroupInterval mReportGroupInterval = GroupInterval.MONTH;
 
@@ -111,6 +105,10 @@ public class ReportsActivity extends BaseDrawerActivity implements AdapterView.O
     public void inflateView() {
         mBinding = ActivityReportsBinding.inflate(getLayoutInflater());
         setContentView(mBinding.getRoot());
+        mDrawerLayout = mBinding.drawerLayout;
+        mNavigationView = mBinding.navView;
+        mToolbar = mBinding.toolbarLayout.toolbar;
+        mToolbarProgress = mBinding.toolbarLayout.toolbarProgress.progress;
     }
 
     @Override
@@ -167,7 +165,13 @@ public class ReportsActivity extends BaseDrawerActivity implements AdapterView.O
         if (savedInstanceState == null) {
             showOverview();
         } else {
-            mReportType = (ReportType) savedInstanceState.getSerializable(STATE_REPORT_TYPE);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                mReportType = savedInstanceState.getSerializable(STATE_REPORT_TYPE, ReportType.class);
+            } else {
+                mReportType = (ReportType) savedInstanceState.getSerializable(STATE_REPORT_TYPE);
+            }
+            mReportPeriodStart = LocalDate.fromDateFields(new Date(savedInstanceState.getLong(STATE_REPORT_START)));
+            mReportPeriodEnd = LocalDate.fromDateFields(new Date(savedInstanceState.getLong(STATE_REPORT_END)));
         }
     }
 
@@ -256,7 +260,9 @@ public class ReportsActivity extends BaseDrawerActivity implements AdapterView.O
         List<Fragment> fragments = getSupportFragmentManager().getFragments();
         for (Fragment fragment : fragments) {
             if (fragment instanceof ReportOptionsListener) {
-                ((ReportOptionsListener) fragment).onTimeRangeUpdated(mReportPeriodStart.toDate().getTime(), mReportPeriodEnd.toDate().getTime());
+                long startTime = mReportPeriodStart.toDate().getTime();
+                long endTime = mReportPeriodEnd.toDate().getTime();
+                ((ReportOptionsListener) fragment).onTimeRangeUpdated(startTime, endTime);
             }
         }
     }
@@ -327,29 +333,29 @@ public class ReportsActivity extends BaseDrawerActivity implements AdapterView.O
 
     @Override
     public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-        mReportPeriodEnd = new LocalDate().plusDays(1);
+        LocalDate now = LocalDate.now();
+        mReportPeriodEnd = now.plusDays(1);
         switch (position) {
             case 0: //current month
-                mReportPeriodStart = new LocalDate().dayOfMonth().withMinimumValue();
+                mReportPeriodStart = now.dayOfMonth().withMinimumValue();
                 break;
             case 1: // last 3 months. x-2, x-1, x
-                mReportPeriodStart = new LocalDate().minusMonths(2).dayOfMonth().withMinimumValue();
+                mReportPeriodStart = now.minusMonths(2).dayOfMonth().withMinimumValue();
                 break;
-            case 2:
-                mReportPeriodStart = new LocalDate().minusMonths(5).dayOfMonth().withMinimumValue();
+            case 2: // last 6 months
+                mReportPeriodStart = now.minusMonths(5).dayOfMonth().withMinimumValue();
                 break;
-            case 3:
-                mReportPeriodStart = new LocalDate().minusMonths(11).dayOfMonth().withMinimumValue();
+            case 3: // last year
+                mReportPeriodStart = now.minusMonths(11).dayOfMonth().withMinimumValue();
                 break;
             case 4: //ALL TIME
                 mReportPeriodStart = new LocalDate(-1L);
                 mReportPeriodEnd = new LocalDate(-1L);
                 break;
-            case 5:
+            case 5: // custom range
                 String currencyCode = GnuCashApplication.getDefaultCurrencyCode();
                 long earliest = mTransactionsDbAdapter.getTimestampOfEarliestTransaction(mAccountType, currencyCode);
                 long latest = mTransactionsDbAdapter.getTimestampOfLatestTransaction(mAccountType, currencyCode);
-                LocalDate now = new LocalDate();
                 long today = now.toDate().getTime();
                 long tomorrow = now.plusDays(1).toDate().getTime();
                 DialogFragment rangeFragment = DateRangePickerDialogFragment.newInstance(
@@ -427,5 +433,7 @@ public class ReportsActivity extends BaseDrawerActivity implements AdapterView.O
         super.onSaveInstanceState(outState);
 
         outState.putSerializable(STATE_REPORT_TYPE, mReportType);
+        outState.putLong(STATE_REPORT_START, mReportPeriodStart.toDate().getTime());
+        outState.putLong(STATE_REPORT_END, mReportPeriodEnd.toDate().getTime());
     }
 }

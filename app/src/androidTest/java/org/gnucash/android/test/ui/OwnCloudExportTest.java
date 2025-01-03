@@ -21,7 +21,6 @@ import static androidx.test.espresso.action.ViewActions.clearText;
 import static androidx.test.espresso.action.ViewActions.click;
 import static androidx.test.espresso.action.ViewActions.closeSoftKeyboard;
 import static androidx.test.espresso.action.ViewActions.scrollTo;
-import static androidx.test.espresso.action.ViewActions.swipeUp;
 import static androidx.test.espresso.action.ViewActions.typeText;
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
 import static androidx.test.espresso.matcher.RootMatchers.withDecorView;
@@ -45,15 +44,14 @@ import android.net.NetworkInfo;
 
 import androidx.test.espresso.Espresso;
 import androidx.test.espresso.contrib.DrawerActions;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.rule.ActivityTestRule;
 import androidx.test.rule.GrantPermissionRule;
-import androidx.test.ext.junit.runners.AndroidJUnit4;
 
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
 import org.gnucash.android.db.DatabaseHelper;
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
-import org.gnucash.android.db.adapter.BooksDbAdapter;
 import org.gnucash.android.db.adapter.CommoditiesDbAdapter;
 import org.gnucash.android.db.adapter.DatabaseAdapter;
 import org.gnucash.android.model.Account;
@@ -61,9 +59,11 @@ import org.gnucash.android.model.Commodity;
 import org.gnucash.android.model.Money;
 import org.gnucash.android.model.Split;
 import org.gnucash.android.model.Transaction;
+import org.gnucash.android.test.ui.util.DisableAnimationsRule;
 import org.gnucash.android.ui.account.AccountsActivity;
 import org.junit.Assume;
 import org.junit.Before;
+import org.junit.ClassRule;
 import org.junit.FixMethodOrder;
 import org.junit.Rule;
 import org.junit.Test;
@@ -84,6 +84,7 @@ public class OwnCloudExportTest {
     private String OC_USERNAME = "admin";
     private String OC_PASSWORD = "admin";
     private String OC_DIR = "gc_test";
+    private static final boolean OC_DEMO_DISABLED = true;
 
     /**
      * A JUnit {@link Rule @Rule} to launch your activity under test. This is a replacement
@@ -98,17 +99,19 @@ public class OwnCloudExportTest {
      */
     @Rule
     public ActivityTestRule<AccountsActivity> mActivityRule = new ActivityTestRule<>(
-            AccountsActivity.class);
+        AccountsActivity.class);
 
     @Rule
     public GrantPermissionRule animationPermissionsRule = GrantPermissionRule.grant(Manifest.permission.SET_ANIMATION_SCALE);
 
+    @ClassRule
+    public static DisableAnimationsRule disableAnimationsRule = new DisableAnimationsRule();
+
     @Before
     public void setUp() throws Exception {
-
         mAccountsActivity = mActivityRule.getActivity();
         mPrefs = mAccountsActivity.getSharedPreferences(
-                mAccountsActivity.getString(R.string.owncloud_pref), Context.MODE_PRIVATE);
+            mAccountsActivity.getString(R.string.owncloud_pref), Context.MODE_PRIVATE);
 
         preventFirstRunDialogs(getInstrumentation().getTargetContext());
 
@@ -137,17 +140,15 @@ public class OwnCloudExportTest {
         Split split = new Split(new Money("11.11", currencyCode), account.getUID());
         transaction.addSplit(split);
         transaction.addSplit(split.createPair(
-                mAccountsDbAdapter.getOrCreateImbalanceAccountUID(Commodity.DEFAULT_COMMODITY)));
+            mAccountsDbAdapter.getOrCreateImbalanceAccountUID(Commodity.DEFAULT_COMMODITY)));
         account.addTransaction(transaction);
 
         mAccountsDbAdapter.addRecord(account, DatabaseAdapter.UpdateMethod.insert);
 
-
-        SharedPreferences.Editor editor = mPrefs.edit();
-
-        editor.putBoolean(mAccountsActivity.getString(R.string.key_owncloud_sync), false).apply();
-        editor.putInt(mAccountsActivity.getString(R.string.key_last_export_destination), 0);
-        editor.apply();
+        mPrefs.edit()
+            .putBoolean(mAccountsActivity.getString(R.string.key_owncloud_sync), false)
+            .putInt(mAccountsActivity.getString(R.string.key_last_export_destination), 0)
+            .apply();
     }
 
     /**
@@ -157,7 +158,7 @@ public class OwnCloudExportTest {
      */
     public static boolean hasActiveInternetConnection() {
         ConnectivityManager connectivityManager
-                = (ConnectivityManager) GnuCashApplication.getAppContext().getSystemService(Context.CONNECTIVITY_SERVICE);
+            = (ConnectivityManager) GnuCashApplication.getAppContext().getSystemService(Context.CONNECTIVITY_SERVICE);
         NetworkInfo activeNetworkInfo = connectivityManager.getActiveNetworkInfo();
         return activeNetworkInfo != null && activeNetworkInfo.isConnected();
     }
@@ -179,6 +180,8 @@ public class OwnCloudExportTest {
         onView(withId(R.id.owncloud_username)).perform(clearText()).perform(typeText(OC_USERNAME), closeSoftKeyboard());
         onView(withId(R.id.owncloud_password)).perform(clearText()).perform(typeText(OC_PASSWORD), closeSoftKeyboard());
         onView(withId(R.id.owncloud_dir)).perform(clearText()).perform(typeText(OC_DIR), closeSoftKeyboard());
+        // owncloud demo server is offline, so fake check data succeeded.
+        if (OC_DEMO_DISABLED) return;
         onView(withId(R.id.btn_save)).perform(click());
         sleep(5000);
         onView(withId(R.id.btn_save)).perform(click());
@@ -214,8 +217,8 @@ public class OwnCloudExportTest {
      */
     private void assertToastDisplayed(String toastString) {
         onView(withText(toastString))
-                .inRoot(withDecorView(not(is(mActivityRule.getActivity().getWindow().getDecorView()))))
-                .check(matches(isDisplayed()));
+            .inRoot(withDecorView(not(is(mActivityRule.getActivity().getWindow().getDecorView()))))
+            .check(matches(isDisplayed()));
     }
 
     /**

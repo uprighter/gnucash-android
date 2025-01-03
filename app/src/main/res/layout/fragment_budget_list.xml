@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?><!--
+<!--
  Copyright (c) 2015 Ngewi Fet <ngewif@gmail.com>
  
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,6 +15,7 @@
 -->
 
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/fragment_budget_list"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -22,21 +23,22 @@
     android:orientation="vertical">
 
     <org.gnucash.android.ui.util.widget.EmptyRecyclerView
-        android:id="@+id/budget_recycler_view"
-        android:scrollbars="vertical"
-        android:paddingBottom="@dimen/card_min_height"
-        android:clipToPadding="false"
+        android:id="@android:id/list"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:paddingBottom="@dimen/card_min_height"
+        android:scrollbars="vertical" />
 
     <Button
         android:id="@+id/empty_view"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:gravity="center"
         android:layout_gravity="center"
+        android:gravity="center"
+        android:text="Propose Budgets"
+        android:textColor="?colorPrimary"
         android:visibility="gone"
-        android:textColor="@android:color/white"
-        android:text="Propose Budgets" />
+        tools:visibility="visible" />
 
 </LinearLayout>

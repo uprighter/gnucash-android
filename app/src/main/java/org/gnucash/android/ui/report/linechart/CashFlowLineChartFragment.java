@@ -19,6 +19,7 @@ package org.gnucash.android.ui.report.linechart;
 
 import static org.gnucash.android.util.ColorExtKt.parseColor;
 
+import android.content.Context;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -26,6 +27,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 
+import androidx.annotation.ColorInt;
 import androidx.annotation.NonNull;
 
 import com.github.mikephil.charting.components.Legend;
@@ -39,7 +41,6 @@ import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
 
 import org.gnucash.android.R;
 import org.gnucash.android.databinding.FragmentLineChartBinding;
-import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.db.adapter.TransactionsDbAdapter;
 import org.gnucash.android.model.Account;
 import org.gnucash.android.model.AccountType;
@@ -50,10 +51,8 @@ import org.joda.time.LocalDate;
 import org.joda.time.LocalDateTime;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -70,23 +69,28 @@ public class CashFlowLineChartFragment extends BaseReportFragment {
     private static final String X_AXIS_PATTERN = "MMM YY";
     private static final int ANIMATION_DURATION = 3000;
     private static final int NO_DATA_BAR_COUNTS = 5;
-    private static final int[] COLORS = {
-            parseColor("#68F1AF"), parseColor("#cc1f09"), parseColor("#EE8600"),
-            parseColor("#1469EB"), parseColor("#B304AD"),
+    private static final int[] LINE_COLORS = {
+        parseColor("#68F1AF"), parseColor("#cc1f09"), parseColor("#EE8600"),
+        parseColor("#1469EB"), parseColor("#B304AD"),
     };
     private static final int[] FILL_COLORS = {
-            parseColor("#008000"), parseColor("#FF0000"), parseColor("#BE6B00"),
-            parseColor("#0065FF"), parseColor("#8F038A"),
+        parseColor("#008000"), parseColor("#FF0000"), parseColor("#BE6B00"),
+        parseColor("#0065FF"), parseColor("#8F038A"),
     };
 
-    private AccountsDbAdapter mAccountsDbAdapter = AccountsDbAdapter.getInstance();
     private Map<AccountType, Long> mEarliestTimestampsMap = new HashMap<>();
     private Map<AccountType, Long> mLatestTimestampsMap = new HashMap<>();
     private long mEarliestTransactionTimestamp;
     private long mLatestTransactionTimestamp;
     private boolean mChartDataPresent = true;
+    private final List<AccountType> accountTypes = new ArrayList<>(2);
 
     private FragmentLineChartBinding mBinding;
+
+    public CashFlowLineChartFragment() {
+        accountTypes.add(AccountType.INCOME);
+        accountTypes.add(AccountType.EXPENSE);
+    }
 
     @Override
     public View inflateView(LayoutInflater inflater, ViewGroup container) {
@@ -97,19 +101,24 @@ public class CashFlowLineChartFragment extends BaseReportFragment {
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
+        final Context context = mBinding.lineChart.getContext();
+
+        @ColorInt int textColorPrimary = getTextColor(context);
 
         mBinding.lineChart.setOnChartValueSelectedListener(this);
         mBinding.lineChart.setDescription("");
         mBinding.lineChart.getXAxis().setDrawGridLines(false);
+        mBinding.lineChart.getXAxis().setTextColor(textColorPrimary);
         mBinding.lineChart.getAxisRight().setEnabled(false);
         mBinding.lineChart.getAxisLeft().enableGridDashedLine(4.0f, 4.0f, 0);
         mBinding.lineChart.getAxisLeft().setValueFormatter(new LargeValueFormatter(mCommodity.getSymbol()));
+        mBinding.lineChart.getAxisLeft().setTextColor(textColorPrimary);
 
         Legend legend = mBinding.lineChart.getLegend();
         legend.setPosition(Legend.LegendPosition.BELOW_CHART_CENTER);
         legend.setTextSize(16);
         legend.setForm(Legend.LegendForm.CIRCLE);
-
+        legend.setTextColor(textColorPrimary);
     }
 
     @Override
@@ -123,8 +132,9 @@ public class CashFlowLineChartFragment extends BaseReportFragment {
      * @param accountTypeList account's types which will be displayed
      * @return a {@code LineData} instance that represents a user data
      */
-    private LineData getData(List<AccountType> accountTypeList) {
-        Timber.i("getData");
+    @NonNull
+    private LineData getData(@NonNull Context context, List<AccountType> accountTypeList) {
+        Timber.i("getData for %s", accountTypeList);
         calculateEarliestAndLatestTimestamps(accountTypeList);
         // LocalDateTime?
         LocalDate startDate;
@@ -144,7 +154,7 @@ public class CashFlowLineChartFragment extends BaseReportFragment {
             switch (mGroupInterval) {
                 case MONTH:
                     xValues.add(startDate.toString(X_AXIS_PATTERN));
-                    Timber.d("X-axis " + startDate.toString("MM yy"));
+                    Timber.d("X-axis %s", startDate.toString("MM yy"));
                     startDate = startDate.plusMonths(1);
                     break;
                 case QUARTER:
@@ -155,10 +165,9 @@ public class CashFlowLineChartFragment extends BaseReportFragment {
                     break;
                 case YEAR:
                     xValues.add(startDate.toString("yyyy"));
-                    Timber.d("X-axis " + startDate.toString("yyyy"));
+                    Timber.d("X-axis %s", startDate.toString("yyyy"));
                     startDate = startDate.plusYears(1);
                     break;
-//                default:
             }
         }
 
@@ -167,7 +176,7 @@ public class CashFlowLineChartFragment extends BaseReportFragment {
             LineDataSet set = new LineDataSet(getEntryList(accountType), accountType.toString());
             set.setDrawFilled(true);
             set.setLineWidth(2);
-            set.setColor(COLORS[dataSets.size()]);
+            set.setColor(LINE_COLORS[dataSets.size()]);
             set.setFillColor(FILL_COLORS[dataSets.size()]);
 
             dataSets.add(set);
@@ -176,8 +185,9 @@ public class CashFlowLineChartFragment extends BaseReportFragment {
         LineData lineData = new LineData(xValues, dataSets);
         if (getYValueSum(lineData) == 0) {
             mChartDataPresent = false;
-            return getEmptyData();
+            return getEmptyData(context);
         }
+        lineData.setValueTextColor(getTextColor(context));
         return lineData;
     }
 
@@ -186,14 +196,16 @@ public class CashFlowLineChartFragment extends BaseReportFragment {
      *
      * @return a {@code LineData} instance for situation when no user data available
      */
-    private LineData getEmptyData() {
+    private LineData getEmptyData(@NonNull Context context) {
         List<String> xValues = new ArrayList<>();
         List<Entry> yValues = new ArrayList<>();
+        boolean isEven = true;
         for (int i = 0; i < NO_DATA_BAR_COUNTS; i++) {
             xValues.add("");
-            yValues.add(new Entry(i % 2 == 0 ? 5f : 4.5f, i));
+            yValues.add(new Entry(isEven ? 5f : 4.5f, i));
+            isEven = !isEven;
         }
-        LineDataSet set = new LineDataSet(yValues, getResources().getString(R.string.label_chart_no_data));
+        LineDataSet set = new LineDataSet(yValues, context.getString(R.string.label_chart_no_data));
         set.setDrawFilled(true);
         set.setDrawValues(false);
         set.setColor(NO_DATA_COLOR);
@@ -212,8 +224,8 @@ public class CashFlowLineChartFragment extends BaseReportFragment {
         List<String> accountUIDList = new ArrayList<>();
         for (Account account : mAccountsDbAdapter.getSimpleAccountList()) {
             if (account.getAccountType() == accountType
-                    && !account.isPlaceholderAccount()
-                    && account.getCommodity().equals(mCommodity)) {
+                && !account.isPlaceholderAccount()
+                && account.getCommodity().equals(mCommodity)) {
                 accountUIDList.add(account.getUID());
             }
         }
@@ -239,20 +251,20 @@ public class CashFlowLineChartFragment extends BaseReportFragment {
             switch (mGroupInterval) {
                 case QUARTER:
                     int quarter = getQuarter(earliest);
-                    start = earliest.withMonthOfYear(quarter * 3 - 2).dayOfMonth().withMinimumValue().millisOfDay().withMinimumValue().toDate().getTime();
-                    end = earliest.withMonthOfYear(quarter * 3).dayOfMonth().withMaximumValue().millisOfDay().withMaximumValue().toDate().getTime();
+                    start = earliest.withMonthOfYear(quarter * 3 - 2).dayOfMonth().withMinimumValue().millisOfDay().withMinimumValue().toDateTime().getMillis();
+                    end = earliest.withMonthOfYear(quarter * 3).dayOfMonth().withMaximumValue().millisOfDay().withMaximumValue().toDateTime().getMillis();
 
                     earliest = earliest.plusMonths(3);
                     break;
                 case MONTH:
-                    start = earliest.dayOfMonth().withMinimumValue().millisOfDay().withMinimumValue().toDate().getTime();
-                    end = earliest.dayOfMonth().withMaximumValue().millisOfDay().withMaximumValue().toDate().getTime();
+                    start = earliest.dayOfMonth().withMinimumValue().millisOfDay().withMinimumValue().toDateTime().getMillis();
+                    end = earliest.dayOfMonth().withMaximumValue().millisOfDay().withMaximumValue().toDateTime().getMillis();
 
                     earliest = earliest.plusMonths(1);
                     break;
                 case YEAR:
-                    start = earliest.dayOfYear().withMinimumValue().millisOfDay().withMinimumValue().toDate().getTime();
-                    end = earliest.dayOfYear().withMaximumValue().millisOfDay().withMaximumValue().toDate().getTime();
+                    start = earliest.dayOfYear().withMinimumValue().millisOfDay().withMinimumValue().toDateTime().getMillis();
+                    end = earliest.dayOfYear().withMaximumValue().millisOfDay().withMaximumValue().toDateTime().getMillis();
 
                     earliest = earliest.plusYears(1);
                     break;
@@ -268,25 +280,25 @@ public class CashFlowLineChartFragment extends BaseReportFragment {
     /**
      * Calculates the earliest and latest transaction's timestamps of the specified account types
      *
-     * @param accountTypeList account's types which will be processed
+     * @param accountTypes account's types which will be processed
      */
-    private void calculateEarliestAndLatestTimestamps(List<AccountType> accountTypeList) {
+    private void calculateEarliestAndLatestTimestamps(List<AccountType> accountTypes) {
         if (mReportPeriodStart != -1 && mReportPeriodEnd != -1) {
             mEarliestTransactionTimestamp = mReportPeriodStart;
             mLatestTransactionTimestamp = mReportPeriodEnd;
             return;
         }
 
+        mEarliestTimestampsMap.clear();
+        mLatestTimestampsMap.clear();
         TransactionsDbAdapter dbAdapter = TransactionsDbAdapter.getInstance();
-        for (Iterator<AccountType> iter = accountTypeList.iterator(); iter.hasNext(); ) {
-            AccountType type = iter.next();
-            long earliest = dbAdapter.getTimestampOfEarliestTransaction(type, mCommodity.getCurrencyCode());
-            long latest = dbAdapter.getTimestampOfLatestTransaction(type, mCommodity.getCurrencyCode());
+        final String currencyCode = mCommodity.getCurrencyCode();
+        for (AccountType type : accountTypes) {
+            long earliest = dbAdapter.getTimestampOfEarliestTransaction(type, currencyCode);
+            long latest = dbAdapter.getTimestampOfLatestTransaction(type, currencyCode);
             if (earliest > 0 && latest > 0) {
                 mEarliestTimestampsMap.put(type, earliest);
                 mLatestTimestampsMap.put(type, latest);
-            } else {
-                iter.remove();
             }
         }
 
@@ -307,24 +319,21 @@ public class CashFlowLineChartFragment extends BaseReportFragment {
     }
 
     @Override
-    protected void generateReport() {
-        LineData lineData = getData(new ArrayList<>(Arrays.asList(AccountType.INCOME, AccountType.EXPENSE)));
-        if (lineData != null) {
-            mBinding.lineChart.setData(lineData);
-            mChartDataPresent = true;
-        } else {
-            mChartDataPresent = false;
-        }
+    protected void generateReport(@NonNull Context context) {
+        LineData lineData = getData(context, accountTypes);
+        mBinding.lineChart.setData(lineData);
+        mChartDataPresent = true;
     }
 
     @Override
     protected void displayReport() {
         if (!mChartDataPresent) {
+            final Context context = mBinding.lineChart.getContext();
             mBinding.lineChart.getAxisLeft().setAxisMaxValue(10);
             mBinding.lineChart.getAxisLeft().setDrawLabels(false);
             mBinding.lineChart.getXAxis().setDrawLabels(false);
             mBinding.lineChart.setTouchEnabled(false);
-            mSelectedValueTextView.setText(getResources().getString(R.string.label_chart_no_data));
+            mSelectedValueTextView.setText(context.getString(R.string.label_chart_no_data));
         } else {
             mBinding.lineChart.animateX(ANIMATION_DURATION);
         }
@@ -336,7 +345,7 @@ public class CashFlowLineChartFragment extends BaseReportFragment {
         if (mReportPeriodStart != start || mReportPeriodEnd != end) {
             mReportPeriodStart = start;
             mReportPeriodEnd = end;
-            mBinding.lineChart.setData(getData(new ArrayList<>(Arrays.asList(AccountType.INCOME, AccountType.EXPENSE))));
+            mBinding.lineChart.setData(getData(mBinding.lineChart.getContext(), accountTypes));
             mBinding.lineChart.invalidate();
         }
     }
@@ -345,7 +354,7 @@ public class CashFlowLineChartFragment extends BaseReportFragment {
     public void onGroupingUpdated(GroupInterval groupInterval) {
         if (mGroupInterval != groupInterval) {
             mGroupInterval = groupInterval;
-            mBinding.lineChart.setData(getData(new ArrayList<>(Arrays.asList(AccountType.INCOME, AccountType.EXPENSE))));
+            mBinding.lineChart.setData(getData(mBinding.lineChart.getContext(), accountTypes));
             mBinding.lineChart.invalidate();
         }
     }

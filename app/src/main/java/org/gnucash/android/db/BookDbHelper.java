@@ -20,6 +20,9 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
+import android.text.TextUtils;
+
+import androidx.annotation.NonNull;
 
 import org.gnucash.android.app.GnuCashApplication;
 import org.gnucash.android.db.DatabaseSchema.BookEntry;
@@ -55,19 +58,30 @@ public class BookDbHelper extends SQLiteOpenHelper {
             + BookEntry.COLUMN_MODIFIED_AT + " TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP "
             + ");" + DatabaseHelper.createUpdatedAtTrigger(BookEntry.TABLE_NAME);
 
-    public BookDbHelper(Context context) {
+    @NonNull
+    private final Context context;
+
+    public BookDbHelper(@NonNull Context context) {
         super(context, DatabaseSchema.BOOK_DATABASE_NAME, null, DatabaseSchema.BOOK_DATABASE_VERSION);
+        this.context = context;
     }
 
     @Override
     public void onCreate(SQLiteDatabase db) {
         db.execSQL(BOOKS_TABLE_CREATE);
 
+        insertBlankBook(db);
+    }
+
+    @NonNull
+    public Book insertBlankBook(@NonNull SQLiteDatabase db) {
         Book book = new Book();
-        DatabaseHelper helper = new DatabaseHelper(GnuCashApplication.getAppContext(), book.getUID());
+        DatabaseHelper helper = new DatabaseHelper(context, book.getUID());
         SQLiteDatabase mainDb = helper.getWritableDatabase(); //actually create the db
-        AccountsDbAdapter accountsDbAdapter = new AccountsDbAdapter(mainDb,
-                new TransactionsDbAdapter(mainDb, new SplitsDbAdapter(mainDb)));
+        AccountsDbAdapter accountsDbAdapter = new AccountsDbAdapter(
+            mainDb,
+            new TransactionsDbAdapter(mainDb, new SplitsDbAdapter(mainDb))
+        );
 
         String rootAccountUID = accountsDbAdapter.getOrCreateGnuCashRootAccountUID();
         try {
@@ -78,6 +92,7 @@ public class BookDbHelper extends SQLiteOpenHelper {
         book.setRootAccountUID(rootAccountUID);
         book.setActive(true);
         insertBook(db, book);
+        return book;
     }
 
     /**
@@ -87,7 +102,18 @@ public class BookDbHelper extends SQLiteOpenHelper {
      * @return SQLiteDatabase of the book
      */
     public static SQLiteDatabase getDatabase(String bookUID) {
-        DatabaseHelper dbHelper = new DatabaseHelper(GnuCashApplication.getAppContext(), bookUID);
+        return getDatabase(GnuCashApplication.getAppContext(), bookUID);
+    }
+
+    /**
+     * Returns the database for the book
+     *
+     * @param context The application context.
+     * @param bookUID GUID of the book
+     * @return SQLiteDatabase of the book
+     */
+    public static SQLiteDatabase getDatabase(@NonNull Context context, String bookUID) {
+        DatabaseHelper dbHelper = new DatabaseHelper(context, bookUID);
         return dbHelper.getWritableDatabase();
     }
 
@@ -98,11 +124,15 @@ public class BookDbHelper extends SQLiteOpenHelper {
      * @param book Book to insert
      */
     private void insertBook(SQLiteDatabase db, Book book) {
+        String name = book.getDisplayName();
+        if (TextUtils.isEmpty(name)) {
+            name = new BooksDbAdapter(db).generateDefaultBookName();
+        }
         ContentValues contentValues = new ContentValues();
         contentValues.put(BookEntry.COLUMN_UID, book.getUID());
         contentValues.put(BookEntry.COLUMN_ROOT_GUID, book.getRootAccountUID());
         contentValues.put(BookEntry.COLUMN_TEMPLATE_GUID, Book.generateUID());
-        contentValues.put(BookEntry.COLUMN_DISPLAY_NAME, new BooksDbAdapter(db).generateDefaultBookName());
+        contentValues.put(BookEntry.COLUMN_DISPLAY_NAME, name);
         contentValues.put(BookEntry.COLUMN_ACTIVE, book.isActive() ? 1 : 0);
 
         db.insert(BookEntry.TABLE_NAME, null, contentValues);

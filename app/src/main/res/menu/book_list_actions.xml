@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?><!--
+<!--
  Copyright (c) 2016 Ngewi Fet <ngewif@gmail.com>
 
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,13 +16,13 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
-        android:id="@+id/menu_create_book"
-        android:icon="@drawable/ic_add_white"
+        android:id="@+id/menu_create"
+        android:icon="@drawable/ic_add"
         android:title="@string/menu_title_new_book"
         app:showAsAction="always" />
     <item
-        android:id="@+id/menu_open_book"
-        android:icon="@drawable/ic_folder_open_white"
+        android:id="@+id/menu_open"
+        android:icon="@drawable/ic_folder_open"
         android:title="@string/nav_menu_open"
         app:showAsAction="ifRoom" />
 </menu>

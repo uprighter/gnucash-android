@@ -24,21 +24,15 @@ import org.gnucash.android.model.Account;
 import org.gnucash.android.model.Commodity;
 import org.gnucash.android.model.Money;
 import org.gnucash.android.model.Transaction;
-import org.gnucash.android.test.unit.testutil.ShadowCrashlytics;
-import org.gnucash.android.test.unit.testutil.ShadowUserVoice;
+import org.gnucash.android.test.unit.GnuCashTest;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.robolectric.RobolectricTestRunner;
-import org.robolectric.annotation.Config;
 
-@RunWith(RobolectricTestRunner.class)
-@Config(sdk = 21, shadows = {ShadowCrashlytics.class, ShadowUserVoice.class})
-public class AccountTest {
+public class AccountTest extends GnuCashTest {
 
     @Test
     public void testAccountUsesDefaultCurrency() {
         Account account = new Account("Dummy account");
-        assertThat(account.getCommodity().getCurrencyCode()).isEqualTo(Money.DEFAULT_CURRENCY_CODE);
+        assertThat(account.getCommodity().getCurrencyCode()).isEqualTo(Commodity.DEFAULT_COMMODITY.getCurrencyCode());
     }
 
     @Test
@@ -54,7 +48,7 @@ public class AccountTest {
         Transaction trx = new Transaction("Underground");
         Transaction term = new Transaction("Tube");
 
-        assertThat(trx.getCurrencyCode()).isEqualTo(Money.DEFAULT_CURRENCY_CODE);
+        assertThat(trx.getCurrencyCode()).isEqualTo(Commodity.DEFAULT_COMMODITY.getCurrencyCode());
 
         acc1.addTransaction(trx);
         acc1.addTransaction(term);

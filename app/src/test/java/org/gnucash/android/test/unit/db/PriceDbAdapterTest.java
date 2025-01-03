@@ -4,21 +4,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.gnucash.android.db.adapter.CommoditiesDbAdapter;
 import org.gnucash.android.db.adapter.PricesDbAdapter;
+import org.gnucash.android.model.Commodity;
 import org.gnucash.android.model.Price;
-import org.gnucash.android.test.unit.testutil.ShadowCrashlytics;
-import org.gnucash.android.test.unit.testutil.ShadowUserVoice;
+import org.gnucash.android.test.unit.GnuCashTest;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.robolectric.RobolectricTestRunner;
-import org.robolectric.annotation.Config;
 
 /**
  * Test price functions
  */
-@RunWith(RobolectricTestRunner.class)
-//package is required so that resources can be found in dev mode
-@Config(sdk = 21, shadows = {ShadowCrashlytics.class, ShadowUserVoice.class})
-public class PriceDbAdapterTest {
+public class PriceDbAdapterTest extends GnuCashTest {
 
     /**
      * The price table should override price for any commodity/currency pair
@@ -26,9 +20,9 @@ public class PriceDbAdapterTest {
      */
     @Test
     public void shouldOnlySaveOnePricePerCommodityPair() {
-        String commodityUID = CommoditiesDbAdapter.getInstance().getCommodityUID("EUR");
-        String currencyUID = CommoditiesDbAdapter.getInstance().getCommodityUID("USD");
-        Price price = new Price(commodityUID, currencyUID);
+        Commodity commodity = CommoditiesDbAdapter.getInstance().getCommodity("EUR");
+        Commodity currency = CommoditiesDbAdapter.getInstance().getCommodity("USD");
+        Price price = new Price(commodity, currency);
         price.setValueNum(134);
         price.setValueDenom(100);
 
@@ -39,7 +33,7 @@ public class PriceDbAdapterTest {
         assertThat(pricesDbAdapter.getRecordsCount()).isEqualTo(1);
         assertThat(price.getValueNum()).isEqualTo(67); //the price is reduced to 57/100 before saving
 
-        Price price1 = new Price(commodityUID, currencyUID);
+        Price price1 = new Price(commodity, currency);
         price1.setValueNum(187);
         price1.setValueDenom(100);
         pricesDbAdapter.addRecord(price1);
@@ -51,7 +45,7 @@ public class PriceDbAdapterTest {
         assertThat(savedPrice.getValueDenom()).isEqualTo(100);
 
 
-        Price price2 = new Price(currencyUID, commodityUID);
+        Price price2 = new Price(currency, commodity);
         price2.setValueNum(190);
         price2.setValueDenom(100);
         pricesDbAdapter.addRecord(price2);

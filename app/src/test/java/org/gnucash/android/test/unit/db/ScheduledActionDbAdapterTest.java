@@ -2,6 +2,7 @@ package org.gnucash.android.test.unit.db;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import android.content.Context;
 import android.content.res.Resources;
 
 import org.gnucash.android.R;
@@ -11,23 +12,16 @@ import org.gnucash.android.model.BaseModel;
 import org.gnucash.android.model.PeriodType;
 import org.gnucash.android.model.Recurrence;
 import org.gnucash.android.model.ScheduledAction;
-import org.gnucash.android.test.unit.testutil.ShadowCrashlytics;
-import org.gnucash.android.test.unit.testutil.ShadowUserVoice;
+import org.gnucash.android.test.unit.GnuCashTest;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.robolectric.RobolectricTestRunner;
-import org.robolectric.annotation.Config;
 
 import java.util.List;
 
 /**
  * Test the scheduled actions database adapter
  */
-@RunWith(RobolectricTestRunner.class)
-//package is required so that resources can be found in dev mode
-@Config(sdk = 21, shadows = {ShadowCrashlytics.class, ShadowUserVoice.class})
-public class ScheduledActionDbAdapterTest {
+public class ScheduledActionDbAdapterTest extends GnuCashTest {
 
     ScheduledActionDbAdapter mScheduledActionDbAdapter;
 
@@ -63,18 +57,18 @@ public class ScheduledActionDbAdapterTest {
 
     @Test
     public void testGenerateRepeatString() {
+        Context context = GnuCashApplication.getAppContext();
         ScheduledAction scheduledAction = new ScheduledAction(ScheduledAction.ActionType.TRANSACTION);
         PeriodType periodType = PeriodType.MONTH;
         Recurrence recurrence = new Recurrence(periodType);
         recurrence.setMultiplier(2);
         scheduledAction.setRecurrence(recurrence);
         scheduledAction.setTotalPlannedExecutionCount(4);
-        Resources res = GnuCashApplication.getAppContext().getResources();
-        String repeatString = res.getQuantityString(R.plurals.label_every_x_months, 2, 2) + ", " +
+        Resources res = context.getResources();
+        String repeatString = recurrence.frequencyRepeatString(context) + ", " +
                 res.getString(R.string.repeat_x_times, 4);
 
-        assertThat(scheduledAction.getRepeatString().trim()).isEqualTo(repeatString);
-
+        assertThat(scheduledAction.getRepeatString(context).trim()).isEqualTo(repeatString);
     }
 
     @Test
@@ -88,7 +82,7 @@ public class ScheduledActionDbAdapterTest {
         scheduledAction.setEnabled(true);
         scheduledAction.setStartTime(11111);
         scheduledAction.setEndTime(33333);
-        scheduledAction.setLastRun(22222);
+        scheduledAction.setLastRunTime(22222);
         scheduledAction.setExecutionCount(3);
         scheduledAction.setRecurrence(new Recurrence(PeriodType.MONTH));
         scheduledAction.setTag("QIF;SD_CARD;2016-06-25 12:56:07.175;false");

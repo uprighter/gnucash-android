@@ -15,11 +15,15 @@
  */
 package org.gnucash.android.ui.report;
 
+import static org.gnucash.android.util.ColorExtKt.getTextColorPrimary;
+import static org.gnucash.android.util.ColorExtKt.parseColor;
+
 import android.app.Activity;
 import android.content.Context;
 import android.graphics.Color;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -27,12 +31,12 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
+import androidx.annotation.ColorInt;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.fragment.app.Fragment;
 
 import com.github.mikephil.charting.data.ChartData;
 import com.github.mikephil.charting.data.Entry;
@@ -41,8 +45,8 @@ import com.github.mikephil.charting.interfaces.datasets.IDataSet;
 import com.github.mikephil.charting.listener.OnChartValueSelectedListener;
 
 import org.gnucash.android.R;
-import org.gnucash.android.app.GnuCashApplication;
-import org.gnucash.android.db.adapter.CommoditiesDbAdapter;
+import org.gnucash.android.app.MenuFragment;
+import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.model.AccountType;
 import org.gnucash.android.model.Commodity;
 import org.gnucash.android.ui.common.Refreshable;
@@ -56,10 +60,8 @@ import java.util.List;
 /**
  * Base class for report fragments.
  * <p>All report fragments should extend this class. At the minimum, reports must implement
- * {@link #getReportType()}, {@link #generateReport()}, {@link #displayReport()} and {@link #getTitle()}</p>
- * <p>Implementing classes should create their own XML layouts and inflate it in {@link #inflateView()}.
- * Then annotate any views in the resource using {@code @Bind} annotation from ButterKnife library.
- * This base activity will automatically call {@link ButterKnife#bind(View)} for the layout.
+ * {@link #getReportType()}, {@link #generateReport(Context)}, {@link #displayReport()} and {@link #getTitle()}</p>
+ * <p>Implementing classes should create their own XML layouts and inflate it in {@link #inflateView(LayoutInflater, ViewGroup)}.
  * </p>
  * <p>Any custom information to be initialized for the report should be done in {@link #onActivityCreated(Bundle)} in implementing classes.
  * The report is then generated in {@link #onStart()}
@@ -67,13 +69,23 @@ import java.util.List;
  *
  * @author Ngewi Fet <ngewif@gmail.com>
  */
-public abstract class BaseReportFragment extends Fragment implements
+public abstract class BaseReportFragment extends MenuFragment implements
     OnChartValueSelectedListener, ReportOptionsListener, Refreshable {
 
     /**
      * Color for chart with no data
      */
     public static final int NO_DATA_COLOR = Color.LTGRAY;
+
+    protected static final int[] COLORS = {
+        parseColor("#17ee4e"), parseColor("#cc1f09"), parseColor("#3940f7"),
+        parseColor("#f9cd04"), parseColor("#5f33a8"), parseColor("#e005b6"),
+        parseColor("#17d6ed"), parseColor("#e4a9a2"), parseColor("#8fe6cd"),
+        parseColor("#8b48fb"), parseColor("#343a36"), parseColor("#6decb1"),
+        parseColor("#f0f8ff"), parseColor("#5c3378"), parseColor("#a6dcfd"),
+        parseColor("#ba037c"), parseColor("#708809"), parseColor("#32072c"),
+        parseColor("#fddef8"), parseColor("#fa0e6e"), parseColor("#d9e7b5")
+    };
 
     /**
      * Reporting period start time
@@ -88,11 +100,13 @@ public abstract class BaseReportFragment extends Fragment implements
      * Account type for which to display reports
      */
     protected AccountType mAccountType;
+    protected AccountsDbAdapter mAccountsDbAdapter;
+    protected boolean mUseAccountColor = true;
 
     /**
      * Commodity for which to display reports
      */
-    protected Commodity mCommodity;
+    protected Commodity mCommodity = Commodity.DEFAULT_COMMODITY;
 
     /**
      * Intervals in which to group reports
@@ -153,7 +167,7 @@ public abstract class BaseReportFragment extends Fragment implements
      * <br>Put any code to update the UI in {@link #displayReport()}
      * </p>
      */
-    protected abstract void generateReport();
+    protected abstract void generateReport(@NonNull Context context);
 
     /**
      * Update the view after the report chart has been generated <br/>
@@ -172,18 +186,26 @@ public abstract class BaseReportFragment extends Fragment implements
     }
 
     @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        ActionBar actionBar = ((AppCompatActivity) requireActivity()).getSupportActionBar();
+        assert actionBar != null;
+        actionBar.setTitle(getTitle());
+    }
+
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        mAccountsDbAdapter = AccountsDbAdapter.getInstance();
+        mUseAccountColor = PreferenceManager.getDefaultSharedPreferences(requireContext())
+            .getBoolean(getString(R.string.key_use_account_color), false);
+    }
+
+    @Override
     public void onActivityCreated(@Nullable Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
 
-        ActionBar actionBar = ((AppCompatActivity) getActivity()).getSupportActionBar();
-        assert actionBar != null;
-        actionBar.setTitle(getTitle());
-
-        setHasOptionsMenu(true);
-        mCommodity = CommoditiesDbAdapter.getInstance()
-            .getCommodity(GnuCashApplication.getDefaultCurrencyCode());
-
-        ReportsActivity reportsActivity = (ReportsActivity) getActivity();
+        ReportsActivity reportsActivity = (ReportsActivity) requireActivity();
         mReportPeriodStart = reportsActivity.getReportPeriodStart();
         mReportPeriodEnd = reportsActivity.getReportPeriodEnd();
         mAccountType = reportsActivity.getAccountType();
@@ -275,22 +297,23 @@ public abstract class BaseReportFragment extends Fragment implements
             mReportGenerator.cancel(true);
 
         mReportGenerator = new AsyncTask<Void, Void, Void>() {
+            private final ReportsActivity activity = mReportsActivity;
 
             @Override
             protected void onPreExecute() {
-                mReportsActivity.getProgressBar().setVisibility(View.VISIBLE);
+                activity.showProgressBar(true);
             }
 
             @Override
             protected Void doInBackground(Void... params) {
-                generateReport();
+                generateReport(activity);
                 return null;
             }
 
             @Override
             protected void onPostExecute(Void aVoid) {
                 displayReport();
-                mReportsActivity.getProgressBar().setVisibility(View.GONE);
+                activity.showProgressBar(false);
             }
         };
         mReportGenerator.execute();
@@ -367,5 +390,10 @@ public abstract class BaseReportFragment extends Fragment implements
             values.add(dataSet.getEntryForIndex(i));
         }
         return values;
+    }
+
+    @ColorInt
+    protected int getTextColor(@NonNull Context context) {
+        return getTextColorPrimary(context);
     }
 }

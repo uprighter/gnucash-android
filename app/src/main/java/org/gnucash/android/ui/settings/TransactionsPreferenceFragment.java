@@ -19,18 +19,20 @@ package org.gnucash.android.ui.settings;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.view.View;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
-import androidx.preference.SwitchPreferenceCompat;
+import androidx.preference.SwitchPreference;
 
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
 import org.gnucash.android.db.DatabaseSchema;
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
-import org.gnucash.android.db.adapter.BooksDbAdapter;
 import org.gnucash.android.model.Commodity;
 import org.gnucash.android.ui.settings.dialog.DeleteAllTransactionsConfirmationDialog;
 
@@ -48,10 +50,13 @@ public class TransactionsPreferenceFragment extends PreferenceFragmentCompat imp
         super.onCreate(savedInstanceState);
 
         getPreferenceManager().setSharedPreferencesName(GnuCashApplication.getActiveBookUID());
+    }
 
-        ActionBar actionBar = ((AppCompatActivity) getActivity()).getSupportActionBar();
-        actionBar.setHomeButtonEnabled(true);
-        actionBar.setDisplayHomeAsUpEnabled(true);
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        ActionBar actionBar = ((AppCompatActivity) requireActivity()).getSupportActionBar();
+        assert actionBar != null;
         actionBar.setTitle(R.string.title_transaction_preferences);
     }
 
@@ -65,26 +70,20 @@ public class TransactionsPreferenceFragment extends PreferenceFragmentCompat imp
         super.onResume();
 
         SharedPreferences sharedPreferences = getPreferenceManager().getSharedPreferences();
-        String defaultTransactionType = sharedPreferences.getString(
-                getString(R.string.key_default_transaction_type),
-                getString(R.string.label_debit));
-        Preference pref = findPreference(getString(R.string.key_default_transaction_type));
-        setLocalizedSummary(pref, defaultTransactionType);
-        pref.setOnPreferenceChangeListener(this);
 
-        pref = findPreference(getString(R.string.key_use_double_entry));
+        Preference pref = findPreference(getString(R.string.key_use_double_entry));
         pref.setOnPreferenceChangeListener(this);
 
         String keyCompactView = getString(R.string.key_use_compact_list);
-        SwitchPreferenceCompat switchPref = (SwitchPreferenceCompat) findPreference(keyCompactView);
+        SwitchPreference switchPref = findPreference(keyCompactView);
         switchPref.setChecked(sharedPreferences.getBoolean(keyCompactView, false));
 
         String keySaveBalance = getString(R.string.key_save_opening_balances);
-        switchPref = (SwitchPreferenceCompat) findPreference(keySaveBalance);
+        switchPref = findPreference(keySaveBalance);
         switchPref.setChecked(sharedPreferences.getBoolean(keySaveBalance, false));
 
         String keyDoubleEntry = getString(R.string.key_use_double_entry);
-        switchPref = (SwitchPreferenceCompat) findPreference(keyDoubleEntry);
+        switchPref = findPreference(keyDoubleEntry);
         switchPref.setChecked(sharedPreferences.getBoolean(keyDoubleEntry, true));
 
         Preference preference = findPreference(getString(R.string.key_delete_all_transactions));
@@ -102,8 +101,6 @@ public class TransactionsPreferenceFragment extends PreferenceFragmentCompat imp
         if (preference.getKey().equals(getString(R.string.key_use_double_entry))) {
             boolean useDoubleEntry = (Boolean) newValue;
             setImbalanceAccountsHidden(useDoubleEntry);
-        } else {
-            setLocalizedSummary(preference, newValue.toString());
         }
         return true;
     }
@@ -139,16 +136,4 @@ public class TransactionsPreferenceFragment extends PreferenceFragmentCompat imp
             }
         }
     }
-
-    /**
-     * Localizes the label for DEBIT/CREDIT in the settings summary
-     *
-     * @param preference Preference whose summary is to be localized
-     * @param value      New value for the preference summary
-     */
-    private void setLocalizedSummary(Preference preference, String value) {
-        String localizedLabel = value.equals("DEBIT") ? getString(R.string.label_debit) : getActivity().getString(R.string.label_credit);
-        preference.setSummary(localizedLabel);
-    }
-
 }

@@ -17,6 +17,7 @@ package org.gnucash.android.ui.budget;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.database.Cursor;
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -35,18 +36,20 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.fragment.app.Fragment;
 
 import org.gnucash.android.R;
+import org.gnucash.android.app.MenuFragment;
 import org.gnucash.android.databinding.FragmentBudgetAmountEditorBinding;
 import org.gnucash.android.databinding.ItemBudgetAmountBinding;
 import org.gnucash.android.db.DatabaseSchema;
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
+import org.gnucash.android.inputmethodservice.CalculatorKeyboardView;
 import org.gnucash.android.model.BudgetAmount;
 import org.gnucash.android.model.Commodity;
 import org.gnucash.android.model.Money;
 import org.gnucash.android.ui.common.UxArgument;
 import org.gnucash.android.ui.util.widget.CalculatorEditText;
+import org.gnucash.android.ui.util.widget.CalculatorKeyboard;
 import org.gnucash.android.util.QualifiedAccountNameCursorAdapter;
 
 import java.math.BigDecimal;
@@ -57,7 +60,7 @@ import java.util.List;
 /**
  * Fragment for editing budgeting amounts
  */
-public class BudgetAmountEditorFragment extends Fragment {
+public class BudgetAmountEditorFragment extends MenuFragment {
 
     private Cursor mAccountCursor;
     private QualifiedAccountNameCursorAdapter mAccountCursorAdapter;
@@ -89,13 +92,12 @@ public class BudgetAmountEditorFragment extends Fragment {
     }
 
     @Override
-    public void onActivityCreated(@Nullable Bundle savedInstanceState) {
-        super.onActivityCreated(savedInstanceState);
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
 
-        ActionBar actionBar = ((AppCompatActivity) getActivity()).getSupportActionBar();
+        ActionBar actionBar = ((AppCompatActivity) requireActivity()).getSupportActionBar();
         assert actionBar != null;
         actionBar.setTitle("Edit Budget Amounts");
-        setHasOptionsMenu(true);
 
         ArrayList<BudgetAmount> budgetAmounts = getArguments().getParcelableArrayList(UxArgument.BUDGET_AMOUNT_LIST);
         if (budgetAmounts != null) {
@@ -120,7 +122,7 @@ public class BudgetAmountEditorFragment extends Fragment {
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         switch (item.getItemId()) {
-            case R.id.menu_add_budget_amount:
+            case R.id.menu_add:
                 addBudgetAmountView(null);
                 return true;
 
@@ -228,6 +230,20 @@ public class BudgetAmountEditorFragment extends Fragment {
         return budgetAmounts;
     }
 
+    @Override
+    public void onConfigurationChanged(@NonNull Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        View view = getView();
+        if (view instanceof ViewGroup parent) {
+            CalculatorKeyboardView keyboardView = mBinding.calculatorKeyboard.calculatorKeyboard;
+            keyboardView = CalculatorKeyboard.rebind(parent, keyboardView, null);
+            for (View budgetAmountView : mBudgetAmountViews) {
+                BudgetAmountViewHolder viewHolder = (BudgetAmountViewHolder) budgetAmountView.getTag();
+                viewHolder.amountEditText.bindKeyboard(keyboardView);
+            }
+        }
+    }
+
     /**
      * View holder for budget amounts
      */
@@ -246,7 +262,7 @@ public class BudgetAmountEditorFragment extends Fragment {
             itemView = binding.getRoot();
             itemView.setTag(this);
 
-            amountEditText.bindListeners(mBinding.calculatorKeyboard);
+            amountEditText.bindKeyboard(mBinding.calculatorKeyboard);
             budgetAccountSpinner.setAdapter(mAccountCursorAdapter);
 
             budgetAccountSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
@@ -274,7 +290,7 @@ public class BudgetAmountEditorFragment extends Fragment {
 
         public void bindViews(BudgetAmount budgetAmount) {
             amountEditText.setValue(budgetAmount.getAmount().asBigDecimal());
-            budgetAccountSpinner.setSelection(mAccountCursorAdapter.getPosition(budgetAmount.getAccountUID()));
+            budgetAccountSpinner.setSelection(mAccountCursorAdapter.getItemPosition(budgetAmount.getAccountUID()));
         }
     }
 }

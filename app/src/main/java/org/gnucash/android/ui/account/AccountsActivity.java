@@ -20,6 +20,7 @@ package org.gnucash.android.ui.account;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -30,22 +31,22 @@ import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.res.Resources;
 import android.net.Uri;
 import android.os.Bundle;
-import android.util.SparseArray;
+import android.text.TextUtils;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
-import androidx.fragment.app.FragmentManager;
-import androidx.fragment.app.FragmentPagerAdapter;
+import androidx.fragment.app.FragmentActivity;
 import androidx.preference.PreferenceManager;
 
 import com.google.android.material.tabs.TabLayout;
+import com.google.android.material.tabs.TabLayoutMediator;
 import com.kobakei.ratethisapp.RateThisApp;
 
 import org.gnucash.android.BuildConfig;
@@ -54,14 +55,15 @@ import org.gnucash.android.app.GnuCashApplication;
 import org.gnucash.android.databinding.ActivityAccountsBinding;
 import org.gnucash.android.db.DatabaseSchema;
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
-import org.gnucash.android.db.adapter.BooksDbAdapter;
 import org.gnucash.android.importer.ImportAsyncTask;
+import org.gnucash.android.service.ScheduledActionService;
 import org.gnucash.android.ui.common.BaseDrawerActivity;
 import org.gnucash.android.ui.common.FormActivity;
 import org.gnucash.android.ui.common.Refreshable;
 import org.gnucash.android.ui.common.UxArgument;
 import org.gnucash.android.ui.transaction.TransactionsActivity;
 import org.gnucash.android.ui.util.TaskDelegate;
+import org.gnucash.android.ui.util.widget.FragmentStateAdapter;
 import org.gnucash.android.ui.wizard.FirstRunWizardActivity;
 import org.gnucash.android.util.BackupManager;
 
@@ -74,7 +76,7 @@ import timber.log.Timber;
  * @author Ngewi Fet <ngewif@gmail.com>
  * @author Oleksandr Tyshkovets <olexandr.tyshkovets@gmail.com>
  */
-public class AccountsActivity extends BaseDrawerActivity implements OnAccountClickedListener {
+public class AccountsActivity extends BaseDrawerActivity implements OnAccountClickedListener, Refreshable {
 
     /**
      * Request code for GnuCash account structure file to import
@@ -85,11 +87,6 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
      * Request code for opening the account to edit
      */
     public static final int REQUEST_EDIT_ACCOUNT = 0x10;
-
-    /**
-     * Number of pages to show
-     */
-    private static final int DEFAULT_NUM_PAGES = 3;
 
     /**
      * Index for the recent accounts tab
@@ -117,11 +114,6 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
     public static final String EXTRA_TAB_INDEX = BuildConfig.APPLICATION_ID + ".extra.TAB_INDEX";
 
     /**
-     * Map containing fragments for the different tabs
-     */
-    private SparseArray<Refreshable> mFragmentPageReferenceMap = new SparseArray<>();
-
-    /**
      * Configuration for rating the app
      */
     public static RateThisApp.Config rateAppConfig = new RateThisApp.Config(14, 100);
@@ -129,77 +121,58 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
 
     private ActivityAccountsBinding mBinding;
 
+    @Override
+    public void refresh() {
+        mPagerAdapter.notifyDataSetChanged();
+    }
+
+    @Override
+    public void refresh(String uid) {
+        refresh();
+    }
+
     /**
      * Adapter for managing the sub-account and transaction fragment pages in the accounts view
      */
-    private class AccountViewPagerAdapter extends FragmentPagerAdapter {
+    private static class AccountViewPagerAdapter extends FragmentStateAdapter {
+        /**
+         * Number of pages to show
+         */
+        private static final int DEFAULT_NUM_PAGES = 3;
 
-        public AccountViewPagerAdapter(FragmentManager fm) {
-            super(fm);
+        public AccountViewPagerAdapter(FragmentActivity activity) {
+            super(activity);
         }
 
-        @Override
-        public Fragment getItem(int i) {
-            AccountsListFragment currentFragment = (AccountsListFragment) mFragmentPageReferenceMap.get(i);
-            if (currentFragment == null) {
-                switch (i) {
-                    case INDEX_RECENT_ACCOUNTS_FRAGMENT:
-                        currentFragment = AccountsListFragment.newInstance(AccountsListFragment.DisplayMode.RECENT);
-                        break;
-
-                    case INDEX_FAVORITE_ACCOUNTS_FRAGMENT:
-                        currentFragment = AccountsListFragment.newInstance(AccountsListFragment.DisplayMode.FAVORITES);
-                        break;
-
-                    case INDEX_TOP_LEVEL_ACCOUNTS_FRAGMENT:
-                    default:
-                        currentFragment = AccountsListFragment.newInstance(AccountsListFragment.DisplayMode.TOP_LEVEL);
-                        break;
-                }
-                mFragmentPageReferenceMap.put(i, currentFragment);
-            }
-            return currentFragment;
-        }
-
-        @Override
-        public void destroyItem(ViewGroup container, int position, Object object) {
-            super.destroyItem(container, position, object);
-            mFragmentPageReferenceMap.remove(position);
-        }
-
-        @Override
-        public CharSequence getPageTitle(int position) {
+        @NonNull
+        public Fragment createFragment(int position) {
             switch (position) {
                 case INDEX_RECENT_ACCOUNTS_FRAGMENT:
-                    return getString(R.string.title_recent_accounts);
+                    return AccountsListFragment.newInstance(AccountsListFragment.DisplayMode.RECENT);
 
                 case INDEX_FAVORITE_ACCOUNTS_FRAGMENT:
-                    return getString(R.string.title_favorite_accounts);
+                    return AccountsListFragment.newInstance(AccountsListFragment.DisplayMode.FAVORITES);
 
                 case INDEX_TOP_LEVEL_ACCOUNTS_FRAGMENT:
                 default:
-                    return getString(R.string.title_all_accounts);
+                    return AccountsListFragment.newInstance(AccountsListFragment.DisplayMode.TOP_LEVEL);
             }
         }
 
         @Override
-        public int getCount() {
+        public int getItemCount() {
             return DEFAULT_NUM_PAGES;
         }
-    }
-
-    public AccountsListFragment getCurrentAccountListFragment() {
-        int index = mBinding.pager.getCurrentItem();
-        Fragment fragment = (Fragment) mFragmentPageReferenceMap.get(index);
-        if (fragment == null)
-            fragment = mPagerAdapter.getItem(index);
-        return (AccountsListFragment) fragment;
     }
 
     @Override
     public void inflateView() {
         mBinding = ActivityAccountsBinding.inflate(getLayoutInflater());
         setContentView(mBinding.getRoot());
+        mDrawerLayout = mBinding.drawerLayout;
+        mNavigationView = mBinding.navView;
+        mToolbar = mBinding.toolbarLayout.toolbar;
+        mToolbarProgress = mBinding.toolbarLayout.toolbarProgress.progress;
     }
 
     @Override
@@ -216,18 +189,17 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
 
         init();
 
-        TabLayout tabLayout = (TabLayout) findViewById(R.id.tab_layout);
-        tabLayout.addTab(tabLayout.newTab().setText(R.string.title_recent_accounts));
-        tabLayout.addTab(tabLayout.newTab().setText(R.string.title_all_accounts));
-        tabLayout.addTab(tabLayout.newTab().setText(R.string.title_favorite_accounts));
+        TabLayout tabLayout = mBinding.tabLayout;
+        tabLayout.addTab(tabLayout.newTab());
+        tabLayout.addTab(tabLayout.newTab());
+        tabLayout.addTab(tabLayout.newTab());
         tabLayout.setTabGravity(TabLayout.GRAVITY_FILL);
 
         //show the simple accounts list
-        mPagerAdapter = new AccountViewPagerAdapter(getSupportFragmentManager());
+        mPagerAdapter = new AccountViewPagerAdapter(this);
         mBinding.pager.setAdapter(mPagerAdapter);
 
-        mBinding.pager.addOnPageChangeListener(new TabLayout.TabLayoutOnPageChangeListener(tabLayout));
-        tabLayout.setOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
+        tabLayout.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
             @Override
             public void onTabSelected(TabLayout.Tab tab) {
                 mBinding.pager.setCurrentItem(tab.getPosition());
@@ -243,6 +215,25 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
                 //nothing to see here, move along
             }
         });
+
+        TabLayoutMediator tabLayoutMediator = new TabLayoutMediator(tabLayout, mBinding.pager, new TabLayoutMediator.TabConfigurationStrategy() {
+
+            @Override
+            public void onConfigureTab(@NonNull TabLayout.Tab tab, int position) {
+                switch (position) {
+                    case INDEX_RECENT_ACCOUNTS_FRAGMENT:
+                        tab.setText(R.string.title_recent_accounts);
+                        break;
+                    case INDEX_TOP_LEVEL_ACCOUNTS_FRAGMENT:
+                        tab.setText(R.string.title_all_accounts);
+                        break;
+                    case INDEX_FAVORITE_ACCOUNTS_FRAGMENT:
+                        tab.setText(R.string.title_favorite_accounts);
+                        break;
+                }
+            }
+        });
+        tabLayoutMediator.attach();
 
         setCurrentTab();
 
@@ -292,12 +283,6 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
         super.onNewIntent(intent);
         setIntent(intent);
         setCurrentTab();
-
-        int index = mBinding.pager.getCurrentItem();
-        Fragment fragment = (Fragment) mFragmentPageReferenceMap.get(index);
-        if (fragment != null)
-            ((Refreshable) fragment).refresh();
-
         handleOpenFileIntent(intent);
     }
 
@@ -316,26 +301,26 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
      * <p>Also handles displaying the What's New dialog</p>
      */
     private void init() {
-        PreferenceManager.setDefaultValues(this, GnuCashApplication.getActiveBookUID(),
-                Context.MODE_PRIVATE, R.xml.fragment_transaction_preferences, true);
+        final Context context = this;
+        PreferenceManager.setDefaultValues(context, GnuCashApplication.getActiveBookUID(),
+            Context.MODE_PRIVATE, R.xml.fragment_transaction_preferences, true);
 
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
         boolean firstRun = prefs.getBoolean(getString(R.string.key_first_run), true);
 
         if (firstRun) {
-            startActivity(new Intent(GnuCashApplication.getAppContext(), FirstRunWizardActivity.class));
-
             //default to using double entry and save the preference explicitly
             prefs.edit().putBoolean(getString(R.string.key_use_double_entry), true).apply();
+
+            startActivity(new Intent(context, FirstRunWizardActivity.class));
             finish();
             return;
         }
 
         if (hasNewFeatures()) {
-            showWhatsNewDialog(this);
+            showWhatsNewDialog(context);
         }
-        GnuCashApplication.startScheduledActionExecutionService(this);
-        BackupManager.schedulePeriodicBackups(this);
+        ScheduledActionService.schedulePeriodic(context);
     }
 
     @Override
@@ -352,7 +337,7 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
      * @return <code>true</code> if the minor version has been increased, <code>false</code> otherwise.
      */
     private boolean hasNewFeatures() {
-        String minorVersion = getResources().getString(R.string.app_minor_version);
+        String minorVersion = getString(R.string.app_minor_version);
         int currentMinor = Integer.parseInt(minorVersion);
 
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
@@ -381,15 +366,15 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
         }
 
         return new AlertDialog.Builder(context)
-                .setTitle(releaseTitle.toString())
-                .setMessage(R.string.whats_new)
-                .setPositiveButton(R.string.label_dismiss, new DialogInterface.OnClickListener() {
+            .setTitle(releaseTitle.toString())
+            .setMessage(R.string.whats_new)
+            .setPositiveButton(R.string.label_dismiss, new DialogInterface.OnClickListener() {
 
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        dialog.dismiss();
-                    }
-                }).show();
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    dialog.dismiss();
+                }
+            }).show();
     }
 
     /**
@@ -426,19 +411,38 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
      * @param currencyCode Currency code to assign to the imported accounts
      * @param activity     Activity for providing context and displaying dialogs
      */
-    public static void createDefaultAccounts(final String currencyCode, final Activity activity) {
-        TaskDelegate delegate = null;
-        if (currencyCode != null) {
+    public static void createDefaultAccounts(@NonNull final String currencyCode, @NonNull final Activity activity) {
+        createDefaultAccounts(currencyCode, activity, null);
+    }
+
+    /**
+     * Creates default accounts with the specified currency code.
+     * If the currency parameter is null, then locale currency will be used if available
+     *
+     * @param currencyCode Currency code to assign to the imported accounts
+     * @param activity     Activity for providing context and displaying dialogs
+     * @param callback     The callback to call when the book has been imported.
+     */
+    public static void createDefaultAccounts(@NonNull final String currencyCode, @NonNull final Activity activity, @Nullable final TaskDelegate callback) {
+        TaskDelegate delegate = callback;
+        if (!TextUtils.isEmpty(currencyCode)) {
             delegate = new TaskDelegate() {
                 @Override
                 public void onTaskComplete() {
                     AccountsDbAdapter.getInstance().updateAllAccounts(DatabaseSchema.AccountEntry.COLUMN_CURRENCY, currencyCode);
                     GnuCashApplication.setDefaultCurrencyCode(activity, currencyCode);
+                    if (callback != null) {
+                        callback.onTaskComplete();
+                    }
                 }
             };
         }
 
-        Uri uri = Uri.parse("android.resource://" + BuildConfig.APPLICATION_ID + "/" + R.raw.default_accounts);
+        Uri uri = new Uri.Builder()
+            .scheme(ContentResolver.SCHEME_ANDROID_RESOURCE)
+            .authority(BuildConfig.APPLICATION_ID)
+            .path(String.valueOf(R.raw.default_accounts))
+            .build();
         new ImportAsyncTask(activity, delegate).execute(uri);
     }
 
@@ -509,7 +513,7 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
     /**
      * Starts the AccountsActivity and clears the activity stack
      *
-     * @param context Application context
+     * @param context  Application context
      * @param tabIndex the initial tab index to select.
      */
     public static void start(Context context, int tabIndex) {
@@ -532,12 +536,14 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
     /**
      * Removes the flag indicating that the app is being run for the first time.
      * This is called every time the app is started because the next time won't be the first time
+     *
      * @param context the context.
      */
     public static void removeFirstRunFlag(Context context) {
-        Editor editor = PreferenceManager.getDefaultSharedPreferences(context).edit();
-        editor.putBoolean(context.getString(R.string.key_first_run), false);
-        editor.apply();
+        PreferenceManager.getDefaultSharedPreferences(context)
+            .edit()
+            .putBoolean(context.getString(R.string.key_first_run), false)
+            .apply();
     }
 
 }

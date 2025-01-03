@@ -19,6 +19,7 @@ package org.gnucash.android.db.adapter;
 
 import static org.gnucash.android.db.DatabaseSchema.SplitEntry;
 import static org.gnucash.android.db.DatabaseSchema.TransactionEntry;
+import static org.gnucash.android.model.Commodity.NO_CURRENCY_CODE;
 
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
@@ -108,9 +109,9 @@ public class SplitsDbAdapter extends DatabaseAdapter<Split> {
         stmt.bindLong(4, split.getValue().getDenominator());
         stmt.bindLong(5, split.getQuantity().getNumerator());
         stmt.bindLong(6, split.getQuantity().getDenominator());
-        stmt.bindString(7, split.getCreatedTimestamp().toString());
+        stmt.bindString(7, TimestampHelper.getUtcStringFromTimestamp(split.getCreatedTimestamp()));
         stmt.bindString(8, String.valueOf(split.getReconcileState()));
-        stmt.bindString(9, split.getReconcileDate().toString());
+        stmt.bindString(9, TimestampHelper.getUtcStringFromTimestamp(split.getReconcileDate()));
         stmt.bindString(10, split.getAccountUID());
         stmt.bindString(11, split.getTransactionUID());
         stmt.bindString(12, split.getUID());
@@ -143,8 +144,8 @@ public class SplitsDbAdapter extends DatabaseAdapter<Split> {
         Money quantity = new Money(quantityNum, quantityDenom, currencyCode);
 
         Split split = new Split(value, accountUID);
-        split.setQuantity(quantity);
         populateBaseModelAttributes(cursor, split);
+        split.setQuantity(quantity);
         split.setTransactionUID(transxUID);
         split.setType(TransactionType.valueOf(typeName));
         split.setMemo(memo);
@@ -227,7 +228,7 @@ public class SplitsDbAdapter extends DatabaseAdapter<Split> {
                 long amount_num = cursor.getLong(0);
                 long amount_denom = cursor.getLong(1);
                 String commodityCode = cursor.getString(2);
-                if (commodityCode.equals("XXX") || amount_num == 0) {
+                if (commodityCode.equals(NO_CURRENCY_CODE) || amount_num == 0) {
                     // ignore custom currency
                     continue;
                 }

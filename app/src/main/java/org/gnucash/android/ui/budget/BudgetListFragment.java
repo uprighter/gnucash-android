@@ -33,6 +33,7 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.PopupMenu;
 import androidx.fragment.app.Fragment;
@@ -85,15 +86,15 @@ public class BudgetListFragment extends Fragment implements Refreshable,
         mBinding = FragmentBudgetListBinding.inflate(inflater, container, false);
         View view = mBinding.getRoot();
 
-        mBinding.budgetRecyclerView.setHasFixedSize(true);
-        mBinding.budgetRecyclerView.setEmptyView(mBinding.emptyView);
+        mBinding.list.setHasFixedSize(true);
+        mBinding.list.setEmptyView(mBinding.emptyView);
 
         if (getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE) {
             GridLayoutManager gridLayoutManager = new GridLayoutManager(getActivity(), 2);
-            mBinding.budgetRecyclerView.setLayoutManager(gridLayoutManager);
+            mBinding.list.setLayoutManager(gridLayoutManager);
         } else {
             LinearLayoutManager mLayoutManager = new LinearLayoutManager(getActivity());
-            mBinding.budgetRecyclerView.setLayoutManager(mLayoutManager);
+            mBinding.list.setLayoutManager(mLayoutManager);
         }
         return view;
     }
@@ -105,11 +106,12 @@ public class BudgetListFragment extends Fragment implements Refreshable,
         mBudgetsDbAdapter = BudgetsDbAdapter.getInstance();
         mBudgetRecyclerAdapter = new BudgetRecyclerAdapter(null);
 
-        mBinding.budgetRecyclerView.setAdapter(mBudgetRecyclerAdapter);
+        mBinding.list.setAdapter(mBudgetRecyclerAdapter);
 
         getLoaderManager().initLoader(0, null, this);
     }
 
+    @NonNull
     @Override
     public Loader<Cursor> onCreateLoader(int id, Bundle args) {
         Timber.d("Creating the accounts loader");
@@ -117,14 +119,14 @@ public class BudgetListFragment extends Fragment implements Refreshable,
     }
 
     @Override
-    public void onLoadFinished(Loader<Cursor> loaderCursor, Cursor cursor) {
+    public void onLoadFinished(@NonNull Loader<Cursor> loaderCursor, Cursor cursor) {
         Timber.d("Budget loader finished. Swapping in cursor");
         mBudgetRecyclerAdapter.swapCursor(cursor);
         mBudgetRecyclerAdapter.notifyDataSetChanged();
     }
 
     @Override
-    public void onLoaderReset(Loader<Cursor> arg0) {
+    public void onLoaderReset(@NonNull Loader<Cursor> arg0) {
         Timber.d("Resetting the accounts loader");
         mBudgetRecyclerAdapter.swapCursor(null);
     }
@@ -133,8 +135,9 @@ public class BudgetListFragment extends Fragment implements Refreshable,
     public void onResume() {
         super.onResume();
         refresh();
-        getActivity().findViewById(R.id.fab_create_budget).setVisibility(View.VISIBLE);
-        ((AppCompatActivity) getActivity()).getSupportActionBar().setTitle("Budgets");
+        requireActivity().findViewById(R.id.fab_create_budget).setVisibility(View.VISIBLE);
+        ActionBar actionbar = ((AppCompatActivity) requireActivity()).getSupportActionBar();
+        actionbar.setTitle("Budgets");
     }
 
     @Override
@@ -204,6 +207,7 @@ public class BudgetListFragment extends Fragment implements Refreshable,
 
         @Override
         public void onBindViewHolderCursor(BudgetViewHolder holder, Cursor cursor) {
+            Context context = holder.itemView.getContext();
             final Budget budget = mBudgetsDbAdapter.buildModelInstance(cursor);
             holder.bind(budget);
         }
@@ -244,11 +248,11 @@ public class BudgetListFragment extends Fragment implements Refreshable,
             @Override
             public boolean onMenuItemClick(@NonNull MenuItem item) {
                 switch (item.getItemId()) {
-                    case R.id.context_menu_edit_budget:
+                    case R.id.menu_edit:
                         editBudget(budgetUID);
                         return true;
 
-                    case R.id.context_menu_delete:
+                    case R.id.menu_delete:
                         deleteBudget(budgetUID);
                         return true;
 
@@ -258,6 +262,7 @@ public class BudgetListFragment extends Fragment implements Refreshable,
             }
 
             public void bind(final Budget budget) {
+                Context context = itemView.getContext();
                 this.budgetUID = budget.getUID();
 
                 budgetName.setText(budget.getName());
@@ -272,13 +277,13 @@ public class BudgetListFragment extends Fragment implements Refreshable,
                 }
                 accountName.setText(accountString);
 
-                budgetRecurrence.setText(budget.getRecurrence().getRepeatString() + " - "
+                budgetRecurrence.setText(budget.getRecurrence().getRepeatString(context) + " - "
                     + budget.getRecurrence().getDaysLeftInCurrentPeriod() + " days left");
 
                 BigDecimal spentAmountValue = BigDecimal.ZERO;
                 for (BudgetAmount budgetAmount : budget.getCompactedBudgetAmounts()) {
                     Money balance = accountsDbAdapter.getAccountBalance(budgetAmount.getAccountUID(),
-                        budget.getStartofCurrentPeriod(), budget.getEndOfCurrentPeriod());
+                        budget.getStartOfCurrentPeriod(), budget.getEndOfCurrentPeriod());
                     spentAmountValue = spentAmountValue.add(balance.asBigDecimal());
                 }
 
@@ -308,7 +313,7 @@ public class BudgetListFragment extends Fragment implements Refreshable,
     /**
      * Loads Budgets asynchronously from the database
      */
-    private static class BudgetsCursorLoader extends DatabaseCursorLoader {
+    private static class BudgetsCursorLoader extends DatabaseCursorLoader<BudgetsDbAdapter> {
 
         /**
          * Constructor
@@ -322,8 +327,9 @@ public class BudgetListFragment extends Fragment implements Refreshable,
 
         @Override
         public Cursor loadInBackground() {
-            mDatabaseAdapter = BudgetsDbAdapter.getInstance();
-            return mDatabaseAdapter.fetchAllRecords(null, null, DatabaseSchema.BudgetEntry.COLUMN_NAME + " ASC");
+            databaseAdapter = BudgetsDbAdapter.getInstance();
+            if (databaseAdapter == null) return null;
+            return databaseAdapter.fetchAllRecords(null, null, DatabaseSchema.BudgetEntry.COLUMN_NAME + " ASC");
         }
     }
 }

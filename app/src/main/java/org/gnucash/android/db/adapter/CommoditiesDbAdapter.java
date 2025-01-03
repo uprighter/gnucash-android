@@ -43,7 +43,8 @@ public class CommoditiesDbAdapter extends DatabaseAdapter<Commodity> {
             CommodityEntry.COLUMN_LOCAL_SYMBOL,
             CommodityEntry.COLUMN_CUSIP,
             CommodityEntry.COLUMN_SMALLEST_FRACTION,
-            CommodityEntry.COLUMN_QUOTE_FLAG
+            CommodityEntry.COLUMN_QUOTE_SOURCE,
+            CommodityEntry.COLUMN_QUOTE_TZ
         });
         if (initCommon) {
             initCommon();
@@ -65,6 +66,7 @@ public class CommoditiesDbAdapter extends DatabaseAdapter<Commodity> {
         Commodity.DEFAULT_COMMODITY = getCommodity(GnuCashApplication.getDefaultCurrencyCode());
     }
 
+    @Nullable
     public static CommoditiesDbAdapter getInstance() {
         return GnuCashApplication.getCommoditiesDbAdapter();
     }
@@ -73,13 +75,22 @@ public class CommoditiesDbAdapter extends DatabaseAdapter<Commodity> {
     protected @NonNull SQLiteStatement setBindings(@NonNull SQLiteStatement stmt, @NonNull final Commodity commodity) {
         stmt.clearBindings();
         stmt.bindString(1, commodity.getFullname());
-        stmt.bindString(2, commodity.getNamespace().name());
+        stmt.bindString(2, commodity.getNamespace());
         stmt.bindString(3, commodity.getMnemonic());
-        stmt.bindString(4, commodity.getLocalSymbol());
-        stmt.bindString(5, commodity.getCusip());
+        if (commodity.getLocalSymbol() != null) {
+            stmt.bindString(4, commodity.getLocalSymbol());
+        }
+        if (commodity.getCusip() != null) {
+            stmt.bindString(5, commodity.getCusip());
+        }
         stmt.bindLong(6, commodity.getSmallestFraction());
-        stmt.bindLong(7, commodity.getQuoteFlag());
-        stmt.bindString(8, commodity.getUID());
+        if (commodity.getQuoteSource() != null) {
+            stmt.bindString(7, commodity.getQuoteSource());
+        }
+        if (commodity.getQuoteTimeZoneId() != null) {
+            stmt.bindString(8, commodity.getQuoteTimeZoneId());
+        }
+        stmt.bindString(9, commodity.getUID());
 
         return stmt;
     }
@@ -93,22 +104,23 @@ public class CommoditiesDbAdapter extends DatabaseAdapter<Commodity> {
         String localSymbol = cursor.getString(cursor.getColumnIndexOrThrow(CommodityEntry.COLUMN_LOCAL_SYMBOL));
 
         int fraction = cursor.getInt(cursor.getColumnIndexOrThrow(CommodityEntry.COLUMN_SMALLEST_FRACTION));
-        int quoteFlag = cursor.getInt(cursor.getColumnIndexOrThrow(CommodityEntry.COLUMN_QUOTE_FLAG));
+        String quoteSource = cursor.getString(cursor.getColumnIndexOrThrow(CommodityEntry.COLUMN_QUOTE_SOURCE));
+        String quoteTZ = cursor.getString(cursor.getColumnIndexOrThrow(CommodityEntry.COLUMN_QUOTE_TZ));
 
         Commodity commodity = new Commodity(fullname, mnemonic, fraction);
-        commodity.setNamespace(Commodity.Namespace.valueOf(namespace));
-        commodity.setCusip(cusip);
-        commodity.setQuoteFlag(quoteFlag);
-        commodity.setLocalSymbol(localSymbol);
         populateBaseModelAttributes(cursor, commodity);
+        commodity.setNamespace(namespace);
+        commodity.setCusip(cusip);
+        commodity.setQuoteSource(quoteSource);
+        commodity.setQuoteTimeZone(quoteTZ);
+        commodity.setLocalSymbol(localSymbol);
 
         return commodity;
     }
 
     @Override
     public Cursor fetchAllRecords() {
-        return mDb.query(mTableName, null, null, null, null, null,
-            CommodityEntry.COLUMN_FULLNAME + " ASC");
+        return fetchAllRecords(CommodityEntry.COLUMN_MNEMONIC + " ASC");
     }
 
     /**
@@ -118,8 +130,7 @@ public class CommoditiesDbAdapter extends DatabaseAdapter<Commodity> {
      * @return Cursor holding all commodity records
      */
     public Cursor fetchAllRecords(String orderBy) {
-        return mDb.query(mTableName, null, null, null, null, null,
-            orderBy);
+        return mDb.query(mTableName, null, null, null, null, null, orderBy);
     }
 
     /**

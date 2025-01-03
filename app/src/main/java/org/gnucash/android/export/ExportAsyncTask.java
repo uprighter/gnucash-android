@@ -62,11 +62,9 @@ import org.gnucash.android.export.ofx.OfxExporter;
 import org.gnucash.android.export.qif.QifExporter;
 import org.gnucash.android.export.xml.GncXmlExporter;
 import org.gnucash.android.model.Transaction;
-import org.gnucash.android.ui.account.AccountsActivity;
-import org.gnucash.android.ui.account.AccountsListFragment;
 import org.gnucash.android.ui.common.GnucashProgressDialog;
+import org.gnucash.android.ui.common.Refreshable;
 import org.gnucash.android.ui.settings.BackupPreferenceFragment;
-import org.gnucash.android.ui.transaction.TransactionsActivity;
 import org.gnucash.android.util.BackupManager;
 import org.gnucash.android.util.FileUtils;
 import org.joda.time.format.DateTimeFormat;
@@ -138,7 +136,7 @@ public class ExportAsyncTask extends AsyncTask<ExportParams, Void, Integer> {
             exportedFiles = exporter.generateExport();
         } catch (final Throwable e) {
             Timber.e(e, "Error exporting: %s", e.getMessage());
-            return 0;
+            return -1;
         }
 
         if (exportedFiles.isEmpty())
@@ -415,8 +413,8 @@ public class ExportAsyncTask extends AsyncTask<ExportParams, Void, Integer> {
     }
 
     private static String getFileLastModifiedTimestamp(String path) {
-        Long timeStampLong = new File(path).lastModified() / 1000;
-        return timeStampLong.toString();
+        long timeStampLong = new File(path).lastModified() / 1000;
+        return Long.toString(timeStampLong);
     }
 
     /**
@@ -562,14 +560,8 @@ public class ExportAsyncTask extends AsyncTask<ExportParams, Void, Integer> {
     }
 
     private void refreshViews() {
-        if (mContext instanceof AccountsActivity) {
-            AccountsListFragment fragment =
-                ((AccountsActivity) mContext).getCurrentAccountListFragment();
-            if (fragment != null)
-                fragment.refresh();
-        }
-        if (mContext instanceof TransactionsActivity) {
-            ((TransactionsActivity) mContext).refresh();
+        if (mContext instanceof Refreshable) {
+            ((Refreshable) mContext).refresh();
         }
     }
 }

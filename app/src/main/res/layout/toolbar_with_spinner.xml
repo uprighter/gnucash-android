@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?><!--
+<!--
  Copyright (c) 2015 Ngewi Fet <ngewif@gmail.com>
 
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,29 +13,27 @@
  See the License for the specific language governing permissions and
  limitations under the License.
 -->
-<FrameLayout xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content">
 
-    <include layout="@layout/actionbar_progress_indicator" />
-
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/toolbar"
-        android:background="?attr/colorPrimary"
         android:layout_width="match_parent"
-        android:layout_height="?attr/actionBarSize"
-        app:elevation="@dimen/elevation_default"
+        android:layout_height="wrap_content"
+        android:theme="?actionBarTheme"
         app:layout_scrollFlags="scroll|enterAlways"
-        android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
-        app:popupTheme="@style/ThemeOverlay.AppCompat.Light"
         tools:showIn="@layout/activity_form">
 
         <Spinner
             android:id="@+id/toolbar_spinner"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            app:popupTheme="@style/ThemeOverlay.AppCompat.Light" />
+            android:layout_height="wrap_content" />
     </androidx.appcompat.widget.Toolbar>
+
+    <include
+        android:id="@+id/toolbar_progress"
+        layout="@layout/actionbar_progress_indicator" />
 </FrameLayout>

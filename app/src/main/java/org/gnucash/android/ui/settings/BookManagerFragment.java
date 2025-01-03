@@ -87,6 +87,7 @@ public class BookManagerFragment extends ListFragment implements
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        setHasOptionsMenu(true);
 
         mCursorAdapter = new BooksCursorAdapter(requireContext(), R.layout.cardview_book,
                 null, new String[]{BookEntry.COLUMN_DISPLAY_NAME, BookEntry.COLUMN_SOURCE_URI},
@@ -96,15 +97,11 @@ public class BookManagerFragment extends ListFragment implements
     }
 
     @Override
-    public void onActivityCreated(@Nullable Bundle savedInstanceState) {
-        super.onActivityCreated(savedInstanceState);
-
-        ActionBar actionBar = ((AppCompatActivity) getActivity()).getSupportActionBar();
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        ActionBar actionBar = ((AppCompatActivity) requireActivity()).getSupportActionBar();
         assert actionBar != null;
-        actionBar.setHomeButtonEnabled(true);
-        actionBar.setDisplayHomeAsUpEnabled(true);
         actionBar.setTitle(R.string.title_manage_books);
-        setHasOptionsMenu(true);
 
         getListView().setChoiceMode(ListView.CHOICE_MODE_NONE);
     }
@@ -124,11 +121,11 @@ public class BookManagerFragment extends ListFragment implements
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         switch (item.getItemId()) {
-            case R.id.menu_create_book:
+            case R.id.menu_create:
                 AccountsActivity.createDefaultAccounts(GnuCashApplication.getDefaultCurrencyCode(), requireActivity());
                 return true;
 
-            case R.id.menu_open_book:
+            case R.id.menu_open:
                 String[] mimeTypes = {"text/*", "application/*"};
                 //use the storage access framework
                 Intent openDocument = new Intent(Intent.ACTION_OPEN_DOCUMENT)
@@ -154,6 +151,7 @@ public class BookManagerFragment extends ListFragment implements
         refresh();
     }
 
+    @NonNull
     @Override
     public Loader<Cursor> onCreateLoader(int id, Bundle args) {
         Timber.d("Creating loader for books");
@@ -161,14 +159,14 @@ public class BookManagerFragment extends ListFragment implements
     }
 
     @Override
-    public void onLoadFinished(Loader<Cursor> loader, Cursor data) {
+    public void onLoadFinished(@NonNull Loader<Cursor> loader, Cursor data) {
         Timber.d("Finished loading books from database");
         mCursorAdapter.swapCursor(data);
         mCursorAdapter.notifyDataSetChanged();
     }
 
     @Override
-    public void onLoaderReset(Loader<Cursor> loader) {
+    public void onLoaderReset(@NonNull Loader<Cursor> loader) {
         Timber.d("Resetting books list loader");
         mCursorAdapter.swapCursor(null);
     }
@@ -246,12 +244,12 @@ public class BookManagerFragment extends ListFragment implements
                         @Override
                         public boolean onMenuItemClick(@NonNull MenuItem item) {
                             switch (item.getItemId()) {
-                                case R.id.ctx_menu_rename_book:
+                                case R.id.menu_rename:
                                     return handleMenuRenameBook(bookName, bookUID);
-                                case R.id.ctx_menu_sync_book:
+                                case R.id.menu_sync:
                                     //TODO implement sync
                                     return false;
-                                case R.id.ctx_menu_delete_book:
+                                case R.id.menu_delete:
                                     return handleMenuDeleteBook(bookUID);
                                 default:
                                     return true;
@@ -261,7 +259,7 @@ public class BookManagerFragment extends ListFragment implements
 
                     String activeBookUID = GnuCashApplication.getActiveBookUID();
                     if (activeBookUID.equals(bookUID)) {//we cannot delete the active book
-                        popupMenu.getMenu().findItem(R.id.ctx_menu_delete_book).setEnabled(false);
+                        popupMenu.getMenu().findItem(R.id.menu_delete).setEnabled(false);
                     }
                     popupMenu.show();
                 }
@@ -344,15 +342,17 @@ public class BookManagerFragment extends ListFragment implements
      *
      * @author Ngewi Fet <ngewif@gmail.com>
      */
-    private static class BooksCursorLoader extends DatabaseCursorLoader {
+    private static class BooksCursorLoader extends DatabaseCursorLoader<BooksDbAdapter> {
         BooksCursorLoader(Context context) {
             super(context);
         }
 
         @Override
         public Cursor loadInBackground() {
-            BooksDbAdapter booksDbAdapter = BooksDbAdapter.getInstance();
-            Cursor cursor = booksDbAdapter.fetchAllRecords();
+            BooksDbAdapter dbAdapter = BooksDbAdapter.getInstance();
+            if (dbAdapter == null) return null;
+            databaseAdapter = dbAdapter;
+            Cursor cursor = dbAdapter.fetchAllRecords();
             registerContentObserver(cursor);
             return cursor;
         }

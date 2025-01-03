@@ -18,21 +18,20 @@ package org.gnucash.android.ui.common;
 
 import android.content.Intent;
 import android.graphics.drawable.ColorDrawable;
-import android.os.Build;
 import android.os.Bundle;
 import android.view.MenuItem;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.widget.Toolbar;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
-import androidx.fragment.app.FragmentTransaction;
 
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
+import org.gnucash.android.databinding.ActivityFormBinding;
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
-import org.gnucash.android.db.adapter.BooksDbAdapter;
 import org.gnucash.android.ui.account.AccountFormFragment;
 import org.gnucash.android.ui.budget.BudgetAmountEditorFragment;
 import org.gnucash.android.ui.budget.BudgetFormFragment;
@@ -54,35 +53,47 @@ public class FormActivity extends PasscodeLockActivity {
 
     private String mAccountUID;
 
+    private ActivityFormBinding binding;
+    @Nullable
     private CalculatorKeyboard mOnBackListener;
 
-    public enum FormType {ACCOUNT, TRANSACTION, EXPORT, SPLIT_EDITOR, BUDGET, BUDGET_AMOUNT_EDITOR}
+    public enum FormType {
+        ACCOUNT,
+        TRANSACTION,
+        EXPORT,
+        SPLIT_EDITOR,
+        BUDGET,
+        BUDGET_AMOUNT_EDITOR
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_form);
+        binding = ActivityFormBinding.inflate(getLayoutInflater());
+        setContentView(binding.getRoot());
+
+        final Intent intent = getIntent();
 
         //if a parameter was passed to open an account within a specific book, then switch
-        String bookUID = getIntent().getStringExtra(UxArgument.BOOK_UID);
+        String bookUID = intent.getStringExtra(UxArgument.BOOK_UID);
         if (bookUID != null && !bookUID.equals(GnuCashApplication.getActiveBookUID())) {
             BookUtils.activateBook(this, bookUID);
         }
 
-        Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
-        setSupportActionBar(toolbar);
+        setSupportActionBar(binding.toolbarLayout.toolbar);
 
         ActionBar actionBar = getSupportActionBar();
         assert (actionBar != null);
         actionBar.setHomeButtonEnabled(true);
         actionBar.setDisplayHomeAsUpEnabled(true);
-        actionBar.setHomeAsUpIndicator(R.drawable.ic_close_white);
+        actionBar.setHomeAsUpIndicator(R.drawable.ic_close);
 
-        final Intent intent = getIntent();
+        Bundle args = intent.getExtras();
+        if (args == null) args = new Bundle();
 
-        mAccountUID = intent.getStringExtra(UxArgument.SELECTED_ACCOUNT_UID);
+        mAccountUID = args.getString(UxArgument.SELECTED_ACCOUNT_UID);
         if (mAccountUID == null) {
-            mAccountUID = intent.getStringExtra(UxArgument.PARENT_ACCOUNT_UID);
+            mAccountUID = args.getString(UxArgument.PARENT_ACCOUNT_UID);
         }
         if (mAccountUID != null) {
             int colorCode = AccountsDbAdapter.getActiveAccountColorResource(mAccountUID);
@@ -90,8 +101,6 @@ public class FormActivity extends PasscodeLockActivity {
             getWindow().setStatusBarColor(GnuCashApplication.darken(colorCode));
         }
 
-        Bundle args = intent.getExtras();
-        if (args == null) args = new Bundle();
         String formtypeString = args.getString(UxArgument.FORM_TYPE);
         FormType formType = FormType.valueOf(formtypeString);
         switch (formType) {
@@ -225,19 +234,17 @@ public class FormActivity extends PasscodeLockActivity {
     }
 
 
-    public void setOnBackListener(CalculatorKeyboard keyboard) {
+    public void setOnBackListener(@Nullable CalculatorKeyboard keyboard) {
         mOnBackListener = keyboard;
     }
 
     @Override
     public void onBackPressed() {
-        boolean eventProcessed = false;
+        if (mOnBackListener != null && mOnBackListener.onBackPressed()) {
+            return;
+        }
 
-        if (mOnBackListener != null)
-            eventProcessed = mOnBackListener.onBackPressed();
-
-        if (!eventProcessed)
-            super.onBackPressed();
+        super.onBackPressed();
     }
 
 }

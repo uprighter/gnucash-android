@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?><!--
+<!--
 Copyright (c) 2014 - 2015 Ngewi Fet <ngewif@gmail.com>
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -40,14 +40,11 @@ limitations under the License.
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:focusableInTouchMode="true"
             android:gravity="center_vertical"
             android:hint="@string/label_transaction_amount"
-            android:inputType="none"
             android:nextFocusDown="@+id/input_split_memo"
             android:textColor="@color/debit_red"
-            android:textSize="18sp"
-            gnucash:keyboardKeysLayout="@xml/calculator_keyboard" />
+            android:textSize="18sp" />
 
         <org.gnucash.android.ui.util.widget.TransactionTypeSwitch
             android:id="@+id/btn_split_type"
@@ -72,7 +69,7 @@ limitations under the License.
             android:paddingTop="6dp"
             android:paddingEnd="6dp"
             android:paddingBottom="6dp"
-            android:src="@drawable/ic_close_black"
+            android:src="@drawable/ic_close"
             tools:ignore="ContentDescription" />
     </LinearLayout>
 
@@ -86,7 +83,7 @@ limitations under the License.
             android:id="@+id/input_split_memo"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@android:color/transparent"
+            android:background="@null"
             android:gravity="top"
             android:hint="@string/hint_split_memo"
             android:inputType="textMultiLine|textCapSentences"

@@ -15,6 +15,8 @@
  */
 package org.gnucash.android.ui.transaction;
 
+import static org.gnucash.android.ui.util.TextViewExtKt.displayBalance;
+
 import android.app.Activity;
 import android.content.Intent;
 import android.content.res.Configuration;
@@ -35,20 +37,23 @@ import android.widget.ImageView;
 import android.widget.Spinner;
 import android.widget.TextView;
 
+import androidx.annotation.ColorInt;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.cursoradapter.widget.SimpleCursorAdapter;
-import androidx.fragment.app.Fragment;
 
 import com.google.android.material.snackbar.Snackbar;
 
 import org.gnucash.android.R;
+import org.gnucash.android.app.MenuFragment;
 import org.gnucash.android.databinding.FragmentSplitEditorBinding;
 import org.gnucash.android.databinding.ItemSplitEntryBinding;
 import org.gnucash.android.db.DatabaseSchema;
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.db.adapter.CommoditiesDbAdapter;
+import org.gnucash.android.inputmethodservice.CalculatorKeyboardView;
 import org.gnucash.android.model.AccountType;
 import org.gnucash.android.model.BaseModel;
 import org.gnucash.android.model.Commodity;
@@ -75,7 +80,7 @@ import java.util.List;
  *
  * @author Ngewi Fet <ngewif@gmail.com>
  */
-public class SplitEditorFragment extends Fragment {
+public class SplitEditorFragment extends MenuFragment {
     private AccountsDbAdapter mAccountsDbAdapter;
     private Cursor mCursor;
     private SimpleCursorAdapter mCursorAdapter;
@@ -84,8 +89,6 @@ public class SplitEditorFragment extends Fragment {
     private Commodity mCommodity;
 
     private BigDecimal mBaseAmount = BigDecimal.ZERO;
-
-    private CalculatorKeyboard mCalculatorKeyboard;
 
     private final BalanceTextWatcher mImbalanceWatcher = new BalanceTextWatcher();
 
@@ -103,6 +106,8 @@ public class SplitEditorFragment extends Fragment {
     private final Collection<SplitViewHolder> transferAttempt = new ArrayList<>();
 
     private FragmentSplitEditorBinding mBinding;
+    @ColorInt
+    private int colorBalanceZero;
 
     /**
      * Create and return a new instance of the fragment with the appropriate paramenters
@@ -120,19 +125,18 @@ public class SplitEditorFragment extends Fragment {
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         mBinding = FragmentSplitEditorBinding.inflate(inflater, container, false);
+        colorBalanceZero = mBinding.imbalanceTextview.getCurrentTextColor();
         return mBinding.getRoot();
     }
 
     @Override
-    public void onActivityCreated(Bundle savedInstanceState) {
-        super.onActivityCreated(savedInstanceState);
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
 
         ActionBar actionBar = ((AppCompatActivity) requireActivity()).getSupportActionBar();
         assert actionBar != null;
         actionBar.setTitle(R.string.title_split_editor);
-        setHasOptionsMenu(true);
 
-        mCalculatorKeyboard = new CalculatorKeyboard(requireActivity(), mBinding.calculatorKeyboard, R.xml.calculator_keyboard);
         mSplitItemViewList = new ArrayList<>();
 
         //we are editing splits for a new transaction.
@@ -152,10 +156,10 @@ public class SplitEditorFragment extends Fragment {
             AccountType accountType = mAccountsDbAdapter.getAccountType(mAccountUID);
             TransactionType transactionType = Transaction.getTypeForBalance(accountType, mBaseAmount.signum() < 0);
             split.setType(transactionType);
-            View view = addSplitView(split);
-            view.findViewById(R.id.input_accounts_spinner).setEnabled(false);
-            view.findViewById(R.id.btn_remove_split).setVisibility(View.GONE);
-            TransactionsActivity.displayBalance(mBinding.imbalanceTextview, new Money(mBaseAmount.negate(), mCommodity));
+            View splitView = addSplitView(split);
+            splitView.findViewById(R.id.input_accounts_spinner).setEnabled(false);
+            splitView.findViewById(R.id.btn_remove_split).setVisibility(View.GONE);
+            displayBalance(mBinding.imbalanceTextview, new Money(mBaseAmount.negate(), mCommodity), colorBalanceZero);
         }
 
     }
@@ -163,7 +167,15 @@ public class SplitEditorFragment extends Fragment {
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
-        mCalculatorKeyboard = new CalculatorKeyboard(requireActivity(), mBinding.calculatorKeyboard, R.xml.calculator_keyboard);
+        View view = getView();
+        if (view instanceof ViewGroup parent) {
+            CalculatorKeyboardView keyboardView = mBinding.calculatorKeyboard.calculatorKeyboard;
+            keyboardView = CalculatorKeyboard.rebind(parent, keyboardView, null);
+            for (View splitView : mSplitItemViewList) {
+                SplitViewHolder viewHolder = (SplitViewHolder) splitView.getTag();
+                viewHolder.splitAmountEditText.bindKeyboard(keyboardView);
+            }
+        }
     }
 
     private void loadSplitViews(List<Split> splitList) {
@@ -191,7 +203,7 @@ public class SplitEditorFragment extends Fragment {
                 saveSplits();
                 return true;
 
-            case R.id.menu_add_split:
+            case R.id.menu_add:
                 addSplitView(null);
                 return true;
 
@@ -231,7 +243,7 @@ public class SplitEditorFragment extends Fragment {
                 + DatabaseSchema.AccountEntry.COLUMN_HIDDEN + " = 0 AND "
                 + DatabaseSchema.AccountEntry.COLUMN_PLACEHOLDER + " = 0"
                 + ")";
-        mCursor = mAccountsDbAdapter.fetchAccountsOrderedByFullName(conditions, null);
+        mCursor = mAccountsDbAdapter.fetchAccountsOrderedByFavoriteAndFullName(conditions, null);
         mCommodity = CommoditiesDbAdapter.getInstance().getCommodity(mAccountsDbAdapter.getCurrencyCode(mAccountUID));
     }
 
@@ -260,7 +272,7 @@ public class SplitEditorFragment extends Fragment {
             this.splitUidTextView = binding.splitUid;
             this.splitTypeSwitch = binding.btnSplitType;
 
-            splitAmountEditText.bindListeners(mCalculatorKeyboard);
+            splitAmountEditText.bindKeyboard(mBinding.calculatorKeyboard);
 
             removeSplitButton.setOnClickListener(new View.OnClickListener() {
                 @Override
@@ -283,7 +295,7 @@ public class SplitEditorFragment extends Fragment {
         }
 
         @Override
-        public void transferComplete(Money amount) {
+        public void transferComplete(Money value, Money amount) {
             mCurrencyConversionDone = true;
             quantity = amount;
 
@@ -462,7 +474,7 @@ public class SplitEditorFragment extends Fragment {
                 }
             }
 
-            TransactionsActivity.displayBalance(mBinding.imbalanceTextview, new Money(imbalance, mCommodity));
+            displayBalance(mBinding.imbalanceTextview, new Money(imbalance, mCommodity), colorBalanceZero);
         }
     }
 

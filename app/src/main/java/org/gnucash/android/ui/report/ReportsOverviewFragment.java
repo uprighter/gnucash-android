@@ -16,22 +16,24 @@
 package org.gnucash.android.ui.report;
 
 import static com.github.mikephil.charting.components.Legend.LegendPosition;
+import static org.gnucash.android.ui.util.TextViewExtKt.displayBalance;
 
+import android.content.Context;
 import android.content.res.ColorStateList;
-import android.os.Build;
+import android.graphics.Color;
 import android.os.Bundle;
+import android.util.StateSet;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 
+import androidx.annotation.ColorInt;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.widget.AppCompatButton;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.ViewCompat;
-import androidx.fragment.app.FragmentManager;
 
 import com.github.mikephil.charting.components.Legend;
 import com.github.mikephil.charting.components.Legend.LegendForm;
@@ -41,16 +43,11 @@ import com.github.mikephil.charting.data.PieDataSet;
 
 import org.gnucash.android.R;
 import org.gnucash.android.databinding.FragmentReportSummaryBinding;
-import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.model.Account;
 import org.gnucash.android.model.AccountType;
 import org.gnucash.android.model.Money;
-import org.gnucash.android.ui.report.barchart.StackedBarChartFragment;
-import org.gnucash.android.ui.report.linechart.CashFlowLineChartFragment;
 import org.gnucash.android.ui.report.piechart.PieChartFragment;
-import org.gnucash.android.ui.report.sheet.BalanceSheetFragment;
-import org.gnucash.android.ui.transaction.TransactionsActivity;
-import org.joda.time.LocalDate;
+import org.joda.time.LocalDateTime;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -65,19 +62,14 @@ public class ReportsOverviewFragment extends BaseReportFragment {
 
     public static final int LEGEND_TEXT_SIZE = 14;
 
-    private AccountsDbAdapter mAccountsDbAdapter;
     private Money mAssetsBalance;
     private Money mLiabilitiesBalance;
 
     private boolean mChartHasData = false;
 
     private FragmentReportSummaryBinding mBinding;
-
-    @Override
-    public void onCreate(@Nullable Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        mAccountsDbAdapter = AccountsDbAdapter.getInstance();
-    }
+    @ColorInt
+    private int colorBalanceZero;
 
     @Override
     public View inflateView(LayoutInflater inflater, ViewGroup container) {
@@ -86,6 +78,7 @@ public class ReportsOverviewFragment extends BaseReportFragment {
         mBinding.btnPieChart.setOnClickListener(this::onClickChartTypeButton);
         mBinding.btnLineChart.setOnClickListener(this::onClickChartTypeButton);
         mBinding.btnBalanceSheet.setOnClickListener(this::onClickChartTypeButton);
+        colorBalanceZero = mBinding.totalAssets.getCurrentTextColor();
         return mBinding.getRoot();
     }
 
@@ -107,26 +100,31 @@ public class ReportsOverviewFragment extends BaseReportFragment {
     @Override
     public void onActivityCreated(@Nullable Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
+        final Context context = mBinding.btnPieChart.getContext();
 
         setHasOptionsMenu(false);
 
+        @ColorInt int textColorPrimary = getTextColor(context);
         mBinding.pieChart.setCenterTextSize(PieChartFragment.CENTER_TEXT_SIZE);
         mBinding.pieChart.setDescription("");
         mBinding.pieChart.setDrawSliceText(false);
+        mBinding.pieChart.setCenterTextColor(textColorPrimary);
+        mBinding.pieChart.setHoleColor(Color.TRANSPARENT);
         Legend legend = mBinding.pieChart.getLegend();
         legend.setEnabled(true);
         legend.setWordWrapEnabled(true);
         legend.setForm(LegendForm.CIRCLE);
         legend.setPosition(LegendPosition.RIGHT_OF_CHART_CENTER);
         legend.setTextSize(LEGEND_TEXT_SIZE);
+        legend.setTextColor(textColorPrimary);
 
-        ColorStateList csl = new ColorStateList(new int[][]{new int[0]}, new int[]{ContextCompat.getColor(getContext(), R.color.account_green)});
+        ColorStateList csl = new ColorStateList(new int[][]{StateSet.WILD_CARD}, new int[]{ContextCompat.getColor(context, R.color.account_green)});
         setButtonTint(mBinding.btnPieChart, csl);
-        csl = new ColorStateList(new int[][]{new int[0]}, new int[]{ContextCompat.getColor(getContext(), R.color.account_red)});
+        csl = new ColorStateList(new int[][]{StateSet.WILD_CARD}, new int[]{ContextCompat.getColor(context, R.color.account_red)});
         setButtonTint(mBinding.btnBarChart, csl);
-        csl = new ColorStateList(new int[][]{new int[0]}, new int[]{ContextCompat.getColor(getContext(), R.color.account_blue)});
+        csl = new ColorStateList(new int[][]{StateSet.WILD_CARD}, new int[]{ContextCompat.getColor(context, R.color.account_blue)});
         setButtonTint(mBinding.btnLineChart, csl);
-        csl = new ColorStateList(new int[][]{new int[0]}, new int[]{ContextCompat.getColor(getContext(), R.color.account_purple)});
+        csl = new ColorStateList(new int[][]{StateSet.WILD_CARD}, new int[]{ContextCompat.getColor(context, R.color.account_purple)});
         setButtonTint(mBinding.btnBalanceSheet, csl);
     }
 
@@ -136,18 +134,18 @@ public class ReportsOverviewFragment extends BaseReportFragment {
     }
 
     @Override
-    protected void generateReport() {
-        PieData pieData = PieChartFragment.groupSmallerSlices(getData(), getActivity());
-        if (pieData != null && pieData.getYValCount() != 0) {
+    protected void generateReport(@NonNull Context context) {
+        PieData pieData = PieChartFragment.groupSmallerSlices(getData(), context);
+        if (pieData.getYValCount() != 0) {
             mBinding.pieChart.setData(pieData);
             float sum = mBinding.pieChart.getData().getYValueSum();
-            String total = getResources().getString(R.string.label_chart_total);
+            String total = context.getString(R.string.label_chart_total);
             String currencySymbol = mCommodity.getSymbol();
             mBinding.pieChart.setCenterText(String.format(PieChartFragment.TOTAL_VALUE_LABEL_PATTERN, total, sum, currencySymbol));
             mChartHasData = true;
         } else {
-            mBinding.pieChart.setData(getEmptyData());
-            mBinding.pieChart.setCenterText(getResources().getString(R.string.label_chart_no_data));
+            mBinding.pieChart.setData(getEmptyData(context));
+            mBinding.pieChart.setCenterText(context.getString(R.string.label_chart_no_data));
             mBinding.pieChart.getLegend().setEnabled(false);
             mChartHasData = false;
         }
@@ -178,15 +176,16 @@ public class ReportsOverviewFragment extends BaseReportFragment {
                     && !account.isPlaceholderAccount()
                     && account.getCommodity().equals(mCommodity)) {
 
-                long start = new LocalDate().minusMonths(2).dayOfMonth().withMinimumValue().toDate().getTime();
-                long end = new LocalDate().plusDays(1).toDate().getTime();
+                LocalDateTime now = LocalDateTime.now();
+                long start = now.minusMonths(2).dayOfMonth().withMinimumValue().toDateTime().getMillis();
+                long end = now.plusDays(1).toDateTime().getMillis();
                 double balance = mAccountsDbAdapter.getAccountsBalance(
                         Collections.singletonList(account.getUID()), start, end).toDouble();
                 if (balance > 0) {
                     dataSet.addEntry(new Entry((float) balance, dataSet.getEntryCount()));
                     colors.add(account.getColor() != Account.DEFAULT_COLOR
                             ? account.getColor()
-                            : ReportsActivity.COLORS[(dataSet.getEntryCount() - 1) % ReportsActivity.COLORS.length]);
+                            : COLORS[(dataSet.getEntryCount() - 1) % COLORS.length]);
                     labels.add(account.getName());
                 }
             }
@@ -207,9 +206,9 @@ public class ReportsOverviewFragment extends BaseReportFragment {
         mBinding.pieChart.highlightValues(null);
         mBinding.pieChart.invalidate();
 
-        TransactionsActivity.displayBalance(mBinding.totalAssets, mAssetsBalance);
-        TransactionsActivity.displayBalance(mBinding.totalLiabilities, mLiabilitiesBalance);
-        TransactionsActivity.displayBalance(mBinding.netWorth, mAssetsBalance.minus(mLiabilitiesBalance));
+        displayBalance(mBinding.totalAssets, mAssetsBalance, colorBalanceZero);
+        displayBalance(mBinding.totalLiabilities, mLiabilitiesBalance, colorBalanceZero);
+        displayBalance(mBinding.netWorth, mAssetsBalance.minus(mLiabilitiesBalance), colorBalanceZero);
     }
 
     /**
@@ -217,8 +216,8 @@ public class ReportsOverviewFragment extends BaseReportFragment {
      *
      * @return a {@code PieData} instance for situation when no user data available
      */
-    private PieData getEmptyData() {
-        PieDataSet dataSet = new PieDataSet(null, getResources().getString(R.string.label_chart_no_data));
+    private PieData getEmptyData(@NonNull Context context) {
+        PieDataSet dataSet = new PieDataSet(null, context.getString(R.string.label_chart_no_data));
         dataSet.addEntry(new Entry(1, 0));
         dataSet.setColor(PieChartFragment.NO_DATA_COLOR);
         dataSet.setDrawValues(false);
@@ -249,12 +248,8 @@ public class ReportsOverviewFragment extends BaseReportFragment {
     }
 
     public void setButtonTint(Button button, ColorStateList tint) {
-        if (Build.VERSION.SDK_INT == Build.VERSION_CODES.LOLLIPOP && button instanceof AppCompatButton) {
-            ((AppCompatButton) button).setSupportBackgroundTintList(tint);
-        } else {
-            ViewCompat.setBackgroundTintList(button, tint);
-        }
-        button.setTextColor(ContextCompat.getColor(button.getContext(), android.R.color.white));
+        ViewCompat.setBackgroundTintList(button, tint);
+        button.setTextColor(Color.WHITE);
     }
 
 }

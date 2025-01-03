@@ -15,24 +15,20 @@
  */
 package org.gnucash.android.app;
 
-import android.app.AlarmManager;
+import android.annotation.SuppressLint;
 import android.app.Application;
-import android.app.PendingIntent;
 import android.content.Context;
-import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.SQLException;
 import android.database.sqlite.SQLiteDatabase;
 import android.graphics.Color;
-import android.os.Build;
-import android.os.SystemClock;
+import android.text.TextUtils;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.preference.PreferenceManager;
 
 import com.google.firebase.FirebaseApp;
-import com.uservoice.uservoicesdk.Config;
-import com.uservoice.uservoicesdk.UserVoice;
 
 import org.gnucash.android.BuildConfig;
 import org.gnucash.android.R;
@@ -49,9 +45,7 @@ import org.gnucash.android.db.adapter.ScheduledActionDbAdapter;
 import org.gnucash.android.db.adapter.SplitsDbAdapter;
 import org.gnucash.android.db.adapter.TransactionsDbAdapter;
 import org.gnucash.android.model.Commodity;
-import org.gnucash.android.model.Money;
-import org.gnucash.android.receivers.PeriodicJobReceiver;
-import org.gnucash.android.service.ScheduledActionService;
+import org.gnucash.android.model.TransactionType;
 import org.gnucash.android.ui.settings.PreferenceActivity;
 import org.gnucash.android.util.CrashlyticsTree;
 import org.gnucash.android.util.LogTree;
@@ -61,7 +55,6 @@ import java.util.Currency;
 import java.util.Locale;
 
 import timber.log.Timber;
-
 
 /**
  * An {@link Application} subclass for retrieving static context
@@ -75,37 +68,29 @@ public class GnuCashApplication extends Application {
      */
     public static final String FILE_PROVIDER_AUTHORITY = BuildConfig.APPLICATION_ID + ".fileprovider";
 
-    /**
-     * Lifetime of passcode session
-     */
-    public static final long SESSION_TIMEOUT = 5 * 1000;
-
-    /**
-     * Init time of passcode session
-     */
-    public static long PASSCODE_SESSION_INIT_TIME = 0L;
-
+    @SuppressLint("StaticFieldLeak")
     private static Context context;
-
+    @Nullable
     private static AccountsDbAdapter mAccountsDbAdapter;
-
+    @Nullable
     private static TransactionsDbAdapter mTransactionsDbAdapter;
-
+    @Nullable
     private static SplitsDbAdapter mSplitsDbAdapter;
-
+    @Nullable
     private static ScheduledActionDbAdapter mScheduledActionDbAdapter;
-
+    @Nullable
     private static CommoditiesDbAdapter mCommoditiesDbAdapter;
-
+    @Nullable
     private static PricesDbAdapter mPricesDbAdapter;
-
+    @Nullable
     private static BudgetsDbAdapter mBudgetsDbAdapter;
-
+    @Nullable
     private static BudgetAmountsDbAdapter mBudgetAmountsDbAdapter;
-
+    @Nullable
     private static RecurrenceDbAdapter mRecurrenceDbAdapter;
-
+    @Nullable
     private static BooksDbAdapter mBooksDbAdapter;
+    @Nullable
     private static DatabaseHelper mDbHelper;
 
     /**
@@ -125,13 +110,13 @@ public class GnuCashApplication extends Application {
         final Context context = getApplicationContext();
         GnuCashApplication.context = context;
 
-        FirebaseApp.initializeApp(this);
+        if (BuildConfig.GOOGLE_GCM) {
+            FirebaseApp.initializeApp(this);
+        }
 
         // Logging
         Timber.Tree tree = (Timber.Tree) (isCrashlyticsEnabled() ? new CrashlyticsTree(BuildConfig.DEBUG) : new LogTree(BuildConfig.DEBUG));
         Timber.plant(tree);
-
-        setUpUserVoice();
 
         initializeDatabaseAdapters(context);
         setDefaultCurrencyCode(context, getDefaultCurrencyCode());
@@ -148,11 +133,13 @@ public class GnuCashApplication extends Application {
     /**
      * Initialize database adapter singletons for use in the application
      * This method should be called every time a new book is opened
+     *
      * @param context the context.
      */
-    public static void initializeDatabaseAdapters(Context context) {
+    public static void initializeDatabaseAdapters(@NonNull Context context) {
         BookDbHelper bookDbHelper = new BookDbHelper(context);
-        mBooksDbAdapter = new BooksDbAdapter(bookDbHelper.getWritableDatabase());
+        SQLiteDatabase db = bookDbHelper.getWritableDatabase();
+        mBooksDbAdapter = new BooksDbAdapter(db);
 
         if (mDbHelper != null) { //close if open
             mDbHelper.getReadableDatabase().close();
@@ -162,8 +149,10 @@ public class GnuCashApplication extends Application {
         try {
             bookUID = mBooksDbAdapter.getActiveBookUID();
         } catch (BooksDbAdapter.NoActiveBookFoundException e) {
-            mBooksDbAdapter.fixBooksDatabase();
-            bookUID = mBooksDbAdapter.getActiveBookUID();
+            bookUID = mBooksDbAdapter.fixBooksDatabase();
+        }
+        if (TextUtils.isEmpty(bookUID)) {
+            bookUID = bookDbHelper.insertBlankBook(db).getUID();
         }
         mDbHelper = new DatabaseHelper(context, bookUID);
         SQLiteDatabase mainDb;
@@ -262,49 +251,60 @@ public class GnuCashApplication extends Application {
         }
     }
 
+    @Nullable
     public static AccountsDbAdapter getAccountsDbAdapter() {
         return mAccountsDbAdapter;
     }
 
+    @Nullable
     public static TransactionsDbAdapter getTransactionDbAdapter() {
         return mTransactionsDbAdapter;
     }
 
+    @Nullable
     public static SplitsDbAdapter getSplitsDbAdapter() {
         return mSplitsDbAdapter;
     }
 
+    @Nullable
     public static ScheduledActionDbAdapter getScheduledEventDbAdapter() {
         return mScheduledActionDbAdapter;
     }
 
+    @Nullable
     public static CommoditiesDbAdapter getCommoditiesDbAdapter() {
         return mCommoditiesDbAdapter;
     }
 
+    @Nullable
     public static PricesDbAdapter getPricesDbAdapter() {
         return mPricesDbAdapter;
     }
 
+    @Nullable
     public static BudgetsDbAdapter getBudgetDbAdapter() {
         return mBudgetsDbAdapter;
     }
 
+    @Nullable
     public static RecurrenceDbAdapter getRecurrenceDbAdapter() {
         return mRecurrenceDbAdapter;
     }
 
+    @Nullable
     public static BudgetAmountsDbAdapter getBudgetAmountsDbAdapter() {
         return mBudgetAmountsDbAdapter;
     }
 
+    @Nullable
     public static BooksDbAdapter getBooksDbAdapter() {
         return mBooksDbAdapter;
     }
 
-    @NonNull
+    @Nullable
     public static String getActiveBookUID() {
-        return getBooksDbAdapter().getActiveBookUID();
+        BooksDbAdapter adapter = getBooksDbAdapter();
+        return (adapter != null) ? adapter.getActiveBookUID() : null;
     }
 
     /**
@@ -312,8 +312,9 @@ public class GnuCashApplication extends Application {
      *
      * @return Currently active {@link SQLiteDatabase}
      */
+    @Nullable
     public static SQLiteDatabase getActiveDb() {
-        return mDbHelper.getWritableDatabase();
+        return (mDbHelper != null) ? mDbHelper.getWritableDatabase() : null;
     }
 
     /**
@@ -321,6 +322,7 @@ public class GnuCashApplication extends Application {
      *
      * @return Application {@link Context} object
      */
+    @NonNull
     public static Context getAppContext() {
         return GnuCashApplication.context;
     }
@@ -331,7 +333,8 @@ public class GnuCashApplication extends Application {
      * @return {@code true} if crashlytics is enabled, {@code false} otherwise
      */
     public static boolean isCrashlyticsEnabled() {
-        return PreferenceManager.getDefaultSharedPreferences(context).getBoolean(context.getString(R.string.key_enable_crashlytics), false);
+        return BuildConfig.GOOGLE_GCM && PreferenceManager.getDefaultSharedPreferences(context)
+            .getBoolean(context.getString(R.string.key_enable_crashlytics), false);
     }
 
     /**
@@ -370,7 +373,7 @@ public class GnuCashApplication extends Application {
     public static String getDefaultCurrencyCode() {
         Locale locale = getDefaultLocale();
 
-        String currencyCode = "USD"; //start with USD as the default
+        String currencyCode = Commodity.DEFAULT_COMMODITY.getCurrencyCode();
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
         try { //there are some strange locales out there
             currencyCode = Currency.getInstance(locale).getCurrencyCode();
@@ -386,7 +389,6 @@ public class GnuCashApplication extends Application {
      * Sets the default currency for the application in all relevant places:
      * <ul>
      *     <li>Shared preferences</li>
-     *     <li>{@link Money#DEFAULT_CURRENCY_CODE}</li>
      *     <li>{@link Commodity#DEFAULT_COMMODITY}</li>
      * </ul>
      *
@@ -401,21 +403,19 @@ public class GnuCashApplication extends Application {
      * Sets the default currency for the application in all relevant places:
      * <ul>
      *     <li>Shared preferences</li>
-     *     <li>{@link Money#DEFAULT_CURRENCY_CODE}</li>
      *     <li>{@link Commodity#DEFAULT_COMMODITY}</li>
      * </ul>
      *
-     * @param context the context.
+     * @param context      the context.
      * @param currencyCode ISO 4217 currency code
      * @see #getDefaultCurrencyCode()
      */
     public static void setDefaultCurrencyCode(@NonNull Context context, @NonNull String currencyCode) {
         PreferenceManager.getDefaultSharedPreferences(context)
-                .edit()
-                .putString(context.getString(R.string.key_default_currency), currencyCode)
-                .apply();
-        Money.DEFAULT_CURRENCY_CODE = currencyCode;
-        Commodity.DEFAULT_COMMODITY = mCommoditiesDbAdapter.getCommodity(currencyCode);
+            .edit()
+            .putString(context.getString(R.string.key_default_currency), currencyCode)
+            .apply();
+        Commodity.DEFAULT_COMMODITY = Commodity.getInstance(currencyCode);
     }
 
     /**
@@ -424,6 +424,7 @@ public class GnuCashApplication extends Application {
      *
      * @return The default locale for this device
      */
+    @NonNull
     public static Locale getDefaultLocale() {
         Locale locale = Locale.getDefault();
         //sometimes the locale en_UK is returned which causes a crash with Currency
@@ -443,51 +444,9 @@ public class GnuCashApplication extends Application {
     }
 
     /**
-     * Starts the service for scheduled events and schedules an alarm to call the service twice daily.
-     * <p>If the alarm already exists, this method does nothing. If not, the alarm will be created
-     * Hence, there is no harm in calling the method repeatedly</p>
-     *
-     * @param context Application context
-     */
-    public static void startScheduledActionExecutionService(Context context) {
-        Intent alarmIntent = new Intent(context, PeriodicJobReceiver.class);
-        alarmIntent.setAction(PeriodicJobReceiver.ACTION_SCHEDULED_ACTIONS);
-        PendingIntent pendingIntent = PendingIntent.getBroadcast(context, 0, alarmIntent,
-                PendingIntent.FLAG_NO_CREATE | PendingIntent.FLAG_MUTABLE);
-
-        if (pendingIntent != null) //if service is already scheduled, just return
-            return;
-        else
-            pendingIntent = PendingIntent.getBroadcast(context, 0, alarmIntent, PendingIntent.FLAG_MUTABLE);
-
-        AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
-        alarmManager.setInexactRepeating(AlarmManager.ELAPSED_REALTIME_WAKEUP,
-                SystemClock.elapsedRealtime() + AlarmManager.INTERVAL_FIFTEEN_MINUTES,
-                AlarmManager.INTERVAL_HOUR, pendingIntent);
-
-        ScheduledActionService.enqueueWork(context);
-    }
-
-    /**
-     * Sets up UserVoice.
-     *
-     * <p>Allows users to contact with us and access help topics.</p>
-     */
-    private void setUpUserVoice() {
-        // Set this up once when your application launches
-        Config config = new Config("gnucash.uservoice.com");
-        config.setTopicId(107400);
-        config.setForumId(320493);
-        config.putUserTrait("app_version_name", BuildConfig.VERSION_NAME);
-        config.putUserTrait("app_version_code", BuildConfig.VERSION_CODE);
-        config.putUserTrait("android_version", Build.VERSION.RELEASE);
-        // config.identifyUser("USER_ID", "User Name", "email@example.com");
-        UserVoice.init(config, this);
-    }
-
-    /**
      * Returns <code>true</code> if setting is enabled to backup the book before deleting transactions,
      * <code>false</code> otherwise.
+     *
      * @param context The context.
      * @return <code>true</code> if the book should be backed-up.
      */
@@ -496,4 +455,15 @@ public class GnuCashApplication extends Application {
         return sharedPrefs.getBoolean(context.getString(R.string.key_delete_transaction_backup), true);
     }
 
+    /**
+     * Get the default transaction type.
+     *
+     * @param context The context.
+     * @return <code>DEBIT</code> or <code>CREDIT</code>
+     */
+    public static TransactionType getDefaultTransactionType(@NonNull Context context) {
+        SharedPreferences sharedPrefs = PreferenceActivity.getActiveBookSharedPreferences();
+        String value = sharedPrefs.getString(context.getString(R.string.key_default_transaction_type), null);
+        return TransactionType.of(value);
+    }
 }

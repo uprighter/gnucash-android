@@ -19,6 +19,7 @@ package org.gnucash.android.test.ui;
 import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.action.ViewActions.click;
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
+import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -92,7 +93,7 @@ public class PieChartReportTest {
     private static final String GIFTS_RECEIVED_INCOME_ACCOUNT_UID = "b01950c0df0890b6543209d51c8e0b0f";
     private static final String GIFTS_RECEIVED_INCOME_ACCOUNT_NAME = "Gifts Received";
 
-    public static Commodity CURRENCY;
+    public static Commodity commodity;
 
     private static AccountsDbAdapter mAccountsDbAdapter;
     private static TransactionsDbAdapter mTransactionsDbAdapter;
@@ -114,7 +115,7 @@ public class PieChartReportTest {
 
     public PieChartReportTest() {
         //nothing to se here, move along
-        CURRENCY = new Commodity("US Dollars", "USD", 100);
+        commodity = new Commodity("US Dollars", "USD", 100);
     }
 
     @BeforeClass
@@ -127,10 +128,10 @@ public class PieChartReportTest {
         mTransactionsDbAdapter = TransactionsDbAdapter.getInstance();
         mAccountsDbAdapter = AccountsDbAdapter.getInstance();
 
-        CURRENCY = CommoditiesDbAdapter.getInstance().getCommodity("USD");
+        commodity = CommoditiesDbAdapter.getInstance().getCommodity("USD");
 
         PreferenceActivity.getActiveBookSharedPreferences().edit()
-                .putString(context.getString(R.string.key_default_currency), CURRENCY.getCurrencyCode())
+                .putString(context.getString(R.string.key_default_currency), commodity.getCurrencyCode())
                 .commit();
     }
 
@@ -140,7 +141,7 @@ public class PieChartReportTest {
         mTransactionsDbAdapter.deleteAllRecords();
         mReportsActivity = mActivityRule.getActivity();
         assertThat(mAccountsDbAdapter.getRecordsCount()).isGreaterThan(20); //lots of accounts in the default
-        onView(withId(R.id.btn_pie_chart)).perform(click());
+        onView(withId(R.id.btn_pie_chart)).check(matches(isDisplayed())).perform(click());
     }
 
     /**
@@ -152,7 +153,7 @@ public class PieChartReportTest {
         Transaction transaction = new Transaction(TRANSACTION_NAME);
         transaction.setTime(System.currentTimeMillis());
 
-        Split split = new Split(new Money(BigDecimal.valueOf(TRANSACTION_AMOUNT), CURRENCY), DINING_EXPENSE_ACCOUNT_UID);
+        Split split = new Split(new Money(BigDecimal.valueOf(TRANSACTION_AMOUNT), commodity), DINING_EXPENSE_ACCOUNT_UID);
         split.setType(TransactionType.DEBIT);
 
         transaction.addSplit(split);
@@ -168,9 +169,9 @@ public class PieChartReportTest {
      */
     private void addTransactionForPreviousMonth(int minusMonths) {
         Transaction transaction = new Transaction(TRANSACTION2_NAME);
-        transaction.setTime(new LocalDateTime().minusMonths(minusMonths).toDate().getTime());
+        transaction.setTime(new LocalDateTime().minusMonths(minusMonths).toDateTime().getMillis());
 
-        Split split = new Split(new Money(BigDecimal.valueOf(TRANSACTION2_AMOUNT), CURRENCY), BOOKS_EXPENSE_ACCOUNT_UID);
+        Split split = new Split(new Money(BigDecimal.valueOf(TRANSACTION2_AMOUNT), commodity), BOOKS_EXPENSE_ACCOUNT_UID);
         split.setType(TransactionType.DEBIT);
 
         transaction.addSplit(split);
@@ -193,14 +194,14 @@ public class PieChartReportTest {
         refreshReport();
 
         onView(withId(R.id.pie_chart)).perform(clickXY(Position.BEGIN, Position.MIDDLE));
-        float percent = (float) (TRANSACTION_AMOUNT / (TRANSACTION_AMOUNT + TRANSACTION2_AMOUNT) * 100);
+        float percent = (float) ((TRANSACTION_AMOUNT * 100) / (TRANSACTION_AMOUNT + TRANSACTION2_AMOUNT));
         String selectedText = String.format(Locale.US, BaseReportFragment.SELECTED_VALUE_PATTERN, DINING_EXPENSE_ACCOUNT_NAME, TRANSACTION_AMOUNT, percent);
         onView(withId(R.id.selected_chart_slice)).check(matches(withText(selectedText)));
     }
 
     @Test
     public void testSpinner() throws Exception {
-        Split split = new Split(new Money(BigDecimal.valueOf(TRANSACTION3_AMOUNT), CURRENCY), GIFTS_RECEIVED_INCOME_ACCOUNT_UID);
+        Split split = new Split(new Money(BigDecimal.valueOf(TRANSACTION3_AMOUNT), commodity), GIFTS_RECEIVED_INCOME_ACCOUNT_UID);
         Transaction transaction = new Transaction(TRANSACTION3_NAME);
         transaction.addSplit(split);
         transaction.addSplit(split.createPair(CASH_IN_WALLET_ASSET_ACCOUNT_UID));

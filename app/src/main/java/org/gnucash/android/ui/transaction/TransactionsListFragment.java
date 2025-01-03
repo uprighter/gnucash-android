@@ -16,6 +16,8 @@
 
 package org.gnucash.android.ui.transaction;
 
+import static org.gnucash.android.ui.util.TextViewExtKt.displayBalance;
+
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
@@ -32,12 +34,12 @@ import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import androidx.annotation.ColorInt;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.PopupMenu;
-import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentResultListener;
 import androidx.loader.app.LoaderManager;
@@ -48,6 +50,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
+import org.gnucash.android.app.MenuFragment;
 import org.gnucash.android.databinding.CardviewCompactTransactionBinding;
 import org.gnucash.android.databinding.CardviewTransactionBinding;
 import org.gnucash.android.databinding.FragmentTransactionsListBinding;
@@ -78,7 +81,7 @@ import timber.log.Timber;
  *
  * @author Ngewi Fet <ngewif@gmail.com>
  */
-public class TransactionsListFragment extends Fragment implements
+public class TransactionsListFragment extends MenuFragment implements
     Refreshable, LoaderManager.LoaderCallbacks<Cursor>, FragmentResultListener {
 
     private TransactionsDbAdapter mTransactionsDbAdapter;
@@ -93,12 +96,12 @@ public class TransactionsListFragment extends Fragment implements
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setHasOptionsMenu(true);
         Bundle args = getArguments();
         mAccountUID = args.getString(UxArgument.SELECTED_ACCOUNT_UID);
 
+        boolean isDoubleEntryDisabled = !GnuCashApplication.isDoubleEntryEnabled();
         mUseCompactView = PreferenceActivity.getActiveBookSharedPreferences()
-                .getBoolean(getActivity().getString(R.string.key_use_compact_list), !GnuCashApplication.isDoubleEntryEnabled());
+                .getBoolean(getString(R.string.key_use_compact_list), false) || isDoubleEntryDisabled;
         //if there was a local override of the global setting, respect it
         if (savedInstanceState != null)
             mUseCompactView = savedInstanceState.getBoolean(getString(R.string.key_use_compact_list), mUseCompactView);
@@ -118,31 +121,30 @@ public class TransactionsListFragment extends Fragment implements
         mBinding = FragmentTransactionsListBinding.inflate(inflater, container, false);
         View view = mBinding.getRoot();
 
-        mBinding.transactionRecyclerView.setHasFixedSize(true);
-        if (getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE) {
-            GridLayoutManager gridLayoutManager = new GridLayoutManager(getActivity(), 2);
-            mBinding.transactionRecyclerView.setLayoutManager(gridLayoutManager);
-        } else {
-            LinearLayoutManager mLayoutManager = new LinearLayoutManager(getActivity());
-            mBinding.transactionRecyclerView.setLayoutManager(mLayoutManager);
-        }
-        mBinding.transactionRecyclerView.setEmptyView(view.findViewById(R.id.empty_view));
 
         return view;
     }
 
     @Override
-    public void onActivityCreated(Bundle savedInstanceState) {
-        super.onActivityCreated(savedInstanceState);
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        ActionBar actionBar = ((AppCompatActivity) requireActivity()).getSupportActionBar();
+        assert actionBar != null;
+        actionBar.setDisplayShowTitleEnabled(false);
+        actionBar.setDisplayHomeAsUpEnabled(true);
 
-        ActionBar aBar = ((AppCompatActivity) getActivity()).getSupportActionBar();
-        aBar.setDisplayShowTitleEnabled(false);
-        aBar.setDisplayHomeAsUpEnabled(true);
+        mBinding.list.setHasFixedSize(true);
+        if (getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE) {
+            GridLayoutManager gridLayoutManager = new GridLayoutManager(getActivity(), 2);
+            mBinding.list.setLayoutManager(gridLayoutManager);
+        } else {
+            LinearLayoutManager mLayoutManager = new LinearLayoutManager(getActivity());
+            mBinding.list.setLayoutManager(mLayoutManager);
+        }
+        mBinding.list.setEmptyView(mBinding.emptyView);
 
         mTransactionRecyclerAdapter = new TransactionRecyclerAdapter(null);
-        mBinding.transactionRecyclerView.setAdapter(mTransactionRecyclerAdapter);
-
-        setHasOptionsMenu(true);
+        mBinding.list.setAdapter(mTransactionRecyclerAdapter);
     }
 
     /**
@@ -176,7 +178,6 @@ public class TransactionsListFragment extends Fragment implements
         intent.putExtra(UxArgument.SELECTED_TRANSACTION_UID, mTransactionsDbAdapter.getUID(id));
         intent.putExtra(UxArgument.SELECTED_ACCOUNT_UID, mAccountUID);
         startActivity(intent);
-//		mTransactionEditListener.editTransaction(mTransactionsDbAdapter.getUID(id));
     }
 
     @Override
@@ -188,7 +189,7 @@ public class TransactionsListFragment extends Fragment implements
     @Override
     public void onPrepareOptionsMenu(@NonNull Menu menu) {
         super.onPrepareOptionsMenu(menu);
-        MenuItem item = menu.findItem(R.id.menu_compact_trn_view);
+        MenuItem item = menu.findItem(R.id.menu_toggle_compact);
         item.setChecked(mUseCompactView);
         item.setEnabled(GnuCashApplication.isDoubleEntryEnabled()); //always compact for single-entry
     }
@@ -196,7 +197,7 @@ public class TransactionsListFragment extends Fragment implements
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         switch (item.getItemId()) {
-            case R.id.menu_compact_trn_view:
+            case R.id.menu_toggle_compact:
                 item.setChecked(!item.isChecked());
                 mUseCompactView = !mUseCompactView;
                 refresh();
@@ -206,21 +207,22 @@ public class TransactionsListFragment extends Fragment implements
         }
     }
 
+    @NonNull
     @Override
-    public Loader<Cursor> onCreateLoader(int arg0, Bundle arg1) {
+    public Loader<Cursor> onCreateLoader(int id, Bundle args) {
         Timber.d("Creating transactions loader");
         return new TransactionsCursorLoader(getActivity(), mAccountUID);
     }
 
     @Override
-    public void onLoadFinished(Loader<Cursor> loader, Cursor cursor) {
+    public void onLoadFinished(@NonNull Loader<Cursor> loader, Cursor cursor) {
         Timber.d("Transactions loader finished. Swapping in cursor");
         mTransactionRecyclerAdapter.swapCursor(cursor);
         mTransactionRecyclerAdapter.notifyDataSetChanged();
     }
 
     @Override
-    public void onLoaderReset(Loader<Cursor> loader) {
+    public void onLoaderReset(@NonNull Loader<Cursor> loader) {
         Timber.d("Resetting transactions loader");
         mTransactionRecyclerAdapter.swapCursor(null);
     }
@@ -238,7 +240,7 @@ public class TransactionsListFragment extends Fragment implements
      *
      * @author Ngewi Fet <ngewif@gmail.com>
      */
-    protected static class TransactionsCursorLoader extends DatabaseCursorLoader {
+    protected static class TransactionsCursorLoader extends DatabaseCursorLoader<TransactionsDbAdapter> {
         private final String accountUID;
 
         public TransactionsCursorLoader(Context context, String accountUID) {
@@ -248,8 +250,9 @@ public class TransactionsListFragment extends Fragment implements
 
         @Override
         public Cursor loadInBackground() {
-            mDatabaseAdapter = TransactionsDbAdapter.getInstance();
-            Cursor c = ((TransactionsDbAdapter) mDatabaseAdapter).fetchAllTransactionsForAccount(accountUID);
+            databaseAdapter = TransactionsDbAdapter.getInstance();
+            if (databaseAdapter == null) return null;
+            Cursor c = databaseAdapter.fetchAllTransactionsForAccount(accountUID);
             if (c != null)
                 registerContentObserver(c);
             return c;
@@ -267,13 +270,13 @@ public class TransactionsListFragment extends Fragment implements
 
         @Override
         public TransactionViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+            LayoutInflater inflater = LayoutInflater.from(parent.getContext());
             if (viewType == ITEM_TYPE_COMPACT) {
-                CardviewCompactTransactionBinding binding = CardviewCompactTransactionBinding.inflate(LayoutInflater.from(parent.getContext()), parent, false);
-                return new TransactionViewHolder(binding);
-            } else {
-                CardviewTransactionBinding binding = CardviewTransactionBinding.inflate(LayoutInflater.from(parent.getContext()), parent, false);
+                CardviewCompactTransactionBinding binding = CardviewCompactTransactionBinding.inflate(inflater, parent, false);
                 return new TransactionViewHolder(binding);
             }
+            CardviewTransactionBinding binding = CardviewTransactionBinding.inflate(inflater, parent, false);
+            return new TransactionViewHolder(binding);
         }
 
         @Override
@@ -299,6 +302,8 @@ public class TransactionsListFragment extends Fragment implements
             public final ImageView editTransaction;
 
             private long transactionId;
+            @ColorInt
+            private final int colorBalanceZero;
 
             public TransactionViewHolder(CardviewCompactTransactionBinding binding) {
                 super(binding.getRoot());
@@ -308,6 +313,7 @@ public class TransactionsListFragment extends Fragment implements
                 optionsMenu = binding.optionsMenu;
                 transactionDate = null;
                 editTransaction = null;
+                colorBalanceZero = transactionAmount.getCurrentTextColor();
                 setup();
             }
 
@@ -319,6 +325,7 @@ public class TransactionsListFragment extends Fragment implements
                 optionsMenu = binding.optionsMenu;
                 transactionDate = binding.transactionDate;
                 editTransaction = binding.editTransaction;
+                colorBalanceZero = transactionAmount.getCurrentTextColor();
                 setup();
             }
 
@@ -343,15 +350,15 @@ public class TransactionsListFragment extends Fragment implements
             @Override
             public boolean onMenuItemClick(@NonNull MenuItem item) {
                 switch (item.getItemId()) {
-                    case R.id.context_menu_delete:
+                    case R.id.menu_delete:
                         deleteTransaction(transactionId);
                         return true;
 
-                    case R.id.context_menu_duplicate_transaction:
+                    case R.id.menu_duplicate:
                         duplicateTransaction(transactionId);
                         return true;
 
-                    case R.id.context_menu_move_transaction:
+                    case R.id.menu_move:
                         moveTransaction(transactionId);
                         return true;
 
@@ -368,7 +375,7 @@ public class TransactionsListFragment extends Fragment implements
 
                 final String transactionUID = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseSchema.TransactionEntry.COLUMN_UID));
                 Money amount = mTransactionsDbAdapter.getBalance(transactionUID, mAccountUID);
-                TransactionsActivity.displayBalance(transactionAmount, amount);
+                displayBalance(transactionAmount, amount, colorBalanceZero);
 
                 long dateMillis = cursor.getLong(cursor.getColumnIndexOrThrow(DatabaseSchema.TransactionEntry.COLUMN_TIMESTAMP));
                 String dateText = TransactionsActivity.getPrettyDateFormat(getActivity(), dateMillis);

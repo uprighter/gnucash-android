@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Wizard Pager - Review page -->
+    <color name="text_light" tools:ignore="MissingDefaultResource">#66FFFFFF</color>
+
+    <color name="debit_red">#FF1B17</color>
+    <color name="credit_green">#5DE15D</color>
+
+    <color name="widget_bg">#CC000000</color>
+
+    <color name="kbd_bg">#EE1F1F23</color>
+    <color name="kbd_key_action">#98B858</color>
+    <color name="kbd_key_clear">#67734E</color>
+    <color name="kbd_key_delete">#67734E</color>
+    <color name="kbd_key_digit">#343538</color>
+    <color name="kbd_key_op">#A5D6A7</color>
+</resources>

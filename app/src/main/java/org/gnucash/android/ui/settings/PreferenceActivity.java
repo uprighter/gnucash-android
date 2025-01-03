@@ -38,7 +38,7 @@ import androidx.preference.PreferenceManager;
 import org.gnucash.android.BuildConfig;
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
-import org.gnucash.android.db.adapter.BooksDbAdapter;
+import org.gnucash.android.databinding.ActivitySettingsBinding;
 import org.gnucash.android.ui.passcode.PasscodeLockActivity;
 
 import timber.log.Timber;
@@ -51,10 +51,13 @@ public class PreferenceActivity extends PasscodeLockActivity implements
 
     public static final String ACTION_MANAGE_BOOKS = BuildConfig.APPLICATION_ID + ".action.MANAGE_BOOKS";
 
+    private ActivitySettingsBinding binding;
+
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_settings);
+        binding = ActivitySettingsBinding.inflate(getLayoutInflater());
+        setContentView(binding.getRoot());
 
         if (savedInstanceState == null || getSupportFragmentManager().getFragments().isEmpty()) {
             String action = getIntent().getAction();
@@ -131,6 +134,10 @@ public class PreferenceActivity extends PasscodeLockActivity implements
         FragmentManager fm = getSupportFragmentManager();
         if (fm.getBackStackEntryCount() > 0) {
             fm.popBackStack();
+
+            ActionBar actionBar = getSupportActionBar();
+            assert actionBar != null;
+            actionBar.setTitle(R.string.title_settings);
         } else {
             finish();
         }

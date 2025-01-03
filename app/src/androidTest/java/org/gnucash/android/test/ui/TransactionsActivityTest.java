@@ -33,7 +33,6 @@ import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.not;
 
 import android.Manifest;
-import android.app.UiAutomation;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
@@ -45,10 +44,7 @@ import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.rule.ActivityTestRule;
 import androidx.test.rule.GrantPermissionRule;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
-import androidx.test.uiautomator.By;
 import androidx.test.uiautomator.UiDevice;
-
-import com.google.android.gms.common.util.UidVerifier;
 
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
@@ -71,7 +67,6 @@ import org.gnucash.android.ui.settings.PreferenceActivity;
 import org.gnucash.android.ui.transaction.TransactionFormFragment;
 import org.gnucash.android.ui.transaction.TransactionsActivity;
 import org.junit.After;
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
@@ -155,6 +150,9 @@ public class TransactionsActivityTest {
 
     @Before
     public void setUp() throws Exception {
+        setDoubleEntryEnabled(true);
+        setDefaultTransactionType(TransactionType.DEBIT);
+
         mAccountsDbAdapter.deleteAllRecords();
         mAccountsDbAdapter.addRecord(mBaseAccount, DatabaseAdapter.UpdateMethod.insert);
         mAccountsDbAdapter.addRecord(mTransferAccount, DatabaseAdapter.UpdateMethod.insert);
@@ -173,7 +171,7 @@ public class TransactionsActivityTest {
 
 
     private void validateTransactionListDisplayed() {
-        onView(withId(R.id.transaction_recycler_view)).check(matches(isDisplayed()));
+        onView(withId(android.R.id.list)).check(matches(isDisplayed()));
     }
 
     private int getTransactionCount() {
@@ -258,7 +256,6 @@ public class TransactionsActivityTest {
     //TODO: Add test for only one account but with double-entry enabled
     @Test
     public void testAddTransaction() {
-        setDoubleEntryEnabled(true);
         setDefaultTransactionType(TransactionType.DEBIT);
         validateTransactionListDisplayed();
 
@@ -298,7 +295,6 @@ public class TransactionsActivityTest {
         mAccountsDbAdapter.addRecord(euroAccount);
 
         int transactionCount = mTransactionsDbAdapter.getTransactionsCount(TRANSACTIONS_ACCOUNT_UID);
-        setDoubleEntryEnabled(true);
         setDefaultTransactionType(TransactionType.DEBIT);
         validateTransactionListDisplayed();
 
@@ -409,7 +405,6 @@ public class TransactionsActivityTest {
      */
     @Test
     public void testSplitEditor() {
-        setDoubleEntryEnabled(true);
         setDefaultTransactionType(TransactionType.DEBIT);
         mTransactionsDbAdapter.deleteAllRecords();
 
@@ -460,10 +455,11 @@ public class TransactionsActivityTest {
 
 
     private void setDoubleEntryEnabled(boolean enabled) {
+        Context context = GnuCashApplication.getAppContext();
         SharedPreferences prefs = PreferenceActivity.getActiveBookSharedPreferences();
-        Editor editor = prefs.edit();
-        editor.putBoolean(mTransactionsActivity.getString(R.string.key_use_double_entry), enabled);
-        editor.apply();
+        prefs.edit()
+            .putBoolean(context.getString(R.string.key_use_double_entry), enabled)
+            .apply();
     }
 
     @Test
@@ -475,10 +471,11 @@ public class TransactionsActivityTest {
     }
 
     private void setDefaultTransactionType(TransactionType type) {
+        Context context = GnuCashApplication.getAppContext();
         SharedPreferences prefs = PreferenceActivity.getActiveBookSharedPreferences();
-        Editor editor = prefs.edit();
-        editor.putString(mTransactionsActivity.getString(R.string.key_default_transaction_type), type.name());
-        editor.commit();
+        prefs.edit()
+            .putString(context.getString(R.string.key_default_transaction_type), type.value)
+            .commit();
     }
 
     //FIXME: Improve on this test
@@ -598,9 +595,6 @@ public class TransactionsActivityTest {
      */
     @Test
     public void editingSplit_shouldNotSetAmountToZero() {
-        setDoubleEntryEnabled(true);
-        setDefaultTransactionType(TransactionType.DEBIT);
-
         mTransactionsDbAdapter.deleteAllRecords();
 
         Account account = new Account("Z Account", Commodity.getInstance(CURRENCY_CODE));
@@ -769,7 +763,7 @@ public class TransactionsActivityTest {
         mTransactionsDbAdapter.addRecord(multiTransaction);
 
         Transaction savedTransaction = mTransactionsDbAdapter.getRecord(multiTransaction.getUID());
-        assertThat(savedTransaction.getSplits()).extracting("_quantity").contains(expectedQty);
+        assertThat(savedTransaction.getSplits()).extracting("quantity").contains(expectedQty);
         assertThat(savedTransaction.getSplits()).extracting("value").contains(expectedValue);
 
         refreshTransactionsList();
@@ -778,6 +772,7 @@ public class TransactionsActivityTest {
                 withId(R.id.edit_transaction))).perform(click());
 
         //now change the transfer account to be no longer multi-currency
+        onView(withId(R.id.input_transfer_account_spinner)).check(matches(isDisplayed()));
         onView(withId(R.id.input_transfer_account_spinner)).perform(click());
         onView(withText(mTransferAccount.getFullName())).perform(click());
 
@@ -799,7 +794,7 @@ public class TransactionsActivityTest {
                 .contains(mTransferAccount.getUID())
                 .doesNotContain(euroAccount.getUID());
         assertThat(allSplits).extracting("value").contains(expectedValue).doesNotContain(expectedQty);
-        assertThat(allSplits).extracting("_quantity").contains(expectedValue).doesNotContain(expectedQty);
+        assertThat(allSplits).extracting("quantity").contains(expectedValue).doesNotContain(expectedQty);
     }
 
     /**
@@ -810,19 +805,20 @@ public class TransactionsActivityTest {
     @Test
     public void editingTransferAccount_shouldKeepSplitAmountsConsistent() {
         mTransactionsDbAdapter.deleteAllRecords(); //clean slate
-        Commodity euroCommodity = CommoditiesDbAdapter.getInstance().getCommodity("EUR");
-        Account euroAccount = new Account("Euro Account", euroCommodity);
+        String currencyOther = "EUR".equals(COMMODITY.getCurrencyCode()) ? "USD" : "EUR";
+        Commodity commodityOther = CommoditiesDbAdapter.getInstance().getCommodity(currencyOther);
+        Account accountOther = new Account("Other Account", commodityOther);
 
-        mAccountsDbAdapter.addRecord(euroAccount);
+        mAccountsDbAdapter.addRecord(accountOther);
 
         Money expectedValue = new Money(BigDecimal.TEN, COMMODITY);
-        Money expectedQty = new Money("5", "EUR");
+        Money expectedQty = new Money("5", commodityOther);
 
         String trnDescription = "Multicurrency Test Trn";
         Transaction multiTransaction = new Transaction(trnDescription);
         Split split1 = new Split(expectedValue, TRANSACTIONS_ACCOUNT_UID);
         split1.setType(TransactionType.CREDIT);
-        Split split2 = new Split(expectedValue, expectedQty, euroAccount.getUID());
+        Split split2 = new Split(expectedValue, expectedQty, accountOther.getUID());
         split2.setType(TransactionType.DEBIT);
         multiTransaction.addSplit(split1);
         multiTransaction.addSplit(split2);
@@ -831,7 +827,7 @@ public class TransactionsActivityTest {
         mTransactionsDbAdapter.addRecord(multiTransaction);
 
         Transaction savedTransaction = mTransactionsDbAdapter.getRecord(multiTransaction.getUID());
-        assertThat(savedTransaction.getSplits()).extracting("_quantity").contains(expectedQty);
+        assertThat(savedTransaction.getSplits()).extracting("quantity").contains(expectedQty);
         assertThat(savedTransaction.getSplits()).extracting("value").contains(expectedValue);
 
         assertThat(savedTransaction.getSplits(TRANSACTIONS_ACCOUNT_UID).get(0)
@@ -849,8 +845,11 @@ public class TransactionsActivityTest {
         onView(withText(TRANSFER_ACCOUNT_NAME)).perform(click());
 
         onView(withId(R.id.input_transfer_account_spinner)).perform(click());
-        onView(withText(euroAccount.getFullName())).perform(click());
-        onView(withId(R.id.input_converted_amount)).perform(typeText("5"));
+        onView(withText(accountOther.getFullName())).perform(click());
+        // Exchange dialog should be shown already.
+        onView(withId(R.id.input_converted_amount))
+            .check(matches(isDisplayed()))
+            .perform(typeText("5"));
         Espresso.closeSoftKeyboard();
         onView(withId(R.id.btn_save)).perform(click());
 
@@ -875,7 +874,6 @@ public class TransactionsActivityTest {
         Split transferAcctSplit = editedTransaction.getSplits(TRANSFER_ACCOUNT_UID).get(0);
         assertThat(transferAcctSplit.getQuantity()).isEqualTo(expectedValue);
         assertThat(transferAcctSplit.getValue()).isEqualTo(expectedValue);
-
     }
 
     /**

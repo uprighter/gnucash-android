@@ -25,6 +25,7 @@ import android.net.Uri;
 import android.text.TextUtils;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
 import org.gnucash.android.R;
@@ -80,13 +81,13 @@ public class BooksDbAdapter extends DatabaseAdapter<Book> {
         String lastSync = cursor.getString(cursor.getColumnIndexOrThrow(BookEntry.COLUMN_LAST_SYNC));
 
         Book book = new Book(rootAccountGUID);
+        populateBaseModelAttributes(cursor, book);
         book.setDisplayName(displayName);
         book.setRootTemplateUID(rootTemplateGUID);
         book.setSourceUri(uriString == null ? null : Uri.parse(uriString));
-        book.setActive(active > 0);
+        book.setActive(active != 0);
         book.setLastSync(TimestampHelper.getTimestampFromUtcString(lastSync));
 
-        populateBaseModelAttributes(cursor, book);
         return book;
     }
 
@@ -195,6 +196,10 @@ public class BooksDbAdapter extends DatabaseAdapter<Book> {
         return info.toString();
     }
 
+    public Book getActiveBook() {
+        return getRecord(getActiveBookUID());
+    }
+
     public class NoActiveBookFoundException extends RuntimeException {
         public NoActiveBookFoundException(String message) {
             super(message);
@@ -203,14 +208,19 @@ public class BooksDbAdapter extends DatabaseAdapter<Book> {
 
     /**
      * Tries to fix the books database.
+     * @return the active book UID.
      */
-    public void fixBooksDatabase() {
+    @Nullable
+    public String fixBooksDatabase() {
         Timber.v("Looking for books to set as active...");
         if (getRecordsCount() <= 0) {
             Timber.w("No books found in the database. Recovering books records...");
             recoverBookRecords();
+            if (getRecordsCount() <= 0) {
+                return null;
+            }
         }
-        setFirstBookAsActive();
+        return setFirstBookAsActive();
     }
 
     /**
@@ -244,17 +254,21 @@ public class BooksDbAdapter extends DatabaseAdapter<Book> {
 
     /**
      * Sets the first book in the database as active.
+     *
+     * @return the book UID.
      */
-    private void setFirstBookAsActive() {
+    @Nullable
+    private String setFirstBookAsActive() {
         List<Book> books = getAllRecords();
         if (books.isEmpty()) {
             Timber.w("No books.");
-            return;
+            return null;
         }
         Book firstBook = books.get(0);
         firstBook.setActive(true);
         addRecord(firstBook);
         Timber.i("Book " + firstBook.getUID() + " set as active.");
+        return firstBook.getUID();
     }
 
     /**
@@ -322,17 +336,16 @@ public class BooksDbAdapter extends DatabaseAdapter<Book> {
         while (true) {
             String name = context.getString(R.string.book_default_name, bookCount);
 
-            statement.clearBindings();
             statement.bindString(1, name);
             long nameCount = statement.simpleQueryForLong();
 
             if (nameCount == 0) {
+                statement.close();
                 return name;
             }
 
             bookCount++;
         }
-
     }
 
 

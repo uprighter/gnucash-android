@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?><!--
+<!--
  Copyright (c) 2012 - 2014 Ngewi Fet <ngewif@gmail.com>
  
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,6 +17,7 @@
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <string name="title_create_account">Create Account</string>
     <string name="title_edit_account">Edit Account</string>
+    <string name="title_edit_budget">Edit Budget</string>
     <string name="description_add_transaction_icon">Add a new transaction to an account</string>
     <string name="description_view_account_icon">View account details</string>
     <string name="label_no_accounts">No accounts to display</string>
@@ -96,10 +97,6 @@
     <string name="title_account_preferences">Account Preferences</string>
     <string name="title_default_transaction_type">Default Transaction Type</string>
     <string name="summary_default_transaction_type">The type of transaction to use by default, CREDIT or DEBIT</string>
-    <string-array name="transaction_types">
-        <item>CREDIT</item>
-        <item>DEBIT</item>
-    </string-array>
     <string name="msg_delete_all_transactions_confirmation">Are you sure you want to delete ALL transactions?</string>
     <string name="msg_delete_transaction_confirmation">Are you sure you want to delete this transaction?</string>
     <string name="title_export_preference_category">Export</string>
@@ -181,9 +178,9 @@
     <!-- Default title for color picker dialog [CHAR LIMIT=30] -->
     <string name="color_picker_default_title">Select a Color</string>
     <!-- Content description for a color square. -->
-    <string name="color_swatch_description" translatable="false">Color <xliff:g id="color_index" example="14">%1$d</xliff:g></string>
+    <string name="color_swatch_description" translatable="false">Color <xliff:g example="14" id="color_index">%1$d</xliff:g></string>
     <!-- Content description for a selected color square. -->
-    <string name="color_swatch_description_selected" translatable="false">Color <xliff:g id="color_index" example="14">%1$d</xliff:g> selected</string>
+    <string name="color_swatch_description_selected" translatable="false">Color <xliff:g example="14" id="color_index">%1$d</xliff:g> selected</string>
     <string name="label_account_color_and_type">Account Color &amp; Type</string>
     <string name="label_delete_sub_accounts">Delete sub-accounts</string>
     <string name="title_recent_accounts">Recent</string>
@@ -272,33 +269,12 @@
     <string name="username">User Name</string>
     <string name="password">Password</string>
     <string name="owncloud_pref">owncloud</string>
-    <string name="owncloud_server">https://</string>
     <string name="owncloud_server_invalid">OC server not found</string>
     <string name="owncloud_user_invalid">OC username/password invalid</string>
     <string name="owncloud_dir_invalid">Invalid chars: \\ &lt; &gt; : \&quot; | * ? </string>
     <string name="owncloud_server_ok">OC server OK</string>
     <string name="owncloud_user_ok">OC username/password OK</string>
     <string name="owncloud_dir_ok">Dir name OK</string>
-    <plurals name="label_every_x_hours">
-        <item quantity="one">Hourly</item>
-        <item quantity="other">Every %d hours</item>
-    </plurals>
-    <plurals name="label_every_x_days">
-        <item quantity="one">Daily</item>
-        <item quantity="other">Every %d days</item>
-    </plurals>
-    <plurals name="label_every_x_weeks">
-        <item quantity="one">Weekly</item>
-        <item quantity="other">Every %d weeks</item>
-    </plurals>
-    <plurals name="label_every_x_months">
-        <item quantity="one">Monthly</item>
-        <item quantity="other">Every %d months</item>
-    </plurals>
-    <plurals name="label_every_x_years">
-        <item quantity="one">Yearly</item>
-        <item quantity="other">Every %d years</item>
-    </plurals>
     <string name="title_enable_crashlytics">Enable Crash Logging</string>
     <string name="msg_enable_crashlytics">Automatically send information about app malfunction to the developers.</string>
     <string name="label_export_format"> Format</string>
@@ -313,7 +289,8 @@
     <string name="label_no_recent_accounts">No recent accounts</string>
     <string name="label_no_favorite_accounts">No favorite accounts</string>
     <string name="nav_menu_scheduled_actions">Scheduled Actions</string>
-    <string name="label_scheduled_action_ended">"Ended, last executed on %1$s"</string>
+    <string name="label_scheduled_action">"%1$s, last executed on %2$s"</string>
+    <string name="label_scheduled_action_ended">"Ended"</string>
     <string name="btn_wizard_next">Next</string>
     <string name="btn_wizard_finish">Done</string>
     <string name="wizard_title_default_currency">Default Currency</string>
@@ -443,7 +420,6 @@
     <string name="switch_export_transactions_from_all_time">All time</string>
     <string name="label_recommend_app">Recommend in Play Store</string>
     <string name="repeat_until_date">until %1$s</string>
-    <string name="repeat_on_weekday">on %1$s</string>
     <string name="repeat_x_times">for %1$d times</string>
     <string name="menu_show_compact_view">Compact View</string>
     <string name="book_default_name">Book %1$d</string>
@@ -467,6 +443,7 @@
     <string name="label_csv_separator">Separator</string>
     <string name="export_notice_csv">Exports transactions as CSV</string>
     <string name="no_books">No books in the database</string>
+    <!-- Copied from "csv-transactions-export.cpp" -->
     <string-array name="csv_transaction_headers">
         <item>Date</item>
         <item>Transaction ID</item>
@@ -479,8 +456,10 @@
         <item>Memo</item>
         <item>Full Account Name</item>
         <item>Account Name</item>
-        <item>Amount With Sym.</item>
-        <item>Amount Num</item>
+        <item>Amount With Sym</item>
+        <item>Amount Num.</item>
+        <item>Value With Sym</item>
+        <item>Value Num.</item>
         <item>Reconcile</item>
         <item>Reconcile Date</item>
         <item>Rate/Price</item>
@@ -501,5 +480,4 @@
     </string-array>
     <string name="action_transaction">transaction to</string>
     <string name="action_backup">backup to</string>
-    <string name="schedule_export_desription" translatable="false">"%1$s %2$s %3$s"</string>
 </resources>

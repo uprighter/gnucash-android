@@ -19,6 +19,7 @@ import static org.gnucash.android.db.DatabaseSchema.ScheduledActionEntry;
 
 import android.content.ContentValues;
 import android.database.Cursor;
+import android.database.DatabaseUtils;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteStatement;
 
@@ -28,6 +29,7 @@ import org.gnucash.android.app.GnuCashApplication;
 import org.gnucash.android.db.DatabaseSchema;
 import org.gnucash.android.model.Recurrence;
 import org.gnucash.android.model.ScheduledAction;
+import org.gnucash.android.util.TimestampHelper;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -41,7 +43,7 @@ import timber.log.Timber;
  */
 public class ScheduledActionDbAdapter extends DatabaseAdapter<ScheduledAction> {
 
-    private RecurrenceDbAdapter mRecurrenceDbAdapter;
+    private final RecurrenceDbAdapter mRecurrenceDbAdapter;
 
     public ScheduledActionDbAdapter(SQLiteDatabase db, RecurrenceDbAdapter recurrenceDbAdapter) {
         super(db, ScheduledActionEntry.TABLE_NAME, new String[]{
@@ -104,15 +106,14 @@ public class ScheduledActionDbAdapter extends DatabaseAdapter<ScheduledAction> {
      * @param scheduledAction Scheduled action
      * @return Database record ID of the edited scheduled action
      */
-    public long updateRecurrenceAttributes(ScheduledAction scheduledAction) {
+    public long updateRecurrenceAttributes(@NonNull ScheduledAction scheduledAction) {
         //since we are updating, first fetch the existing recurrence UID and set it to the object
         //so that it will be updated and not a new one created
-        RecurrenceDbAdapter recurrenceDbAdapter = new RecurrenceDbAdapter(mDb);
-        String recurrenceUID = recurrenceDbAdapter.getAttribute(scheduledAction.getUID(), ScheduledActionEntry.COLUMN_RECURRENCE_UID);
+        String recurrenceUID = getAttribute(scheduledAction, ScheduledActionEntry.COLUMN_RECURRENCE_UID);
 
         Recurrence recurrence = scheduledAction.getRecurrence();
         recurrence.setUID(recurrenceUID);
-        recurrenceDbAdapter.addRecord(recurrence, UpdateMethod.update);
+        mRecurrenceDbAdapter.addRecord(recurrence, UpdateMethod.update);
 
         ContentValues contentValues = new ContentValues();
         extractBaseModelAttributes(contentValues, scheduledAction);
@@ -136,20 +137,19 @@ public class ScheduledActionDbAdapter extends DatabaseAdapter<ScheduledAction> {
         stmt.bindLong(4, schedxAction.getEndTime());
         stmt.bindLong(5, schedxAction.getLastRunTime());
         stmt.bindLong(6, schedxAction.isEnabled() ? 1 : 0);
-        stmt.bindString(7, schedxAction.getCreatedTimestamp().toString());
+        stmt.bindString(7, TimestampHelper.getUtcStringFromTimestamp(schedxAction.getCreatedTimestamp()));
         if (schedxAction.getTag() == null)
             stmt.bindNull(8);
         else
             stmt.bindString(8, schedxAction.getTag());
-        stmt.bindString(9, Integer.toString(schedxAction.getTotalPlannedExecutionCount()));
+        stmt.bindLong(9, schedxAction.getTotalPlannedExecutionCount());
         stmt.bindString(10, schedxAction.getRecurrence().getUID());
         stmt.bindLong(11, schedxAction.shouldAutoCreate() ? 1 : 0);
         stmt.bindLong(12, schedxAction.shouldAutoNotify() ? 1 : 0);
         stmt.bindLong(13, schedxAction.getAdvanceCreateDays());
         stmt.bindLong(14, schedxAction.getAdvanceNotifyDays());
         stmt.bindString(15, schedxAction.getTemplateAccountUID());
-
-        stmt.bindString(16, Integer.toString(schedxAction.getExecutionCount()));
+        stmt.bindLong(16, schedxAction.getExecutionCount());
         stmt.bindString(17, schedxAction.getUID());
         return stmt;
     }
@@ -184,7 +184,7 @@ public class ScheduledActionDbAdapter extends DatabaseAdapter<ScheduledAction> {
         event.setStartTime(startTime);
         event.setEndTime(endTime);
         event.setActionUID(actionUid);
-        event.setLastRun(lastRun);
+        event.setLastRunTime(lastRun);
         event.setTag(tag);
         event.setEnabled(enabled);
         event.setTotalPlannedExecutionCount(numOccurrences);
@@ -246,10 +246,11 @@ public class ScheduledActionDbAdapter extends DatabaseAdapter<ScheduledAction> {
      * @return Number of transactions created from scheduled action
      */
     public long getActionInstanceCount(String scheduledActionUID) {
-        String sql = "SELECT COUNT(*) FROM " + DatabaseSchema.TransactionEntry.TABLE_NAME
-                + " WHERE " + DatabaseSchema.TransactionEntry.COLUMN_SCHEDX_ACTION_UID + "=?";
-        SQLiteStatement statement = mDb.compileStatement(sql);
-        statement.bindString(1, scheduledActionUID);
-        return statement.simpleQueryForLong();
+        return DatabaseUtils.queryNumEntries(
+            mDb,
+            DatabaseSchema.TransactionEntry.TABLE_NAME,
+            DatabaseSchema.TransactionEntry.COLUMN_SCHEDX_ACTION_UID + "=?",
+            new String[]{scheduledActionUID}
+        );
     }
 }

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?><!--
+<!--
  Copyright (c) 2014 Oleksandr Tyshkovets <olexandr.tyshkovets@gmail.com>
  
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,17 +14,10 @@
  limitations under the License.
 -->
 
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/fragment_container"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical">
-
-    <fragment
-        android:id="@+id/listFragment"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        tools:layout="@layout/fragment_numeric_keyboard"
-        class="org.gnucash.android.ui.passcode.KeyboardFragment" />
-
-</LinearLayout>
+    android:orientation="vertical"
+    tools:layout="@layout/fragment_numeric_keyboard" />

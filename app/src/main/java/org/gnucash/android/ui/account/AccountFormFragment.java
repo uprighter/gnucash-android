@@ -18,11 +18,11 @@
 package org.gnucash.android.ui.account;
 
 import static org.gnucash.android.ui.colorpicker.ColorPickerDialog.COLOR_PICKER_DIALOG_TAG;
+import static org.gnucash.android.ui.util.widget.ViewExtKt.setTextToEnd;
 
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.database.Cursor;
@@ -46,15 +46,17 @@ import android.widget.CompoundButton.OnCheckedChangeListener;
 import android.widget.Spinner;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.content.res.ResourcesCompat;
+import androidx.core.content.ContextCompat;
 import androidx.cursoradapter.widget.SimpleCursorAdapter;
-import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentResultListener;
 
 import org.gnucash.android.R;
+import org.gnucash.android.app.GnuCashApplication;
+import org.gnucash.android.app.MenuFragment;
 import org.gnucash.android.databinding.FragmentAccountFormBinding;
 import org.gnucash.android.db.DatabaseSchema;
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
@@ -63,10 +65,8 @@ import org.gnucash.android.db.adapter.DatabaseAdapter;
 import org.gnucash.android.model.Account;
 import org.gnucash.android.model.AccountType;
 import org.gnucash.android.model.Commodity;
-import org.gnucash.android.model.Money;
 import org.gnucash.android.ui.colorpicker.ColorPickerDialog;
 import org.gnucash.android.ui.common.UxArgument;
-import org.gnucash.android.ui.settings.PreferenceActivity;
 import org.gnucash.android.util.CommoditiesCursorAdapter;
 import org.gnucash.android.util.QualifiedAccountNameCursorAdapter;
 
@@ -84,7 +84,7 @@ import timber.log.Timber;
  * @author Ngewi Fet <ngewif@gmail.com>
  * @author Yongxin Wang <fefe.wyx@gmail.com>
  */
-public class AccountFormFragment extends Fragment implements FragmentResultListener {
+public class AccountFormFragment extends MenuFragment implements FragmentResultListener {
     /**
      * Accounts database adapter
      */
@@ -171,11 +171,9 @@ public class AccountFormFragment extends Fragment implements FragmentResultListe
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setHasOptionsMenu(true);
         mAccountsDbAdapter = AccountsDbAdapter.getInstance();
-
-        SharedPreferences sharedPrefs = PreferenceActivity.getActiveBookSharedPreferences();
-        mUseDoubleEntry = sharedPrefs.getBoolean(getString(R.string.key_use_double_entry), true);
+        mUseDoubleEntry = GnuCashApplication.isDoubleEntryEnabled();
+        mAccountUID = getArguments().getString(UxArgument.SELECTED_ACCOUNT_UID);
     }
 
     /**
@@ -185,6 +183,12 @@ public class AccountFormFragment extends Fragment implements FragmentResultListe
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         mBinding = FragmentAccountFormBinding.inflate(inflater, container, false);
+        return mBinding.getRoot();
+    }
+
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
 
         mBinding.inputAccountName.addTextChangedListener(new TextWatcher() {
             @Override
@@ -244,32 +248,19 @@ public class AccountFormFragment extends Fragment implements FragmentResultListe
             }
         });
 
-        return mBinding.getRoot();
-    }
-
-
-    /**
-     * Initializes the values of the views in the dialog
-     */
-    @Override
-    public void onActivityCreated(Bundle savedInstanceState) {
-        super.onActivityCreated(savedInstanceState);
-
         CommoditiesCursorAdapter commoditiesAdapter = new CommoditiesCursorAdapter(
-                getActivity(), android.R.layout.simple_spinner_item);
+            getActivity(), android.R.layout.simple_spinner_item);
         commoditiesAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
 
         mBinding.inputCurrencySpinner.setAdapter(commoditiesAdapter);
 
-
-        mAccountUID = getArguments().getString(UxArgument.SELECTED_ACCOUNT_UID);
-
-        ActionBar supportActionBar = ((AppCompatActivity) getActivity()).getSupportActionBar();
+        ActionBar actionBar = ((AppCompatActivity) requireActivity()).getSupportActionBar();
+        assert actionBar != null;
         if (mAccountUID != null) {
             mAccount = mAccountsDbAdapter.getSimpleRecord(mAccountUID);
-            supportActionBar.setTitle(R.string.title_edit_account);
+            actionBar.setTitle(R.string.title_edit_account);
         } else {
-            supportActionBar.setTitle(R.string.title_create_account);
+            actionBar.setTitle(R.string.title_create_account);
         }
 
         mRootAccountUID = mAccountsDbAdapter.getOrCreateGnuCashRootAccountUID();
@@ -288,7 +279,6 @@ public class AccountFormFragment extends Fragment implements FragmentResultListe
         } else {
             initializeViews();
         }
-
     }
 
     /**
@@ -320,8 +310,7 @@ public class AccountFormFragment extends Fragment implements FragmentResultListe
             mBinding.inputCurrencySpinner.setEnabled(false);
         }
 
-        mBinding.inputAccountName.setText(account.getName());
-        mBinding.inputAccountName.setSelection(mBinding.inputAccountName.getText().length());
+        setTextToEnd(mBinding.inputAccountName, account.getName());
         mBinding.inputAccountDescription.setText(account.getDescription());
 
         if (mUseDoubleEntry) {
@@ -353,10 +342,9 @@ public class AccountFormFragment extends Fragment implements FragmentResultListe
      * Initialize views with defaults for new account
      */
     private void initializeViews() {
-        setSelectedCurrency(Money.DEFAULT_CURRENCY_CODE);
+        setSelectedCurrency(Commodity.DEFAULT_COMMODITY.getCurrencyCode());
         mBinding.inputColorPicker.setBackgroundColor(Color.LTGRAY);
         mParentAccountUID = getArguments().getString(UxArgument.PARENT_ACCOUNT_UID);
-
 
         if (mParentAccountUID != null) {
             AccountType parentAccountType = mAccountsDbAdapter.getAccountType(mParentAccountUID);
@@ -397,6 +385,7 @@ public class AccountFormFragment extends Fragment implements FragmentResultListe
      */
     private void setSelectedCurrency(String currencyCode) {
         CommoditiesDbAdapter commodityDbAdapter = CommoditiesDbAdapter.getInstance();
+        if (commodityDbAdapter == null) return;
         long commodityId = commodityDbAdapter.getID(commodityDbAdapter.getCommodityUID(currencyCode));
         int position = 0;
         for (int i = 0; i < mBinding.inputCurrencySpinner.getCount(); i++) {
@@ -455,7 +444,7 @@ public class AccountFormFragment extends Fragment implements FragmentResultListe
      */
     private int[] getAccountColorOptions() {
         Resources res = getResources();
-        int colorDefault = ResourcesCompat.getColor(res, R.color.title_green, null);
+        int colorDefault = ContextCompat.getColor(requireContext(), R.color.title_green);
         TypedArray colorTypedArray = res.obtainTypedArray(R.array.account_colors);
         int colorLength = colorTypedArray.length();
         int[] colorOptions = new int[colorLength];
@@ -477,9 +466,9 @@ public class AccountFormFragment extends Fragment implements FragmentResultListe
         }
 
         ColorPickerDialog colorPickerDialogFragment = ColorPickerDialog.newInstance(
-                R.string.color_picker_default_title,
-                getAccountColorOptions(),
-                currentColor, 4, 12);
+            R.string.color_picker_default_title,
+            getAccountColorOptions(),
+            currentColor, 4, 12);
         fragmentManager.setFragmentResultListener(COLOR_PICKER_DIALOG_TAG, this, this);
         colorPickerDialogFragment.show(fragmentManager, COLOR_PICKER_DIALOG_TAG);
     }
@@ -519,19 +508,19 @@ public class AccountFormFragment extends Fragment implements FragmentResultListe
      */
     private void loadDefaultTransferAccountList() {
         String condition = DatabaseSchema.AccountEntry.COLUMN_UID + " != '" + mAccountUID + "' " //when creating a new account mAccountUID is null, so don't use whereArgs
-                + " AND " + DatabaseSchema.AccountEntry.COLUMN_PLACEHOLDER + "=0"
-                + " AND " + DatabaseSchema.AccountEntry.COLUMN_HIDDEN + "=0"
-                + " AND " + DatabaseSchema.AccountEntry.COLUMN_TYPE + " != ?";
+            + " AND " + DatabaseSchema.AccountEntry.COLUMN_PLACEHOLDER + "=0"
+            + " AND " + DatabaseSchema.AccountEntry.COLUMN_HIDDEN + "=0"
+            + " AND " + DatabaseSchema.AccountEntry.COLUMN_TYPE + " != ?";
 
         Cursor defaultTransferAccountCursor = mAccountsDbAdapter.fetchAccountsOrderedByFullName(condition,
-                new String[]{AccountType.ROOT.name()});
+            new String[]{AccountType.ROOT.name()});
 
         if (mBinding.inputDefaultTransferAccount.getCount() <= 0) {
             setDefaultTransferAccountInputsVisible(false);
         }
 
         mDefaultTransferAccountCursorAdapter = new QualifiedAccountNameCursorAdapter(getActivity(),
-                defaultTransferAccountCursor);
+            defaultTransferAccountCursor);
         mBinding.inputDefaultTransferAccount.setAdapter(mDefaultTransferAccountCursorAdapter);
     }
 
@@ -543,7 +532,7 @@ public class AccountFormFragment extends Fragment implements FragmentResultListe
      */
     private void loadParentAccountList(AccountType accountType) {
         String condition = DatabaseSchema.SplitEntry.COLUMN_TYPE + " IN ("
-                + getAllowedParentAccountTypes(accountType) + ") AND " + DatabaseSchema.AccountEntry.COLUMN_HIDDEN + "!=1 ";
+            + getAllowedParentAccountTypes(accountType) + ") AND " + DatabaseSchema.AccountEntry.COLUMN_HIDDEN + "!=1 ";
 
         if (mAccount != null) {  //if editing an account
             mDescendantAccountUIDs = mAccountsDbAdapter.getDescendantAccountUIDs(mAccount.getUID(), null, null);
@@ -553,7 +542,7 @@ public class AccountFormFragment extends Fragment implements FragmentResultListe
                 descendantAccountUIDs.add(rootAccountUID);
             // limit cyclic account hierarchies.
             condition += " AND (" + DatabaseSchema.AccountEntry.COLUMN_UID + " NOT IN ( '"
-                    + TextUtils.join("','", descendantAccountUIDs) + "','" + mAccountUID + "' ) )";
+                + TextUtils.join("','", descendantAccountUIDs) + "','" + mAccountUID + "' ) )";
         }
 
         //if we are reloading the list, close the previous cursor first
@@ -573,7 +562,7 @@ public class AccountFormFragment extends Fragment implements FragmentResultListe
         }
 
         mParentAccountCursorAdapter = new QualifiedAccountNameCursorAdapter(
-                getActivity(), mParentAccountCursor);
+            getActivity(), mParentAccountCursor);
         mBinding.inputParentAccount.setAdapter(mParentAccountCursorAdapter);
     }
 
@@ -642,7 +631,7 @@ public class AccountFormFragment extends Fragment implements FragmentResultListe
     private void loadAccountTypesList() {
         String[] accountTypes = getResources().getStringArray(R.array.account_type_entry_values);
         ArrayAdapter<String> accountTypesAdapter = new ArrayAdapter<>(
-                getActivity(), android.R.layout.simple_list_item_1, accountTypes);
+            getActivity(), android.R.layout.simple_spinner_item, accountTypes);
 
         accountTypesAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         mBinding.inputAccountTypeSpinner.setAdapter(accountTypesAdapter);
@@ -655,7 +644,7 @@ public class AccountFormFragment extends Fragment implements FragmentResultListe
      */
     private void finishFragment() {
         InputMethodManager imm = (InputMethodManager) getActivity().getSystemService(
-                Context.INPUT_METHOD_SERVICE);
+            Context.INPUT_METHOD_SERVICE);
         imm.hideSoftInputFromWindow(mBinding.inputAccountName.getWindowToken(), 0);
 
         final String action = getActivity().getIntent().getAction();
@@ -726,7 +715,7 @@ public class AccountFormFragment extends Fragment implements FragmentResultListe
         mAccount.setParentUID(newParentAccountUID);
 
         if (mBinding.checkboxDefaultTransferAccount.isChecked()
-                && mBinding.inputDefaultTransferAccount.getSelectedItemId() != Spinner.INVALID_ROW_ID) {
+            && mBinding.inputDefaultTransferAccount.getSelectedItemId() != Spinner.INVALID_ROW_ID) {
             long id = mBinding.inputDefaultTransferAccount.getSelectedItemId();
             mAccount.setDefaultTransferAccountUID(mAccountsDbAdapter.getUID(id));
         } else {
@@ -743,7 +732,7 @@ public class AccountFormFragment extends Fragment implements FragmentResultListe
                 newAccountFullName = mAccount.getName();
             } else {
                 newAccountFullName = mAccountsDbAdapter.getAccountFullName(newParentAccountUID) +
-                        AccountsDbAdapter.ACCOUNT_NAME_SEPARATOR + mAccount.getName();
+                    AccountsDbAdapter.ACCOUNT_NAME_SEPARATOR + mAccount.getName();
             }
             mAccount.setFullName(newAccountFullName);
             if (mDescendantAccountUIDs != null) {
@@ -751,8 +740,8 @@ public class AccountFormFragment extends Fragment implements FragmentResultListe
                 if ((nameChanged || parentAccountId != newParentAccountId) && mDescendantAccountUIDs.size() > 0) {
                     // parent change, update all full names of descent accounts
                     accountsToUpdate.addAll(mAccountsDbAdapter.getSimpleAccountList(
-                            DatabaseSchema.AccountEntry.COLUMN_UID + " IN ('" +
-                                    TextUtils.join("','", mDescendantAccountUIDs) + "')", null, null
+                        DatabaseSchema.AccountEntry.COLUMN_UID + " IN ('" +
+                            TextUtils.join("','", mDescendantAccountUIDs) + "')", null, null
                     ));
                 }
                 Map<String, Account> mapAccount = new HashMap<>();
@@ -765,9 +754,9 @@ public class AccountFormFragment extends Fragment implements FragmentResultListe
                         acct.setFullName(mAccount.getFullName() + AccountsDbAdapter.ACCOUNT_NAME_SEPARATOR + acct.getName());
                     } else {
                         acct.setFullName(
-                                mapAccount.get(acct.getParentUID()).getFullName() +
-                                        AccountsDbAdapter.ACCOUNT_NAME_SEPARATOR +
-                                        acct.getName()
+                            mapAccount.get(acct.getParentUID()).getFullName() +
+                                AccountsDbAdapter.ACCOUNT_NAME_SEPARATOR +
+                                acct.getName()
                         );
                     }
                 }
