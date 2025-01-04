@@ -303,7 +303,7 @@ public class AccountsListFragment extends Fragment implements
     }
 
     private void recursivelyDuplicateAccounts(Account account, String newName, String parentAccountUID) {
-        Account duplicate = new Account(newName);
+        Account duplicate = new Account(account, newName);
         duplicate.setParentUID(parentAccountUID);
         mAccountsDbAdapter.addRecord(duplicate, DatabaseAdapter.UpdateMethod.insert);
         if (mAccountsDbAdapter.getSubAccountCount(account.getUID()) > 0) {

@@ -130,6 +130,35 @@ class Account : BaseModel {
     }
 
     /**
+     * Copy constructor.
+     * Creates a new Account object which is a clone of the parameter.
+     *
+     * **Note:** The unique ID of the transaction is not cloned if the parameter `generateNewUID`,
+     * is set to false. Otherwise, a new one is generated.<br />
+     * The export flag and the template flag are not copied from the old transaction to the new.
+     *
+     * @param that    Account to be cloned
+     * @param newName New name; copy from that if null
+     */
+    constructor(that: Account, newName: String? = null) {
+        if (newName != null) {
+            setName(newName)
+        } else {
+            this.name = that.name
+        }
+        this.fullName = this.name
+
+        this.parentUID = that.parentUID
+        this.color = that.color
+        this.commodity = that.commodity
+        accountType = that.accountType
+        description = that.description
+        setHidden(that.isHidden())
+        setPlaceHolderFlag(that._isPlaceholderAccount)
+        setDefaultTransferAccountUID(that.getDefaultTransferAccountUID())
+    }
+
+    /**
      * Sets the name of the account
      *
      * @param name String name of the account
