@@ -17,8 +17,6 @@
 
 package org.gnucash.android.ui.report.piechart;
 
-import static com.github.mikephil.charting.components.Legend.LegendForm;
-import static com.github.mikephil.charting.components.Legend.LegendPosition;
 import static org.gnucash.android.util.ColorExtKt.getTextColorPrimary;
 
 import android.content.Context;
@@ -34,6 +32,7 @@ import androidx.annotation.ColorInt;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.github.mikephil.charting.components.Legend;
 import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.PieData;
 import com.github.mikephil.charting.data.PieDataSet;
@@ -84,12 +83,11 @@ public class PieChartFragment extends BaseReportFragment {
         mBinding.pieChart.setCenterTextSize(CENTER_TEXT_SIZE);
         mBinding.pieChart.setDescription("");
         mBinding.pieChart.setOnChartValueSelectedListener(this);
-        mBinding.pieChart.getLegend().setForm(LegendForm.CIRCLE);
-        mBinding.pieChart.getLegend().setWordWrapEnabled(true);
-        mBinding.pieChart.getLegend().setPosition(LegendPosition.RIGHT_OF_CHART_INSIDE);
-        mBinding.pieChart.getLegend().setTextColor(textColorPrimary);
         mBinding.pieChart.setHoleColor(Color.TRANSPARENT);
         mBinding.pieChart.setCenterTextColor(textColorPrimary);
+        Legend legend = mBinding.pieChart.getLegend();
+        legend.setTextColor(textColorPrimary);
+        legend.setWordWrapEnabled(true);
     }
 
     @Override
@@ -108,7 +106,7 @@ public class PieChartFragment extends BaseReportFragment {
         PieData pieData = getData();
         if (pieData != null && pieData.getYValCount() != 0) {
             mChartDataPresent = true;
-            mBinding.pieChart.setData(mGroupSmallerSlices ? groupSmallerSlices(pieData, getActivity()) : pieData);
+            mBinding.pieChart.setData(mGroupSmallerSlices ? groupSmallerSlices(context, pieData) : pieData);
             float sum = mBinding.pieChart.getData().getYValueSum();
             String total = context.getString(R.string.label_chart_total);
             String currencySymbol = mCommodity.getSymbol();
@@ -146,11 +144,10 @@ public class PieChartFragment extends BaseReportFragment {
                     && !account.isPlaceholderAccount()
                     && account.getCommodity().equals(mCommodity)) {
 
-                double balance = mAccountsDbAdapter.getAccountsBalance(Collections.singletonList(account.getUID()),
-                        mReportPeriodStart, mReportPeriodEnd).toDouble();
+                float balance = mAccountsDbAdapter.getAccountBalance(account.getUID(), mReportPeriodStart, mReportPeriodEnd).toFloat();
                 if (balance > 0) {
-                    dataSet.addEntry(new Entry((float) balance, dataSet.getEntryCount()));
-                    int color;
+                    dataSet.addEntry(new Entry(balance, dataSet.getEntryCount()));
+                    @ColorInt int color;
                     if (mUseAccountColor) {
                         color = (account.getColor() != Account.DEFAULT_COLOR)
                                 ? account.getColor()
@@ -219,6 +216,7 @@ public class PieChartFragment extends BaseReportFragment {
 
     @Override
     public void onPrepareOptionsMenu(@NonNull Menu menu) {
+        super.onPrepareOptionsMenu(menu);
         menu.findItem(R.id.menu_order_by_size).setVisible(mChartDataPresent);
         menu.findItem(R.id.menu_toggle_labels).setVisible(mChartDataPresent);
         menu.findItem(R.id.menu_group_other_slice).setVisible(mChartDataPresent);
@@ -263,12 +261,12 @@ public class PieChartFragment extends BaseReportFragment {
     /**
      * Groups smaller slices. All smaller slices will be combined and displayed as a single "Other".
      *
-     * @param data    the pie data which smaller slices will be grouped
      * @param context Context for retrieving resources
+     * @param data    the pie data which smaller slices will be grouped
      * @return a {@code PieData} instance with combined smaller slices
      */
     @NonNull
-    public static PieData groupSmallerSlices(@NonNull PieData data, Context context) {
+    public static PieData groupSmallerSlices(@NonNull Context context, @NonNull PieData data) {
         float otherSlice = 0f;
         List<Entry> newEntries = new ArrayList<>();
         List<String> newLabels = new ArrayList<>();

@@ -113,11 +113,7 @@ public class CashFlowLineChartFragment extends BaseReportFragment {
         mBinding.lineChart.getAxisLeft().enableGridDashedLine(4.0f, 4.0f, 0);
         mBinding.lineChart.getAxisLeft().setValueFormatter(new LargeValueFormatter(mCommodity.getSymbol()));
         mBinding.lineChart.getAxisLeft().setTextColor(textColorPrimary);
-
         Legend legend = mBinding.lineChart.getLegend();
-        legend.setPosition(Legend.LegendPosition.BELOW_CHART_CENTER);
-        legend.setTextSize(16);
-        legend.setForm(Legend.LegendForm.CIRCLE);
         legend.setTextColor(textColorPrimary);
     }
 
@@ -361,6 +357,7 @@ public class CashFlowLineChartFragment extends BaseReportFragment {
 
     @Override
     public void onPrepareOptionsMenu(@NonNull Menu menu) {
+        super.onPrepareOptionsMenu(menu);
         menu.findItem(R.id.menu_toggle_average_lines).setVisible(mChartDataPresent);
         // hide pie/bar chart specific menu items
         menu.findItem(R.id.menu_order_by_size).setVisible(false);

@@ -103,6 +103,8 @@ public class SplitsDbAdapter extends DatabaseAdapter<Split> {
         stmt.clearBindings();
         if (split.getMemo() != null) {
             stmt.bindString(1, split.getMemo());
+        } else {
+            stmt.bindNull(1);
         }
         stmt.bindString(2, split.getType().name());
         stmt.bindLong(3, split.getValue().getNumerator());
@@ -190,11 +192,10 @@ public class SplitsDbAdapter extends DatabaseAdapter<Split> {
 
     private Money calculateSplitBalance(List<String> accountUIDList, String currencyCode, boolean hasDebitNormalBalance,
                                         long startTimestamp, long endTimestamp) {
-        if (accountUIDList.size() == 0) {
-            return new Money("0", currencyCode);
+        if (accountUIDList.isEmpty()) {
+            return Money.createZeroInstance(currencyCode);
         }
 
-        Cursor cursor;
         String[] selectionArgs = null;
         String selection = DatabaseSchema.AccountEntry.TABLE_NAME + "_" + DatabaseSchema.CommonColumns.COLUMN_UID + " in ( '" + TextUtils.join("' , '", accountUIDList) + "' ) AND " +
                 TransactionEntry.TABLE_NAME + "_" + TransactionEntry.COLUMN_TEMPLATE + " = 0";
@@ -210,12 +211,12 @@ public class SplitsDbAdapter extends DatabaseAdapter<Split> {
             selectionArgs = new String[]{String.valueOf(startTimestamp)};
         }
 
-        cursor = mDb.query("trans_split_acct",
-                new String[]{"TOTAL ( CASE WHEN " + SplitEntry.TABLE_NAME + "_" + SplitEntry.COLUMN_TYPE + " = 'DEBIT' THEN " +
-                        SplitEntry.TABLE_NAME + "_" + SplitEntry.COLUMN_QUANTITY_NUM + " ELSE - " +
-                        SplitEntry.TABLE_NAME + "_" + SplitEntry.COLUMN_QUANTITY_NUM + " END )",
-                        SplitEntry.TABLE_NAME + "_" + SplitEntry.COLUMN_QUANTITY_DENOM,
-                        DatabaseSchema.AccountEntry.TABLE_NAME + "_" + DatabaseSchema.AccountEntry.COLUMN_CURRENCY},
+        String[] columns = new String[]{"TOTAL ( CASE WHEN " + SplitEntry.TABLE_NAME + "_" + SplitEntry.COLUMN_TYPE + " = 'DEBIT' THEN " +
+            SplitEntry.TABLE_NAME + "_" + SplitEntry.COLUMN_QUANTITY_NUM + " ELSE - " +
+            SplitEntry.TABLE_NAME + "_" + SplitEntry.COLUMN_QUANTITY_NUM + " END )",
+            SplitEntry.TABLE_NAME + "_" + SplitEntry.COLUMN_QUANTITY_DENOM,
+            DatabaseSchema.AccountEntry.TABLE_NAME + "_" + DatabaseSchema.AccountEntry.COLUMN_CURRENCY};
+        Cursor cursor = mDb.query("trans_split_acct", columns,
                 selection, selectionArgs, DatabaseSchema.AccountEntry.TABLE_NAME + "_" + DatabaseSchema.AccountEntry.COLUMN_CURRENCY, null, null);
 
         try {
@@ -242,7 +243,7 @@ public class SplitsDbAdapter extends DatabaseAdapter<Split> {
                     // there is a second currency involved
                     if (commoditiesDbAdapter == null) {
                         commoditiesDbAdapter = new CommoditiesDbAdapter(mDb);
-                        pricesDbAdapter = new PricesDbAdapter(mDb);
+                        pricesDbAdapter = new PricesDbAdapter(mDb, commoditiesDbAdapter);
                         commodity = commoditiesDbAdapter.getCommodity(currencyCode);
                         currencyUID = commoditiesDbAdapter.getCommodityUID(currencyCode);
                     }

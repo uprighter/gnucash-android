@@ -45,12 +45,10 @@ import org.gnucash.android.databinding.FragmentScheduledEventsListBinding;
 import org.gnucash.android.databinding.ListItemScheduledTrxnBinding;
 import org.gnucash.android.db.adapter.ScheduledActionDbAdapter;
 import org.gnucash.android.model.ScheduledAction;
-import org.gnucash.android.ui.common.FormActivity;
 import org.gnucash.android.ui.common.Refreshable;
-import org.gnucash.android.ui.common.UxArgument;
 import org.gnucash.android.ui.util.CursorRecyclerAdapter;
 import org.gnucash.android.util.BackupManager;
-import org.joda.time.format.DateTimeFormat;
+import org.gnucash.android.util.DateExtKt;
 
 import timber.log.Timber;
 
@@ -110,19 +108,6 @@ public abstract class ScheduledActionsListFragment extends MenuFragment implemen
     public void onDestroy() {
         getLoaderManager().destroyLoader(0);
         super.onDestroy();
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
-        switch (item.getItemId()) {
-            case R.id.menu_create:
-                Intent intent = new Intent(getActivity(), FormActivity.class);
-                intent.putExtra(UxArgument.FORM_TYPE, FormActivity.FormType.EXPORT.name());
-                startActivityForResult(intent, 0x1);
-                return true;
-            default:
-                return super.onOptionsItemSelected(item);
-        }
     }
 
     @Override
@@ -232,7 +217,7 @@ public abstract class ScheduledActionsListFragment extends MenuFragment implemen
                 }
                 return context.getString(R.string.label_scheduled_action,
                     period,
-                    DateTimeFormat.shortDateTime().print(lastTime));
+                    DateExtKt.formatMediumDateTime(lastTime));
             }
             return scheduledAction.getRepeatString(context);
         }

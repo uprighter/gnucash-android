@@ -17,7 +17,81 @@
 
 package org.gnucash.android.importer;
 
-import static org.gnucash.android.export.xml.GncXmlHelper.*;
+import static org.gnucash.android.export.xml.GncXmlHelper.ATTR_KEY_TYPE;
+import static org.gnucash.android.export.xml.GncXmlHelper.ATTR_VALUE_FRAME;
+import static org.gnucash.android.export.xml.GncXmlHelper.ATTR_VALUE_NUMERIC;
+import static org.gnucash.android.export.xml.GncXmlHelper.COMMODITY_CURRENCY;
+import static org.gnucash.android.export.xml.GncXmlHelper.COMMODITY_ISO4217;
+import static org.gnucash.android.export.xml.GncXmlHelper.KEY_COLOR;
+import static org.gnucash.android.export.xml.GncXmlHelper.KEY_CREDIT_NUMERIC;
+import static org.gnucash.android.export.xml.GncXmlHelper.KEY_DEBIT_NUMERIC;
+import static org.gnucash.android.export.xml.GncXmlHelper.KEY_DEFAULT_TRANSFER_ACCOUNT;
+import static org.gnucash.android.export.xml.GncXmlHelper.KEY_EXPORTED;
+import static org.gnucash.android.export.xml.GncXmlHelper.KEY_FAVORITE;
+import static org.gnucash.android.export.xml.GncXmlHelper.KEY_NOTES;
+import static org.gnucash.android.export.xml.GncXmlHelper.KEY_PLACEHOLDER;
+import static org.gnucash.android.export.xml.GncXmlHelper.KEY_SPLIT_ACCOUNT_SLOT;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_ACCOUNT;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_ACCT_COMMODITY;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_ACCT_DESCRIPTION;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_ACCT_ID;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_ACCT_NAME;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_ACCT_PARENT;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_ACCT_TYPE;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_BUDGET;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_BUDGET_DESCRIPTION;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_BUDGET_NAME;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_BUDGET_NUM_PERIODS;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_BUDGET_RECURRENCE;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_BUDGET_SLOTS;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_COMMODITY;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_COMMODITY_FRACTION;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_COMMODITY_ID;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_COMMODITY_NAME;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_COMMODITY_QUOTE_SOURCE;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_COMMODITY_QUOTE_TZ;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_COMMODITY_SPACE;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_COMMODITY_XCODE;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_DATE_ENTERED;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_DATE_POSTED;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_GDATE;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_GNC_RECURRENCE;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_PRICE;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_PRICE_COMMODITY;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_PRICE_CURRENCY;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_PRICE_ID;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_PRICE_SOURCE;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_PRICE_TYPE;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_PRICE_VALUE;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_RECURRENCE_PERIOD;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_RX_MULT;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_RX_PERIOD_TYPE;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_RX_START;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_RX_WEEKEND_ADJ;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_SCHEDULED_ACTION;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_SLOT;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_SLOT_KEY;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_SLOT_VALUE;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_SPLIT_ACCOUNT;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_SPLIT_ID;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_SPLIT_MEMO;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_SPLIT_QUANTITY;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_SPLIT_VALUE;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_SX_AUTO_CREATE;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_SX_ENABLED;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_SX_END;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_SX_ID;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_SX_LAST;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_SX_NAME;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_SX_NUM_OCCUR;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_SX_START;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_SX_TEMPL_ACCOUNT;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_TEMPLATE_TRANSACTIONS;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_TRANSACTION;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_TRN_DESCRIPTION;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_TRN_SPLIT;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_TRX_ID;
+import static org.gnucash.android.export.xml.GncXmlHelper.TAG_TS_DATE;
 import static org.gnucash.android.export.xml.GncXmlHelper.parseDate;
 import static org.gnucash.android.export.xml.GncXmlHelper.parseDateTime;
 import static org.gnucash.android.export.xml.GncXmlHelper.parseSplitAmount;
@@ -276,7 +350,7 @@ public class GncXmlHandler extends DefaultHandler implements Closeable {
         RecurrenceDbAdapter recurrenceDbAdapter = new RecurrenceDbAdapter(mDB);
         mScheduledActionsDbAdapter = new ScheduledActionDbAdapter(mDB, recurrenceDbAdapter);
         mCommoditiesDbAdapter = new CommoditiesDbAdapter(mDB);
-        mPricesDbAdapter = new PricesDbAdapter(mDB);
+        mPricesDbAdapter = new PricesDbAdapter(mDB, mCommoditiesDbAdapter);
         mBudgetsDbAdapter = new BudgetsDbAdapter(mDB, new BudgetAmountsDbAdapter(mDB), recurrenceDbAdapter);
 
         mContent = new StringBuilder();
@@ -427,6 +501,7 @@ public class GncXmlHandler extends DefaultHandler implements Closeable {
                 }
                 if (mPrice != null) {
                     Commodity commodity = getCommodity(mCommoditySpace, mCommodityId);
+                    if (commodity == null) break;
                     if (mPriceCommodity) {
                         mPrice.setCommodity(commodity);
                         mPriceCommodity = false;
@@ -478,11 +553,9 @@ public class GncXmlHandler extends DefaultHandler implements Closeable {
                             + "' currency code not found in the database for account " + mAccount.getUID());
                     }
                     String currencyId = commodity.getCurrencyCode();
-                    if (mCurrencyCount.containsKey(currencyId)) {
-                        mCurrencyCount.put(currencyId, mCurrencyCount.get(currencyId) + 1);
-                    } else {
-                        mCurrencyCount.put(currencyId, 1);
-                    }
+                    Integer currencyCount = mCurrencyCount.get(currencyId);
+                    if (currencyCount == null) currencyCount = 0;
+                    mCurrencyCount.put(currencyId, currencyCount + 1);
                 }
                 break;
             case TAG_ACCT_PARENT:
@@ -907,7 +980,7 @@ public class GncXmlHandler extends DefaultHandler implements Closeable {
             String currencyCode = split.getAccountUID();
             Account imbAccount = mapImbalanceAccount.get(currencyCode);
             if (imbAccount == null) {
-                imbAccount = new Account(imbalancePrefix + currencyCode, mCommoditiesDbAdapter.getCommodity(currencyCode));
+                imbAccount = new Account(imbalancePrefix + currencyCode, getCommodity(Commodity.COMMODITY_CURRENCY, currencyCode));
                 imbAccount.setParentUID(mRootAccount.getUID());
                 imbAccount.setAccountType(AccountType.BANK);
                 mapImbalanceAccount.put(currencyCode, imbAccount);
@@ -916,7 +989,7 @@ public class GncXmlHandler extends DefaultHandler implements Closeable {
             split.setAccountUID(imbAccount.getUID());
         }
 
-        java.util.Stack<Account> stack = new Stack<>();
+        Stack<Account> stack = new Stack<>();
         for (Account account : mAccountList) {
             if (mapFullName.get(account.getUID()) != null) {
                 continue;
@@ -1169,8 +1242,11 @@ public class GncXmlHandler extends DefaultHandler implements Closeable {
                 commoditiesById = mCommodities.get(Commodity.COMMODITY_CURRENCY);
             }
         }
-        if (commoditiesById == null) return null;
-        return commoditiesById.get(id);
+        if (commoditiesById != null) {
+            Commodity commodity = commoditiesById.get(id);
+            if (commodity != null) return commodity;
+        }
+        return mCommoditiesDbAdapter.getCommodity(id);
     }
 
     @Nullable
@@ -1181,6 +1257,9 @@ public class GncXmlHandler extends DefaultHandler implements Closeable {
         String id = commodity.getMnemonic();
         if (TextUtils.isEmpty(id)) return null;
         if (TEMPLATE.equals(id)) return null;
+
+        // Already a database record?
+        if (commodity.id != 0L) return null;
 
         Map<String, Commodity> commoditiesById = mCommodities.get(space);
         if (commoditiesById == null) {
