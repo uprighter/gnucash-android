@@ -164,6 +164,7 @@ public class TransactionsListFragment extends MenuFragment implements
      */
     @Override
     public void refresh() {
+        if (isDetached() || getFragmentManager() == null) return;
         getLoaderManager().restartLoader(0, null, this);
     }
 
