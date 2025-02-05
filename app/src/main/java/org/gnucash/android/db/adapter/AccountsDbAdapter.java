@@ -882,7 +882,6 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
         Timber.d("all account list : %d", accountsList.size());
         SplitsDbAdapter splitsDbAdapter = mTransactionsAdapter.getSplitDbAdapter();
         return splitsDbAdapter.computeSplitBalance(accountsList, currencyCode, hasDebitNormalBalance, startTimestamp, endTimestamp);
-
     }
 
     /**
