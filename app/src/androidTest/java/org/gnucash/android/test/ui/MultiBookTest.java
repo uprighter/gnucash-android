@@ -26,15 +26,16 @@ import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withParent;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.gnucash.android.test.ui.AccountsActivityTest.preventFirstRunDialogs;
 import static org.hamcrest.Matchers.allOf;
 
 import android.Manifest;
+import android.content.Context;
 
 import androidx.test.espresso.contrib.DrawerActions;
 import androidx.test.espresso.intent.Intents;
 import androidx.test.espresso.intent.rule.IntentsTestRule;
 import androidx.test.rule.GrantPermissionRule;
-import androidx.test.ext.junit.runners.AndroidJUnit4;
 
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
@@ -47,13 +48,11 @@ import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.Rule;
 import org.junit.Test;
-import org.junit.runner.RunWith;
 
 /**
  * Test support for multiple books in the application
  */
-@RunWith(AndroidJUnit4.class)
-public class MultiBookTest {
+public class MultiBookTest extends GnuAndroidTest {
 
     private static BooksDbAdapter mBooksDbAdapter;
 
@@ -68,6 +67,8 @@ public class MultiBookTest {
 
     @BeforeClass
     public static void prepTestCase() {
+        Context context = GnuCashApplication.getAppContext();
+        preventFirstRunDialogs(context);
         mBooksDbAdapter = BooksDbAdapter.getInstance();
     }
 
@@ -149,13 +150,5 @@ public class MultiBookTest {
         onView(withText(R.string.btn_delete_book)).perform(click());
 
         assertThat(mBooksDbAdapter.getRecordsCount()).isEqualTo(bookCount);
-    }
-
-    private static void sleep(long millis) {
-        try {
-            Thread.sleep(millis);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
     }
 }

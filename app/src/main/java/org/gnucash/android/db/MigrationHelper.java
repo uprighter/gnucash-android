@@ -16,6 +16,11 @@
 
 package org.gnucash.android.db;
 
+import static org.gnucash.android.db.DatabaseHelper.createResetBalancesTriggers;
+import static org.gnucash.android.db.DatabaseSchema.AccountEntry;
+import static org.gnucash.android.db.DatabaseSchema.BudgetAmountEntry;
+import static org.gnucash.android.db.DatabaseSchema.CommodityEntry;
+
 import android.database.sqlite.SQLiteDatabase;
 
 import org.gnucash.android.R;
@@ -66,6 +71,12 @@ public class MigrationHelper {
         if (oldVersion < 16) {
             migrateTo16(db);
         }
+        if (oldVersion < 17) {
+            migrateTo17(db);
+        }
+        if (oldVersion < 18) {
+            migrateTo18(db);
+        }
     }
 
     /**
@@ -76,18 +87,50 @@ public class MigrationHelper {
     private static void migrateTo16(SQLiteDatabase db) {
         Timber.i("Upgrading database to version 16");
 
-        String sqlAddQuoteSource = "ALTER TABLE " + DatabaseSchema.CommodityEntry.TABLE_NAME +
-            " ADD COLUMN " + DatabaseSchema.CommodityEntry.COLUMN_QUOTE_SOURCE + " varchar(255)";
-        String sqlAddQuoteTZ = "ALTER TABLE " + DatabaseSchema.CommodityEntry.TABLE_NAME +
-            " ADD COLUMN " + DatabaseSchema.CommodityEntry.COLUMN_QUOTE_TZ + " varchar(100)";
+        String sqlAddQuoteSource = "ALTER TABLE " + CommodityEntry.TABLE_NAME +
+            " ADD COLUMN " + CommodityEntry.COLUMN_QUOTE_SOURCE + " varchar(255)";
+        String sqlAddQuoteTZ = "ALTER TABLE " + CommodityEntry.TABLE_NAME +
+            " ADD COLUMN " + CommodityEntry.COLUMN_QUOTE_TZ + " varchar(100)";
 
-        try {
-            db.beginTransaction();
-            db.execSQL(sqlAddQuoteSource);
-            db.execSQL(sqlAddQuoteTZ);
-            db.setTransactionSuccessful();
-        } finally {
-            db.endTransaction();
-        }
+        db.execSQL(sqlAddQuoteSource);
+        db.execSQL(sqlAddQuoteTZ);
+    }
+
+    /**
+     * Upgrade the database to version 17.
+     *
+     * @param db the database.
+     */
+    private static void migrateTo17(SQLiteDatabase db) {
+        Timber.i("Upgrading database to version 17");
+
+        String sqlAddBudgetNotes = "ALTER TABLE " + BudgetAmountEntry.TABLE_NAME +
+            " ADD COLUMN " + BudgetAmountEntry.COLUMN_NOTES + " text";
+
+        db.execSQL(sqlAddBudgetNotes);
+    }
+
+    /**
+     * Upgrade the database to version 18.
+     *
+     * @param db the database.
+     */
+    private static void migrateTo18(SQLiteDatabase db) {
+        Timber.i("Upgrading database to version 18");
+
+        String sqlAddBalance = "ALTER TABLE " + AccountEntry.TABLE_NAME
+            + " ADD COLUMN " + AccountEntry.COLUMN_BALANCE + " varchar(255)";
+        String sqlAddClearedBalance = "ALTER TABLE " + AccountEntry.TABLE_NAME
+            + " ADD COLUMN " + AccountEntry.COLUMN_CLEARED_BALANCE + " varchar(255)";
+        String sqlAddNoClosingBalance = "ALTER TABLE " + AccountEntry.TABLE_NAME
+            + " ADD COLUMN " + AccountEntry.COLUMN_NOCLOSING_BALANCE + " varchar(255)";
+        String sqlAddReconciledBalance = "ALTER TABLE " + AccountEntry.TABLE_NAME
+            + " ADD COLUMN " + AccountEntry.COLUMN_RECONCILED_BALANCE + " varchar(255)";
+
+        db.execSQL(sqlAddBalance);
+        db.execSQL(sqlAddClearedBalance);
+        db.execSQL(sqlAddNoClosingBalance);
+        db.execSQL(sqlAddReconciledBalance);
+        createResetBalancesTriggers(db);
     }
 }

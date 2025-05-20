@@ -54,9 +54,9 @@ public class BalanceSheetFragment extends BaseReportFragment {
 
     private Money mAssetsBalance;
     private Money mLiabilitiesBalance;
-    private List<AccountType> mAssetAccountTypes;
-    private List<AccountType> mLiabilityAccountTypes;
-    private List<AccountType> mEquityAccountTypes;
+    private final List<AccountType> mAssetAccountTypes = new ArrayList<>();
+    private final List<AccountType> mLiabilityAccountTypes = new ArrayList<>();
+    private final List<AccountType> mEquityAccountTypes = new ArrayList<>();
 
     private FragmentTextReportBinding mBinding;
     @ColorInt
@@ -71,22 +71,23 @@ public class BalanceSheetFragment extends BaseReportFragment {
 
     @Override
     public ReportType getReportType() {
-        return ReportType.TEXT;
+        return ReportType.SHEET;
     }
 
     @Override
-    public void onActivityCreated(@Nullable Bundle savedInstanceState) {
-        super.onActivityCreated(savedInstanceState);
-        mAssetAccountTypes = new ArrayList<>();
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        mAssetAccountTypes.clear();
         mAssetAccountTypes.add(AccountType.ASSET);
         mAssetAccountTypes.add(AccountType.CASH);
         mAssetAccountTypes.add(AccountType.BANK);
 
-        mLiabilityAccountTypes = new ArrayList<>();
+        mLiabilityAccountTypes.clear();
         mLiabilityAccountTypes.add(AccountType.LIABILITY);
         mLiabilityAccountTypes.add(AccountType.CREDIT);
 
-        mEquityAccountTypes = new ArrayList<>();
+        mEquityAccountTypes.clear();
         mEquityAccountTypes.add(AccountType.EQUITY);
     }
 
@@ -102,8 +103,8 @@ public class BalanceSheetFragment extends BaseReportFragment {
 
     @Override
     protected void generateReport(@NonNull Context context) {
-        mAssetsBalance = mAccountsDbAdapter.getAccountBalance(mAssetAccountTypes, -1, System.currentTimeMillis());
-        mLiabilitiesBalance = mAccountsDbAdapter.getAccountBalance(mLiabilityAccountTypes, -1, System.currentTimeMillis());
+        mAssetsBalance = mAccountsDbAdapter.getCurrentAccountsBalance(mAssetAccountTypes);
+        mLiabilitiesBalance = mAccountsDbAdapter.getCurrentAccountsBalance(mLiabilityAccountTypes);
     }
 
     @Override
@@ -128,7 +129,9 @@ public class BalanceSheetFragment extends BaseReportFragment {
      * @param tableLayout  Table layout into which to load the rows
      */
     private void loadAccountViews(List<AccountType> accountTypes, TableLayout tableLayout) {
-        LayoutInflater inflater = LayoutInflater.from(getActivity());
+        Context context = tableLayout.getContext();
+        LayoutInflater inflater = LayoutInflater.from(context);
+        tableLayout.removeAllViews();
 
         // FIXME move this to generateReport
         Cursor cursor = mAccountsDbAdapter.fetchAccounts(DatabaseSchema.AccountEntry.COLUMN_TYPE

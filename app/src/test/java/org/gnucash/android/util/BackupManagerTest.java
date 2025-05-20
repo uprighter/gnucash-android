@@ -2,6 +2,8 @@ package org.gnucash.android.util;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import android.content.Context;
+
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
 import org.gnucash.android.db.adapter.BooksDbAdapter;
@@ -15,6 +17,8 @@ import java.io.IOException;
 
 import javax.xml.parsers.ParserConfigurationException;
 
+import timber.log.Timber;
+
 public class BackupManagerTest extends GnuCashTest {
     private BooksDbAdapter mBooksDbAdapter;
 
@@ -27,6 +31,7 @@ public class BackupManagerTest extends GnuCashTest {
 
     @Test
     public void backupAllBooks() throws Exception {
+        Context context = GnuCashApplication.getAppContext();
         String activeBookUID = createNewBookWithDefaultAccounts();
         BookUtils.activateBook(activeBookUID);
         createNewBookWithDefaultAccounts();
@@ -35,28 +40,30 @@ public class BackupManagerTest extends GnuCashTest {
         BackupManager.backupAllBooks();
 
         for (String bookUID : mBooksDbAdapter.getAllBookUIDs()) {
-            assertThat(BackupManager.getBackupList(bookUID).size()).isEqualTo(1);
+            assertThat(BackupManager.getBackupList(context, bookUID).size()).isEqualTo(1);
         }
     }
 
     @Test
     public void getBackupList() throws Exception {
+        Context context = GnuCashApplication.getAppContext();
         String bookUID = createNewBookWithDefaultAccounts();
         BookUtils.activateBook(bookUID);
 
-        BackupManager.backupActiveBook();
+        assertThat(BackupManager.backupActiveBook()).isTrue();
         Thread.sleep(1000); // FIXME: Use Mockito to get a different date in Exporter.buildExportFilename
-        BackupManager.backupActiveBook();
+        assertThat(BackupManager.backupActiveBook()).isTrue();
 
-        assertThat(BackupManager.getBackupList(bookUID).size()).isEqualTo(2);
+        assertThat(BackupManager.getBackupList(context, bookUID).size()).isEqualTo(2);
     }
 
     @Test
     public void whenNoBackupsHaveBeenDone_shouldReturnEmptyBackupList() {
+        Context context = GnuCashApplication.getAppContext();
         String bookUID = createNewBookWithDefaultAccounts();
         BookUtils.activateBook(bookUID);
 
-        assertThat(BackupManager.getBackupList(bookUID)).isEmpty();
+        assertThat(BackupManager.getBackupList(context, bookUID)).isEmpty();
     }
 
     /**
@@ -67,9 +74,10 @@ public class BackupManagerTest extends GnuCashTest {
      */
     private String createNewBookWithDefaultAccounts() {
         try {
-            return GncXmlImporter.parse(GnuCashApplication.getAppContext().getResources().openRawResource(R.raw.default_accounts));
+            Context context = GnuCashApplication.getAppContext();
+            return GncXmlImporter.parse(context, context.getResources().openRawResource(R.raw.default_accounts));
         } catch (ParserConfigurationException | SAXException | IOException e) {
-            e.printStackTrace();
+            Timber.e(e);
             throw new RuntimeException("Could not create default accounts");
         }
     }

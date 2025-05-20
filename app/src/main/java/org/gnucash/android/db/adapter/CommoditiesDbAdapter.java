@@ -11,8 +11,9 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import org.gnucash.android.app.GnuCashApplication;
-import org.gnucash.android.db.DatabaseSchema;
 import org.gnucash.android.model.Commodity;
+
+import java.util.Objects;
 
 import timber.log.Timber;
 
@@ -20,12 +21,13 @@ import timber.log.Timber;
  * Database adapter for {@link org.gnucash.android.model.Commodity}
  */
 public class CommoditiesDbAdapter extends DatabaseAdapter<Commodity> {
+    private Commodity defaultCommodity;
     /**
      * Opens the database adapter with an existing database
      *
      * @param db SQLiteDatabase object
      */
-    public CommoditiesDbAdapter(SQLiteDatabase db) {
+    public CommoditiesDbAdapter(@NonNull SQLiteDatabase db) {
         this(db, true);
     }
 
@@ -35,7 +37,7 @@ public class CommoditiesDbAdapter extends DatabaseAdapter<Commodity> {
      * @param db         SQLiteDatabase object
      * @param initCommon initialize commonly used commodities?
      */
-    public CommoditiesDbAdapter(SQLiteDatabase db, boolean initCommon) {
+    public CommoditiesDbAdapter(@NonNull SQLiteDatabase db, boolean initCommon) {
         super(db, CommodityEntry.TABLE_NAME, new String[]{
             CommodityEntry.COLUMN_FULLNAME,
             CommodityEntry.COLUMN_NAMESPACE,
@@ -45,9 +47,11 @@ public class CommoditiesDbAdapter extends DatabaseAdapter<Commodity> {
             CommodityEntry.COLUMN_SMALLEST_FRACTION,
             CommodityEntry.COLUMN_QUOTE_SOURCE,
             CommodityEntry.COLUMN_QUOTE_TZ
-        });
+        }, true);
         if (initCommon) {
             initCommon();
+        } else {
+            defaultCommodity = getDefaultCommodity();
         }
     }
 
@@ -55,15 +59,15 @@ public class CommoditiesDbAdapter extends DatabaseAdapter<Commodity> {
      * initialize commonly used commodities
      */
     public void initCommon() {
-        Commodity.USD = getCommodity("USD");
-        Commodity.EUR = getCommodity("EUR");
-        Commodity.GBP = getCommodity("GBP");
-        Commodity.CHF = getCommodity("CHF");
-        Commodity.CAD = getCommodity("CAD");
-        Commodity.JPY = getCommodity("JPY");
-        Commodity.AUD = getCommodity("AUD");
+        Commodity.AUD = Objects.requireNonNull(getCommodity("AUD"));
+        Commodity.CAD = Objects.requireNonNull(getCommodity("CAD"));
+        Commodity.CHF = Objects.requireNonNull(getCommodity("CHF"));
+        Commodity.EUR = Objects.requireNonNull(getCommodity("EUR"));
+        Commodity.GBP = Objects.requireNonNull(getCommodity("GBP"));
+        Commodity.JPY = Objects.requireNonNull(getCommodity("JPY"));
+        Commodity.USD = Objects.requireNonNull(getCommodity("USD"));
 
-        Commodity.DEFAULT_COMMODITY = getCommodity(GnuCashApplication.getDefaultCurrencyCode());
+        defaultCommodity = Commodity.DEFAULT_COMMODITY = getDefaultCommodity();
     }
 
     @Nullable
@@ -72,33 +76,24 @@ public class CommoditiesDbAdapter extends DatabaseAdapter<Commodity> {
     }
 
     @Override
-    protected @NonNull SQLiteStatement setBindings(@NonNull SQLiteStatement stmt, @NonNull final Commodity commodity) {
-        stmt.clearBindings();
+    protected @NonNull SQLiteStatement bind(@NonNull SQLiteStatement stmt, @NonNull final Commodity commodity) {
+        bindBaseModel(stmt, commodity);
         stmt.bindString(1, commodity.getFullname());
         stmt.bindString(2, commodity.getNamespace());
         stmt.bindString(3, commodity.getMnemonic());
         if (commodity.getLocalSymbol() != null) {
             stmt.bindString(4, commodity.getLocalSymbol());
-        } else {
-            stmt.bindNull(4);
         }
         if (commodity.getCusip() != null) {
             stmt.bindString(5, commodity.getCusip());
-        } else {
-            stmt.bindNull(5);
         }
         stmt.bindLong(6, commodity.getSmallestFraction());
         if (commodity.getQuoteSource() != null) {
             stmt.bindString(7, commodity.getQuoteSource());
-        } else {
-            stmt.bindNull(7);
         }
         if (commodity.getQuoteTimeZoneId() != null) {
             stmt.bindString(8, commodity.getQuoteTimeZoneId());
-        } else {
-            stmt.bindNull(8);
         }
-        stmt.bindString(9, commodity.getUID());
 
         return stmt;
     }
@@ -152,30 +147,69 @@ public class CommoditiesDbAdapter extends DatabaseAdapter<Commodity> {
         if (TextUtils.isEmpty(currencyCode)) {
             return null;
         }
-        Cursor cursor = fetchAllRecords(CommodityEntry.COLUMN_MNEMONIC + "=?", new String[]{currencyCode}, null);
-        Commodity commodity = null;
-        if (cursor.moveToNext()) {
-            commodity = buildModelInstance(cursor);
-        } else {
-            String msg = "Commodity not found in the database: " + currencyCode;
-            Timber.e(msg);
+        if (isCached) {
+            for (Commodity commodity : cache.values()) {
+                if (commodity.isCurrency() && commodity.getCurrencyCode().equals(currencyCode)) {
+                    return commodity;
+                }
+            }
         }
-        cursor.close();
-        return commodity;
-    }
-
-    public String getCurrencyCode(@NonNull String guid) {
-        Cursor cursor = mDb.query(mTableName, new String[]{CommodityEntry.COLUMN_MNEMONIC},
-            DatabaseSchema.CommonColumns.COLUMN_UID + " = ?", new String[]{guid},
-            null, null, null);
+        String where = CommodityEntry.COLUMN_MNEMONIC + "=?"
+            + " AND " + CommodityEntry.COLUMN_NAMESPACE + " IN ('" + Commodity.COMMODITY_CURRENCY + "','" + Commodity.COMMODITY_ISO4217 + "')";
+        String[] whereArgs = new String[]{currencyCode};
+        Cursor cursor = fetchAllRecords(where, whereArgs, null);
         try {
             if (cursor.moveToNext()) {
-                return cursor.getString(cursor.getColumnIndexOrThrow(CommodityEntry.COLUMN_MNEMONIC));
+                Commodity commodity = buildModelInstance(cursor);
+                if (isCached) {
+                    cache.put(commodity.getUID(), commodity);
+                }
+                return commodity;
             } else {
-                throw new IllegalArgumentException("guid " + guid + " not exits in commodity db");
+                String msg = "Commodity not found in the database: " + currencyCode;
+                Timber.e(msg);
             }
         } finally {
             cursor.close();
         }
+        return null;
+    }
+
+    public String getCommodityUID(String currencyCode) {
+        Commodity commodity = getCommodity(currencyCode);
+        return (commodity != null) ? commodity.getUID() : null;
+    }
+
+    public String getCurrencyCode(@NonNull String guid) {
+        Commodity commodity = getRecord(guid);
+        if (commodity != null) {
+            return commodity.getCurrencyCode();
+        }
+        throw new IllegalArgumentException("guid " + guid + " not exits in commodity db");
+    }
+
+    @Nullable
+    public Commodity loadCommodity(@NonNull Commodity commodity) {
+        if (commodity.id != 0) {
+            return commodity;
+        }
+        try {
+            commodity = getRecord(commodity.getUID());
+        } catch (Exception e) {
+            // Commodity not found.
+            commodity = getCommodity(commodity.getCurrencyCode());
+        }
+        return commodity;
+    }
+
+    @NonNull
+    public Commodity getDefaultCommodity() {
+        Commodity commodity = defaultCommodity;
+        if (commodity != null) {
+            return commodity;
+        }
+        String commodityCode = GnuCashApplication.getDefaultCurrencyCode();
+        defaultCommodity = commodity = getCommodity(commodityCode);
+        return (commodity != null) ? commodity : Commodity.DEFAULT_COMMODITY;
     }
 }

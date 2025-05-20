@@ -68,7 +68,7 @@ import java.text.DecimalFormatSymbols;
  */
 public class CalculatorKeyboard {
 
-    private static final String ACCEPTED = "0123456789+*/()";
+    private static final String ACCEPTED = "0123456789١٢٣٤٥٦٧٨٩+*/()";
     private static final int KEY_CODE_CLEAR = CalculatorKeyboardView.KEY_CODE_CLEAR;
     private static final int KEY_CODE_DELETE = CalculatorKeyboardView.KEY_CODE_DELETE;
     private static final int KEY_CODE_EVALUATE = CalculatorKeyboardView.KEY_CODE_EVALUATE;
@@ -194,18 +194,11 @@ public class CalculatorKeyboard {
     }
 
     /**
-     * Returns whether the CalculatorKeyboard is visible.
-     */
-    public boolean isCustomKeyboardVisible() {
-        return keyboardView.getVisibility() == View.VISIBLE;
-    }
-
-    /**
-     * Make the CalculatorKeyboard visible, and hide the system keyboard for view.
+     * Make the keyboard visible, and hide the system keyboard for view.
      *
      * @param view The view that wants to show the keyboard.
      */
-    public void showCustomKeyboard(@Nullable View view) {
+    public void show(@Nullable View view) {
         if (view != null) {
             inputMethodManager.hideSoftInputFromWindow(view.getWindowToken(), 0);
             window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
@@ -216,19 +209,19 @@ public class CalculatorKeyboard {
     }
 
     /**
-     * Make the CalculatorKeyboard invisible.
+     * Make the keyboard invisible.
      */
-    public void hideCustomKeyboard() {
+    public void hide() {
         keyboardView.setVisibility(View.GONE);
         keyboardView.setEnabled(false);
     }
 
-    public boolean onBackPressed() {
-        if (isCustomKeyboardVisible()) {
-            hideCustomKeyboard();
-            return true;
-        }
-        return false;
+    /**
+     * Is the keyboard visible?
+     * @return `true` when visible.
+     */
+    public boolean isVisible() {
+        return keyboardView.getVisibility() == View.VISIBLE;
     }
 
     @NonNull

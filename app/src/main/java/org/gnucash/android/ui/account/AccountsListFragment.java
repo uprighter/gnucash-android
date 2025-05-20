@@ -16,11 +16,10 @@
 
 package org.gnucash.android.ui.account;
 
-import static org.gnucash.android.db.DatabaseHelper.escapeForLike;
 import static org.gnucash.android.util.ColorExtKt.parseColor;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
-import android.app.SearchManager;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
@@ -35,11 +34,12 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.CheckBox;
+import android.widget.CompoundButton;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
-import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
@@ -62,10 +62,7 @@ import org.gnucash.android.databinding.FragmentAccountsListBinding;
 import org.gnucash.android.db.DatabaseCursorLoader;
 import org.gnucash.android.db.DatabaseSchema;
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
-import org.gnucash.android.db.adapter.BudgetsDbAdapter;
 import org.gnucash.android.model.Account;
-import org.gnucash.android.model.Budget;
-import org.gnucash.android.model.Money;
 import org.gnucash.android.ui.common.FormActivity;
 import org.gnucash.android.ui.common.Refreshable;
 import org.gnucash.android.ui.common.UxArgument;
@@ -73,6 +70,7 @@ import org.gnucash.android.ui.util.AccountBalanceTask;
 import org.gnucash.android.ui.util.CursorRecyclerAdapter;
 import org.gnucash.android.util.BackupManager;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import timber.log.Timber;
@@ -86,10 +84,9 @@ public class AccountsListFragment extends MenuFragment implements
     Refreshable,
     LoaderManager.LoaderCallbacks<Cursor>,
     SearchView.OnQueryTextListener,
-    SearchView.OnCloseListener,
     FragmentResultListener {
 
-    AccountRecyclerAdapter mAccountRecyclerAdapter;
+    private AccountRecyclerAdapter mAccountRecyclerAdapter;
 
     /**
      * Describes the kinds of accounts that should be loaded in the accounts list.
@@ -130,12 +127,8 @@ public class AccountsListFragment extends MenuFragment implements
      */
     private String mCurrentFilter;
 
-    /**
-     * Search view for searching accounts
-     */
-    private SearchView mSearchView;
-
     private FragmentAccountsListBinding mBinding;
+    private final List<AccountBalanceTask> accountBalanceTasks = new ArrayList<>();
 
     public static AccountsListFragment newInstance(DisplayMode displayMode) {
         AccountsListFragment fragment = new AccountsListFragment();
@@ -162,9 +155,9 @@ public class AccountsListFragment extends MenuFragment implements
         mBinding.list.setHasFixedSize(true);
         mBinding.list.setEmptyView(mBinding.emptyView);
         mBinding.list.setAdapter(mAccountRecyclerAdapter);
+        mBinding.list.setTag("accounts");
 
         switch (mDisplayMode) {
-
             case TOP_LEVEL:
                 mBinding.emptyView.setText(R.string.label_no_accounts);
                 break;
@@ -249,16 +242,23 @@ public class AccountsListFragment extends MenuFragment implements
      * It shows the delete confirmation dialog if the account has transactions,
      * else deletes the account immediately
      *
+     * @param activity The activity context.
      * @param accountUID The UID of the account
      */
-    private void tryDeleteAccount(String accountUID) {
+    private void tryDeleteAccount(final Activity activity, final String accountUID) {
         if (mAccountsDbAdapter.getTransactionCount(accountUID) > 0 || mAccountsDbAdapter.getSubAccountCount(accountUID) > 0) {
             showConfirmationDialog(accountUID);
         } else {
-            BackupManager.backupActiveBookAsync(requireActivity(), result -> {
-                // Avoid calling AccountsDbAdapter.deleteRecord(long). See #654
-                mAccountsDbAdapter.deleteRecord(accountUID);
-                refresh();
+            BackupManager.backupActiveBookAsync(activity, result -> {
+                if (result) {
+                    try {
+                        // Avoid calling AccountsDbAdapter.deleteRecord(long). See #654
+                        mAccountsDbAdapter.deleteRecord(accountUID);
+                        refreshActivity();
+                    } catch (Exception e) {
+                        Timber.e(e);
+                    }
+                }
                 return null;
             });
         }
@@ -277,28 +277,20 @@ public class AccountsListFragment extends MenuFragment implements
         alertFragment.show(fm, DeleteAccountDialogFragment.TAG);
     }
 
+    private void toggleFavorite(@NonNull String accountUID, boolean isFavoriteAccount) {
+        ContentValues contentValues = new ContentValues();
+        contentValues.put(DatabaseSchema.AccountEntry.COLUMN_FAVORITE, isFavoriteAccount);
+        mAccountsDbAdapter.updateRecord(accountUID, contentValues);
+        refreshActivity();
+    }
+
     @Override
     public void onCreateOptionsMenu(@NonNull Menu menu, @NonNull MenuInflater inflater) {
         super.onCreateOptionsMenu(menu, inflater);
-        if (!TextUtils.isEmpty(mParentAccountUID))
+        if (!TextUtils.isEmpty(mParentAccountUID)) {
             inflater.inflate(R.menu.sub_account_actions, menu);
-        else {
-            inflater.inflate(R.menu.account_actions, menu);
-            // Associate searchable configuration with the SearchView
-
-            mSearchView = (SearchView) menu.findItem(R.id.menu_search).getActionView();
-            if (mSearchView == null)
-                return;
-
-            Activity context = requireActivity();
-            SearchManager searchManager = (SearchManager) context.getSystemService(Context.SEARCH_SERVICE);
-            mSearchView.setSearchableInfo(
-                searchManager.getSearchableInfo(context.getComponentName()));
-            mSearchView.setOnQueryTextListener(this);
-            mSearchView.setOnCloseListener(this);
         }
     }
-
 
     @Override
     /**
@@ -316,7 +308,18 @@ public class AccountsListFragment extends MenuFragment implements
      */
     @Override
     public void refresh() {
+        if (isDetached() || getFragmentManager() == null) return;
         getLoaderManager().restartLoader(0, null, this);
+    }
+
+    private void refreshActivity() {
+        // Tell the parent activity to refresh all the lists.
+        Activity activity = getActivity();
+        if (activity instanceof Refreshable) {
+            ((Refreshable) activity).refresh();
+        } else {
+            refresh();
+        }
     }
 
     @Override
@@ -325,14 +328,16 @@ public class AccountsListFragment extends MenuFragment implements
         outState.putSerializable(STATE_DISPLAY_MODE, mDisplayMode);
     }
 
-    /**
-     * Closes any open database adapters used by the list
-     */
     @Override
-    public void onDestroy() {
-        super.onDestroy();
-        if (mAccountRecyclerAdapter != null)
-            mAccountRecyclerAdapter.swapCursor(null);
+    public void onDestroyView() {
+        super.onDestroyView();
+        if (mAccountRecyclerAdapter != null) {
+            mAccountRecyclerAdapter.changeCursor(null);
+        }
+        for (AccountBalanceTask task : accountBalanceTasks) {
+            task.cancel(true);
+        }
+        accountBalanceTasks.clear();
     }
 
     /**
@@ -341,12 +346,12 @@ public class AccountsListFragment extends MenuFragment implements
      *
      * @param accountUID Unique ID of account to be edited. Pass 0 to create a new account.
      */
-    public void openCreateOrEditActivity(String accountUID) {
-        Intent editAccountIntent = new Intent(AccountsListFragment.this.getActivity(), FormActivity.class);
-        editAccountIntent.setAction(Intent.ACTION_INSERT_OR_EDIT);
-        editAccountIntent.putExtra(UxArgument.SELECTED_ACCOUNT_UID, accountUID);
-        editAccountIntent.putExtra(UxArgument.FORM_TYPE, FormActivity.FormType.ACCOUNT.name());
-        startActivity(editAccountIntent);
+    public void openCreateOrEditActivity(Context context, String accountUID) {
+        Intent intent = new Intent(context, FormActivity.class)
+            .setAction(Intent.ACTION_INSERT_OR_EDIT)
+            .putExtra(UxArgument.SELECTED_ACCOUNT_UID, accountUID)
+            .putExtra(UxArgument.FORM_TYPE, FormActivity.FormType.ACCOUNT.name());
+        context.startActivity(intent);
     }
 
     @NonNull
@@ -357,29 +362,26 @@ public class AccountsListFragment extends MenuFragment implements
         String parentAccountUID = arguments == null ? null : arguments.getString(UxArgument.PARENT_ACCOUNT_UID);
 
         Context context = requireContext();
-        if (TextUtils.isEmpty(mCurrentFilter)) {
-            return new AccountsCursorLoader(context, parentAccountUID, mDisplayMode);
-        } else {
-            return new AccountsCursorLoader(context, mCurrentFilter);
-        }
+        return new AccountsCursorLoader(context, parentAccountUID, mDisplayMode, mCurrentFilter);
     }
 
+    @SuppressLint("NotifyDataSetChanged")
     @Override
     public void onLoadFinished(@NonNull Loader<Cursor> loader, Cursor cursor) {
         Timber.d("Accounts loader finished. Swapping in cursor");
-        mAccountRecyclerAdapter.swapCursor(cursor);
-        mAccountRecyclerAdapter.notifyDataSetChanged();
+        mAccountRecyclerAdapter.changeCursor(cursor);
         if (getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.RESUMED)) {
             if (mBinding.list.getAdapter() == null) {
                 mBinding.list.setAdapter(mAccountRecyclerAdapter);
             }
+            mAccountRecyclerAdapter.notifyDataSetChanged();
         }
     }
 
     @Override
     public void onLoaderReset(@NonNull Loader<Cursor> loader) {
         Timber.d("Resetting the accounts loader");
-        mAccountRecyclerAdapter.swapCursor(null);
+        mAccountRecyclerAdapter.changeCursor(null);
     }
 
     @Override
@@ -391,23 +393,15 @@ public class AccountsListFragment extends MenuFragment implements
     @Override
     public boolean onQueryTextChange(String newText) {
         String newFilter = !TextUtils.isEmpty(newText) ? newText : null;
-
-        if (mCurrentFilter == null && newFilter == null) {
+        String oldFilter = mCurrentFilter;
+        if (oldFilter == null && newFilter == null) {
             return true;
         }
-        if (mCurrentFilter != null && mCurrentFilter.equals(newFilter)) {
+        if (oldFilter != null && oldFilter.equals(newFilter)) {
             return true;
         }
         mCurrentFilter = newFilter;
-        getLoaderManager().restartLoader(0, null, this);
-        return true;
-    }
-
-    @Override
-    public boolean onClose() {
-        if (!TextUtils.isEmpty(mSearchView.getQuery())) {
-            mSearchView.setQuery(null, true);
-        }
+        refresh();
         return true;
     }
 
@@ -421,9 +415,9 @@ public class AccountsListFragment extends MenuFragment implements
      * @author Ngewi Fet <ngewif@gmail.com>
      */
     private static final class AccountsCursorLoader extends DatabaseCursorLoader<AccountsDbAdapter> {
-        private String mParentAccountUID = null;
-        private String mFilter;
-        private DisplayMode mDisplayMode = DisplayMode.TOP_LEVEL;
+        private final String mParentAccountUID;
+        private final String mFilter;
+        private final DisplayMode mDisplayMode;
 
         /**
          * Initializes the loader to load accounts from the database.
@@ -432,23 +426,14 @@ public class AccountsListFragment extends MenuFragment implements
          *
          * @param context          Application context
          * @param parentAccountUID GUID of the parent account
+         * @param displayMode      the mode.
+         * @param filter           Account name filter string
          */
-        public AccountsCursorLoader(Context context, String parentAccountUID, DisplayMode displayMode) {
+        public AccountsCursorLoader(Context context, String parentAccountUID, DisplayMode displayMode, @Nullable String filter) {
             super(context);
             this.mParentAccountUID = parentAccountUID;
             this.mDisplayMode = displayMode;
-        }
-
-        /**
-         * Initializes the loader with a filter for account names.
-         * Only accounts whose name match the filter will be loaded.
-         *
-         * @param context Application context
-         * @param filter  Account name filter string
-         */
-        public AccountsCursorLoader(Context context, String filter) {
-            super(context);
-            mFilter = filter;
+            this.mFilter = filter;
         }
 
         @Override
@@ -458,30 +443,23 @@ public class AccountsListFragment extends MenuFragment implements
             databaseAdapter = dbAdapter;
             final Cursor cursor;
 
-            if (mFilter != null) {
-                cursor = dbAdapter
-                    .fetchAccounts(DatabaseSchema.AccountEntry.COLUMN_HIDDEN + "= 0 AND "
-                            + DatabaseSchema.AccountEntry.COLUMN_NAME + " LIKE '%" + escapeForLike(mFilter) + "%'",
-                        null, null);
-            } else if (!TextUtils.isEmpty(mParentAccountUID))
+            if (!TextUtils.isEmpty(mParentAccountUID)) {
                 cursor = dbAdapter.fetchSubAccounts(mParentAccountUID);
-            else {
+            } else {
                 switch (mDisplayMode) {
                     case RECENT:
-                        cursor = dbAdapter.fetchRecentAccounts(10);
+                        cursor = dbAdapter.fetchRecentAccounts(10, mFilter);
                         break;
                     case FAVORITES:
-                        cursor = dbAdapter.fetchFavoriteAccounts();
+                        cursor = dbAdapter.fetchFavoriteAccounts(mFilter);
                         break;
                     case TOP_LEVEL:
                     default:
-                        cursor = dbAdapter.fetchTopLevelAccounts();
+                        cursor = dbAdapter.fetchTopLevelAccounts(mFilter);
                         break;
                 }
             }
 
-            if (cursor != null)
-                registerContentObserver(cursor);
             return cursor;
         }
     }
@@ -490,14 +468,15 @@ public class AccountsListFragment extends MenuFragment implements
     public void onFragmentResult(@NonNull String requestKey, @NonNull Bundle result) {
         if (DeleteAccountDialogFragment.TAG.equals(requestKey)) {
             boolean refresh = result.getBoolean(Refreshable.EXTRA_REFRESH);
-            if (refresh) refresh();
+            if (refresh) refreshActivity();
         }
     }
 
     class AccountRecyclerAdapter extends CursorRecyclerAdapter<AccountRecyclerAdapter.AccountViewHolder> {
 
-        public AccountRecyclerAdapter(Cursor cursor) {
+        public AccountRecyclerAdapter(@Nullable Cursor cursor) {
             super(cursor);
+            setHasStableIds(true);
         }
 
         @NonNull
@@ -517,7 +496,7 @@ public class AccountsListFragment extends MenuFragment implements
             private final TextView description;
             private final TextView accountBalance;
             private final ImageView createTransaction;
-            private final ImageView favoriteStatus;
+            private final CheckBox favoriteStatus;
             private final ImageView optionsMenu;
             private final View colorStripView;
             private final ProgressBar budgetIndicator;
@@ -564,7 +543,9 @@ public class AccountsListFragment extends MenuFragment implements
                 // add a summary of transactions to the account view
 
                 // Make sure the balance task is truly multi-thread
-                new AccountBalanceTask(accountBalance, description.getCurrentTextColor()).execute(accountUID);
+                AccountBalanceTask task = new AccountBalanceTask(mAccountsDbAdapter, accountBalance, description.getCurrentTextColor());
+                accountBalanceTasks.add(task);
+                task.execute(accountUID);
 
                 String accountColor = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseSchema.AccountEntry.COLUMN_COLOR_CODE));
                 Integer colorValue = parseColor(accountColor);
@@ -573,56 +554,48 @@ public class AccountsListFragment extends MenuFragment implements
 
                 boolean isPlaceholderAccount = mAccountsDbAdapter.isPlaceholderAccount(accountUID);
                 if (isPlaceholderAccount) {
-                    createTransaction.setVisibility(View.GONE);
+                    createTransaction.setVisibility(View.INVISIBLE);
                 } else {
                     createTransaction.setOnClickListener(new View.OnClickListener() {
 
                         @Override
                         public void onClick(View v) {
                             Context context = v.getContext();
-                            Intent intent = new Intent(context, FormActivity.class);
-                            intent.setAction(Intent.ACTION_INSERT_OR_EDIT);
-                            intent.putExtra(UxArgument.SELECTED_ACCOUNT_UID, accountUID);
-                            intent.putExtra(UxArgument.FORM_TYPE, FormActivity.FormType.TRANSACTION.name());
+                            Intent intent = new Intent(context, FormActivity.class)
+                                .setAction(Intent.ACTION_INSERT_OR_EDIT)
+                                .putExtra(UxArgument.SELECTED_ACCOUNT_UID, accountUID)
+                                .putExtra(UxArgument.FORM_TYPE, FormActivity.FormType.TRANSACTION.name());
                             context.startActivity(intent);
                         }
                     });
                 }
 
-                List<Budget> budgets = BudgetsDbAdapter.getInstance().getAccountBudgets(accountUID);
-                //TODO: include fetch only active budgets
-                if (budgets.size() == 1) {
-                    Budget budget = budgets.get(0);
-                    Money balance = mAccountsDbAdapter.getAccountBalance(accountUID, budget.getStartOfCurrentPeriod(), budget.getEndOfCurrentPeriod());
-                    double budgetProgress = balance.div(budget.getAmount(accountUID)).asBigDecimal().doubleValue() * 100;
+                // TODO budgets is not an official feature yet.
+//                List<Budget> budgets = BudgetsDbAdapter.getInstance().getAccountBudgets(accountUID);
+//                //TODO: include fetch only active budgets
+//                if (!budgets.isEmpty()) {
+//                    Budget budget = budgets.get(0);
+//                    Money balance = mAccountsDbAdapter.getAccountBalance(accountUID, budget.getStartOfCurrentPeriod(), budget.getEndOfCurrentPeriod());
+//                    Money budgetAmount = budget.getAmount(accountUID);
+//
+//                    if (budgetAmount != null) {
+//                        double budgetProgress = budgetAmount.isAmountZero() ? 0 : balance.div(budgetAmount).toDouble() * 100;
+//                        budgetIndicator.setVisibility(View.VISIBLE);
+//                        budgetIndicator.setProgress((int) budgetProgress);
+//                    } else {
+//                        budgetIndicator.setVisibility(View.GONE);
+//                    }
+//                } else {
+//                    budgetIndicator.setVisibility(View.GONE);
+//                }
 
-                    budgetIndicator.setVisibility(View.VISIBLE);
-                    budgetIndicator.setProgress((int) budgetProgress);
-                } else {
-                    budgetIndicator.setVisibility(View.GONE);
-                }
-
-                if (mAccountsDbAdapter.isFavoriteAccount(accountUID)) {
-                    favoriteStatus.setImageResource(R.drawable.ic_favorite);
-                } else {
-                    favoriteStatus.setImageResource(R.drawable.ic_favorite_border);
-                }
-
-                favoriteStatus.setOnClickListener(new View.OnClickListener() {
+                boolean isFavoriteAccount = mAccountsDbAdapter.isFavoriteAccount(accountUID);
+                favoriteStatus.setOnCheckedChangeListener(null);
+                favoriteStatus.setChecked(isFavoriteAccount);
+                favoriteStatus.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
                     @Override
-                    public void onClick(View v) {
-                        boolean isFavoriteAccount = mAccountsDbAdapter.isFavoriteAccount(accountUID);
-
-                        ContentValues contentValues = new ContentValues();
-                        contentValues.put(DatabaseSchema.AccountEntry.COLUMN_FAVORITE, !isFavoriteAccount);
-                        mAccountsDbAdapter.updateRecord(accountUID, contentValues);
-
-                        @DrawableRes int drawableResource = isFavoriteAccount ?
-                            R.drawable.ic_favorite_border : R.drawable.ic_favorite;
-                        favoriteStatus.setImageResource(drawableResource);
-                        if (mDisplayMode == DisplayMode.FAVORITES) {
-                            refresh();
-                        }
+                    public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                        toggleFavorite(accountUID, isChecked);
                     }
                 });
 
@@ -636,13 +609,16 @@ public class AccountsListFragment extends MenuFragment implements
 
             @Override
             public boolean onMenuItemClick(@NonNull MenuItem item) {
+                final Activity activity = getActivity();
+                if (activity == null) return false;
+
                 switch (item.getItemId()) {
                     case R.id.menu_edit:
-                        openCreateOrEditActivity(accountUID);
+                        openCreateOrEditActivity(activity, accountUID);
                         return true;
 
                     case R.id.menu_delete:
-                        tryDeleteAccount(accountUID);
+                        tryDeleteAccount(activity, accountUID);
                         return true;
 
                     default:

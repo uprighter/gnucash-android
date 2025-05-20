@@ -21,29 +21,32 @@ import static org.junit.Assert.fail;
 
 import org.gnucash.android.model.Commodity;
 import org.gnucash.android.model.Price;
+import org.gnucash.android.test.unit.GnuCashTest;
 import org.junit.Test;
 
 import java.math.BigDecimal;
 import java.util.Locale;
 
 
-public class PriceTest {
+public class PriceTest extends GnuCashTest {
     @Test
     public void creatingFromExchangeRate_ShouldGetPrecisionRight() {
         Locale.setDefault(Locale.US);
         Commodity commodity1 = Commodity.USD;
         Commodity commodity2 = Commodity.EUR;
 
-        String exchangeRateString = "0.123456";
+        String exchangeRateString = "0.123";
         BigDecimal exchangeRate = new BigDecimal(exchangeRateString);
         Price price = new Price(commodity1, commodity2, exchangeRate);
-        assertThat(price.toString()).isEqualTo(exchangeRateString);
+        // EUR uses 2 fractional digits.
+        assertThat(price.toString()).isEqualTo("0.12");
 
         // ensure we don't get more decimal places than needed (0.123000)
-        exchangeRateString = "0.123";
+        exchangeRateString = "0.123456";
         exchangeRate = new BigDecimal(exchangeRateString);
         price = new Price(commodity1, commodity2, exchangeRate);
-        assertThat(price.toString()).isEqualTo(exchangeRateString);
+        // EUR uses 2 fractional digits.
+        assertThat(price.toString()).isEqualTo("0.12");
     }
 
     @Test
@@ -55,7 +58,8 @@ public class PriceTest {
         String exchangeRateString = "1.234";
         BigDecimal exchangeRate = new BigDecimal(exchangeRateString);
         Price price = new Price(commodity1, commodity2, exchangeRate);
-        assertThat(price.toString()).isEqualTo("1,234");
+        // USD uses 2 fractional digits.
+        assertThat(price.toString()).isEqualTo("1,23");
     }
 
     /**

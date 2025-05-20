@@ -16,9 +16,10 @@
 package org.gnucash.android.test.unit.db;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.Assert.assertEquals;
 
+import android.content.Context;
 import android.database.sqlite.SQLiteDatabase;
+import android.graphics.Color;
 
 import org.assertj.core.data.Index;
 import org.gnucash.android.R;
@@ -60,6 +61,8 @@ import java.util.List;
 
 import javax.xml.parsers.ParserConfigurationException;
 
+import timber.log.Timber;
+
 public class AccountsDbAdapterTest extends GnuCashTest {
 
     private static final String BRAVO_ACCOUNT_NAME = "Bravo";
@@ -90,17 +93,17 @@ public class AccountsDbAdapterTest extends GnuCashTest {
      */
     private void initAdapters(String bookUID) {
         if (bookUID == null) {
+            mCommoditiesDbAdapter = CommoditiesDbAdapter.getInstance();
             mSplitsDbAdapter = SplitsDbAdapter.getInstance();
             mTransactionsDbAdapter = TransactionsDbAdapter.getInstance();
             mAccountsDbAdapter = AccountsDbAdapter.getInstance();
-            mCommoditiesDbAdapter = CommoditiesDbAdapter.getInstance();
         } else {
             DatabaseHelper databaseHelper = new DatabaseHelper(GnuCashApplication.getAppContext(), bookUID);
             SQLiteDatabase db = databaseHelper.getWritableDatabase();
-            mSplitsDbAdapter = new SplitsDbAdapter(db);
-            mTransactionsDbAdapter = new TransactionsDbAdapter(db, mSplitsDbAdapter);
-            mAccountsDbAdapter = new AccountsDbAdapter(db, mTransactionsDbAdapter);
             mCommoditiesDbAdapter = new CommoditiesDbAdapter(db);
+            mSplitsDbAdapter = new SplitsDbAdapter(mCommoditiesDbAdapter);
+            mTransactionsDbAdapter = new TransactionsDbAdapter(mSplitsDbAdapter);
+            mAccountsDbAdapter = new AccountsDbAdapter(mTransactionsDbAdapter);
             BooksDbAdapter.getInstance().setActive(bookUID);
         }
     }
@@ -117,7 +120,7 @@ public class AccountsDbAdapterTest extends GnuCashTest {
         mAccountsDbAdapter.addRecord(first);
 
         List<Account> accountsList = mAccountsDbAdapter.getAllRecords();
-        assertEquals(2, accountsList.size());
+        assertThat(accountsList.size()).isEqualTo(2);
         //bravo was saved first, but alpha should be first alphabetically
         assertThat(accountsList).contains(first, Index.atIndex(0));
         assertThat(accountsList).contains(second, Index.atIndex(1));
@@ -128,7 +131,7 @@ public class AccountsDbAdapterTest extends GnuCashTest {
         Account account1 = new Account("AlphaAccount");
         Account account2 = new Account("BetaAccount");
         Transaction transaction = new Transaction("MyTransaction");
-        Split split = new Split(Money.getZeroInstance(), account1.getUID());
+        Split split = new Split(Money.createZeroInstance(account1.getCommodity()), account1.getUID());
         transaction.addSplit(split);
         transaction.addSplit(split.createPair(account2.getUID()));
         account1.addTransaction(transaction);
@@ -152,14 +155,20 @@ public class AccountsDbAdapterTest extends GnuCashTest {
         Account account1 = new Account("AlphaAccount");
         Account account2 = new Account("BetaAccount");
         Transaction transaction = new Transaction("MyTransaction");
-        Split split = new Split(Money.getZeroInstance(), account1.getUID());
+        Split split = new Split(Money.createZeroInstance(account1.getCommodity()), account1.getUID());
         transaction.addSplit(split);
         transaction.addSplit(split.createPair(account2.getUID()));
         account1.addTransaction(transaction);
         account2.addTransaction(transaction);
 
+        // Disable foreign key validation because the second split,
+        // which is added during 1st account,
+        // references the second account which has not been added yet.
+        mAccountsDbAdapter.enableForeignKey(false);
         mAccountsDbAdapter.addRecord(account1);
         mAccountsDbAdapter.addRecord(account2);
+        mAccountsDbAdapter.enableForeignKey(true);
+        assertThat(mAccountsDbAdapter.getRecordsCount()).isEqualTo(3);//root+account1+account2
 
         Account firstAccount = mAccountsDbAdapter.getRecord(account1.getUID());
         assertThat(firstAccount).isNotNull();
@@ -187,7 +196,7 @@ public class AccountsDbAdapterTest extends GnuCashTest {
         mAccountsDbAdapter.addRecord(first);
 
         Transaction transaction = new Transaction("TestTrn");
-        Split split = new Split(Money.getZeroInstance(), ALPHA_ACCOUNT_NAME);
+        Split split = new Split(Money.createZeroInstance(first.getCommodity()), ALPHA_ACCOUNT_NAME);
         transaction.addSplit(split);
         transaction.addSplit(split.createPair(BRAVO_ACCOUNT_NAME));
 
@@ -223,6 +232,7 @@ public class AccountsDbAdapterTest extends GnuCashTest {
 
         mAccountsDbAdapter.addRecord(parent);
         mAccountsDbAdapter.addRecord(child);
+        assertThat(child.getFullName()).isEqualTo("Child");
 
         child.setParentUID(parent.getUID());
         mAccountsDbAdapter.addRecord(child);
@@ -242,7 +252,7 @@ public class AccountsDbAdapterTest extends GnuCashTest {
         mAccountsDbAdapter.addRecord(account);
 
         Transaction transaction = new Transaction("Test description");
-        Split split = new Split(Money.getZeroInstance(), account.getUID());
+        Split split = new Split(Money.createZeroInstance(account.getCommodity()), account.getUID());
         transaction.addSplit(split);
         Account account1 = new Account("Transfer account");
         transaction.addSplit(split.createPair(account1.getUID()));
@@ -260,7 +270,7 @@ public class AccountsDbAdapterTest extends GnuCashTest {
     public void shouldClearAllTablesWhenDeletingAllAccounts() {
         Account account = new Account("Test");
         Transaction transaction = new Transaction("Test description");
-        Split split = new Split(Money.getZeroInstance(), account.getUID());
+        Split split = new Split(Money.createZeroInstance(account.getCommodity()), account.getUID());
         transaction.addSplit(split);
         Account account2 = new Account("Transfer account");
         transaction.addSplit(split.createPair(account2.getUID()));
@@ -276,8 +286,8 @@ public class AccountsDbAdapterTest extends GnuCashTest {
         scheduledActionDbAdapter.addRecord(scheduledAction);
 
         Budget budget = new Budget("Test");
-        BudgetAmount budgetAmount = new BudgetAmount(Money.getZeroInstance(), account.getUID());
-        budget.addBudgetAmount(budgetAmount);
+        BudgetAmount budgetAmount = new BudgetAmount(Money.createZeroInstance(account.getCommodity()), account.getUID());
+        budget.addAmount(budgetAmount);
         budget.setRecurrence(new Recurrence(PeriodType.MONTH));
         BudgetsDbAdapter.getInstance().addRecord(budget);
 
@@ -297,7 +307,7 @@ public class AccountsDbAdapterTest extends GnuCashTest {
     public void simpleAccountListShouldNotContainTransactions() {
         Account account = new Account("Test");
         Transaction transaction = new Transaction("Test description");
-        Split split = new Split(Money.getZeroInstance(), account.getUID());
+        Split split = new Split(Money.createZeroInstance(account.getCommodity()), account.getUID());
         transaction.addSplit(split);
         Account account1 = new Account("Transfer");
         transaction.addSplit(split.createPair(account1.getUID()));
@@ -374,7 +384,7 @@ public class AccountsDbAdapterTest extends GnuCashTest {
         Transaction transaction = new Transaction("Random");
         account2.addTransaction(transaction);
 
-        Split split = new Split(Money.getZeroInstance(), account.getUID());
+        Split split = new Split(Money.createZeroInstance(account.getCommodity()), account.getUID());
         transaction.addSplit(split);
         transaction.addSplit(split.createPair(account2.getUID()));
 
@@ -385,7 +395,7 @@ public class AccountsDbAdapterTest extends GnuCashTest {
         assertThat(mTransactionsDbAdapter.getRecordsCount()).isEqualTo(1);
         assertThat(mSplitsDbAdapter.getRecordsCount()).isEqualTo(2);
 
-        boolean result = mAccountsDbAdapter.recursiveDeleteAccount(mAccountsDbAdapter.getID(account.getUID()));
+        boolean result = mAccountsDbAdapter.recursiveDeleteAccount(account.getUID());
         assertThat(result).isTrue();
 
         assertThat(mAccountsDbAdapter.getRecordsCount()).isEqualTo(1); //the root account
@@ -408,29 +418,28 @@ public class AccountsDbAdapterTest extends GnuCashTest {
     public void shouldReassignDescendantAccounts() {
         loadDefaultAccounts();
 
-        String savingsAcctUID = mAccountsDbAdapter.findAccountUidByFullName("Assets:Current Assets:Savings Account");
-
-        String currentAssetsUID = mAccountsDbAdapter.findAccountUidByFullName("Assets:Current Assets");
         String assetsUID = mAccountsDbAdapter.findAccountUidByFullName("Assets");
+        String savingsAcctUID = mAccountsDbAdapter.findAccountUidByFullName("Assets:Current Assets:Savings Account");
+        String currentAssetsUID = mAccountsDbAdapter.findAccountUidByFullName("Assets:Current Assets");
 
         assertThat(mAccountsDbAdapter.getParentAccountUID(savingsAcctUID)).isEqualTo(currentAssetsUID);
         mAccountsDbAdapter.reassignDescendantAccounts(currentAssetsUID, assetsUID);
         assertThat(mAccountsDbAdapter.getParentAccountUID(savingsAcctUID)).isEqualTo(assetsUID);
-
         assertThat(mAccountsDbAdapter.getFullyQualifiedAccountName(savingsAcctUID)).isEqualTo("Assets:Savings Account");
 
     }
 
     @Test
     public void shouldCreateImbalanceAccountOnDemand() {
+        Context context = GnuCashApplication.getAppContext();
         assertThat(mAccountsDbAdapter.getRecordsCount()).isEqualTo(1L);
 
         Commodity usd = mCommoditiesDbAdapter.getCommodity("USD");
-        String imbalanceUID = mAccountsDbAdapter.getImbalanceAccountUID(usd);
+        String imbalanceUID = mAccountsDbAdapter.getImbalanceAccountUID(context, usd);
         assertThat(imbalanceUID).isNull();
         assertThat(mAccountsDbAdapter.getRecordsCount()).isEqualTo(1L);
 
-        imbalanceUID = mAccountsDbAdapter.getOrCreateImbalanceAccountUID(usd);
+        imbalanceUID = mAccountsDbAdapter.getOrCreateImbalanceAccountUID(context, usd);
         assertThat(imbalanceUID).isNotNull().isNotEmpty();
         assertThat(mAccountsDbAdapter.getRecordsCount()).isEqualTo(2);
     }
@@ -494,7 +503,7 @@ public class AccountsDbAdapterTest extends GnuCashTest {
         mAccountsDbAdapter.addRecord(account4);
         assertThat(mAccountsDbAdapter.getRecordsCount()).isEqualTo(4L);
 
-        mAccountsDbAdapter.recursiveDeleteAccount(mAccountsDbAdapter.getID(account1.getUID()));
+        mAccountsDbAdapter.recursiveDeleteAccount(account1.getUID());
         assertThat(mAccountsDbAdapter.getRecordsCount()).isEqualTo(2L);
         assertThat(mAccountsDbAdapter.getRecord(account4.getUID()).getDefaultTransferAccountUID()).isNull();
     }
@@ -520,19 +529,56 @@ public class AccountsDbAdapterTest extends GnuCashTest {
         System.out.println("Default currency is now: " + Commodity.DEFAULT_COMMODITY);
     }
 
+    @Test
+    public void testChangesToAccount() {
+        mAccountsDbAdapter.deleteAllRecords();
+        assertThat(mAccountsDbAdapter.getRecordsCount()).isZero();
+
+        Account account1 = new Account("Test");
+        mAccountsDbAdapter.addRecord(account1, DatabaseAdapter.UpdateMethod.insert);
+        assertThat(account1.id).isNotEqualTo(0); //plus ROOT account
+        assertThat(mAccountsDbAdapter.getRecordsCount()).isEqualTo(2); //plus ROOT account
+
+        Account account2 = mAccountsDbAdapter.getRecord(account1.getUID());
+        assertThat(account2).isEqualTo(account1);
+        assertThat(account2.isPlaceholder()).isFalse();
+        assertThat(account2.isFavorite()).isFalse();
+        assertThat(account2.getColor()).isEqualTo(Account.DEFAULT_COLOR);
+
+        account2.setPlaceHolderFlag(true);
+        account2.setFavorite(true);
+        account2.setColor(Color.MAGENTA);
+        mAccountsDbAdapter.addRecord(account2, DatabaseAdapter.UpdateMethod.replace);
+        Account account3 = mAccountsDbAdapter.getRecord(account2.getUID());
+        assertThat(account3).isEqualTo(account2);
+        assertThat(account3.isPlaceholder()).isTrue();
+        assertThat(account3.isFavorite()).isTrue();
+        assertThat(account3.getColor()).isEqualTo(Color.MAGENTA);
+
+        account3.setPlaceHolderFlag(true);
+        account3.setFavorite(false);
+        account3.setColor(Color.YELLOW);
+        mAccountsDbAdapter.addRecord(account3, DatabaseAdapter.UpdateMethod.update);
+        Account account4 = mAccountsDbAdapter.getRecord(account3.getUID());
+        assertThat(account4).isEqualTo(account3);
+        assertThat(account4.isPlaceholder()).isTrue();
+        assertThat(account4.isFavorite()).isFalse();
+        assertThat(account4.getColor()).isEqualTo(Color.YELLOW);
+    }
+
     /**
      * Loads the default accounts from file resource
      */
     private void loadDefaultAccounts() {
         try {
-            String bookUID = GncXmlImporter.parse(GnuCashApplication.getAppContext().getResources().openRawResource(R.raw.default_accounts));
+            Context context = GnuCashApplication.getAppContext();
+            String bookUID = GncXmlImporter.parse(context, context.getResources().openRawResource(R.raw.default_accounts));
             initAdapters(bookUID);
         } catch (ParserConfigurationException | SAXException | IOException e) {
-            e.printStackTrace();
+            Timber.e(e);
             throw new RuntimeException("Could not create default accounts");
         }
     }
-
 
     @After
     public void tearDown() throws Exception {

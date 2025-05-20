@@ -22,6 +22,7 @@ import static org.gnucash.android.util.ContentExtKt.getDocumentName;
 import android.app.Activity;
 import android.app.DatePickerDialog;
 import android.app.TimePickerDialog;
+import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -44,16 +45,17 @@ import android.widget.CompoundButton;
 import android.widget.DatePicker;
 import android.widget.RadioButton;
 import android.widget.TimePicker;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.content.ContextCompat;
 
 import com.codetroopers.betterpickers.recurrencepicker.EventRecurrence;
 import com.codetroopers.betterpickers.recurrencepicker.EventRecurrenceFormatter;
 import com.codetroopers.betterpickers.recurrencepicker.RecurrencePickerDialogFragment;
+import com.google.android.material.snackbar.Snackbar;
 
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
@@ -71,7 +73,6 @@ import org.gnucash.android.model.BaseModel;
 import org.gnucash.android.model.ScheduledAction;
 import org.gnucash.android.ui.common.UxArgument;
 import org.gnucash.android.ui.passcode.PasscodeHelper;
-import org.gnucash.android.ui.settings.BackupPreferenceFragment;
 import org.gnucash.android.ui.settings.dialog.OwnCloudDialogFragment;
 import org.gnucash.android.ui.transaction.TransactionFormFragment;
 import org.gnucash.android.ui.util.RecurrenceParser;
@@ -229,7 +230,7 @@ public class ExportFormFragment extends MenuFragment implements
         if (TextUtils.isEmpty(tag)) {
             return;
         }
-        ExportParams exportParams = ExportParams.parseCsv(tag);
+        ExportParams exportParams = ExportParams.parseTag(tag);
         ExportFormat exportFormat = exportParams.getExportFormat();
         Uri uri = exportParams.getExportLocation();
         ExportParams.ExportTarget exportTarget = exportParams.getExportTarget();
@@ -237,7 +238,7 @@ public class ExportFormFragment extends MenuFragment implements
         Timestamp startTime = exportParams.getExportStartTime();
 
         switch (exportTarget) {
-            case DROPBOX, GOOGLE_DRIVE:
+            case DROPBOX:
                 mBinding.spinnerExportDestination.setSelection(TARGET_DROPBOX);
                 break;
             case OWNCLOUD:
@@ -292,6 +293,7 @@ public class ExportFormFragment extends MenuFragment implements
         }
 
         mBinding.checkboxPostExportDelete.setChecked(exportParams.shouldDeleteTransactionsAfterExport());
+        mBinding.compression.setChecked(exportParams.isCompressed);
 
         String rrule = scheduledAction.getRuleString();
         onRecurrenceSet(rrule);
@@ -344,7 +346,8 @@ public class ExportFormFragment extends MenuFragment implements
      * Starts the export of transactions with the specified parameters
      */
     private void startExport() {
-        ExportParams exportParameters = mExportParams;
+        final Activity activity = requireActivity();
+        final ExportParams exportParameters = mExportParams;
 
         if (exportParameters.getExportTarget() == ExportParams.ExportTarget.URI && exportParameters.getExportLocation() == null) {
             mExportStarted = true;
@@ -359,7 +362,7 @@ public class ExportFormFragment extends MenuFragment implements
         }
 
         Timber.i("Commencing async export of transactions");
-        new ExportAsyncTask(requireActivity(), GnuCashApplication.getActiveBookUID()).execute(exportParameters);
+        new ExportAsyncTask(activity, GnuCashApplication.getActiveBookUID()).execute(exportParameters);
 
         if (mRecurrenceRule != null) {
             DatabaseAdapter.UpdateMethod updateMethod = DatabaseAdapter.UpdateMethod.replace;
@@ -370,13 +373,13 @@ public class ExportFormFragment extends MenuFragment implements
                 updateMethod = DatabaseAdapter.UpdateMethod.insert;
             }
             scheduledAction.setRecurrence(RecurrenceParser.parse(mEventRecurrence));
-            scheduledAction.setTag(exportParameters.toCsv());
+            scheduledAction.setTag(exportParameters.toTag());
             ScheduledActionDbAdapter.getInstance().addRecord(scheduledAction, updateMethod);
             mScheduledAction = scheduledAction;
         }
 
         int position = mBinding.spinnerExportDestination.getSelectedItemPosition();
-        PreferenceManager.getDefaultSharedPreferences(getActivity())
+        PreferenceManager.getDefaultSharedPreferences(activity)
             .edit()
             .putInt(getString(R.string.key_last_export_destination), position)
             .apply();
@@ -391,6 +394,8 @@ public class ExportFormFragment extends MenuFragment implements
      */
     private void bindViewListeners(View view) {
         final Context context = view.getContext();
+        final AppCompatActivity activity = (AppCompatActivity) requireActivity();
+        final SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
         // export destination bindings
         ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(context,
             R.array.export_destinations, android.R.layout.simple_spinner_item);
@@ -421,8 +426,7 @@ public class ExportFormFragment extends MenuFragment implements
                         setExportUri(null);
                         mBinding.recurrenceOptions.setVisibility(View.VISIBLE);
                         mExportParams.setExportTarget(ExportParams.ExportTarget.OWNCLOUD);
-                        if (!(PreferenceManager.getDefaultSharedPreferences(getActivity())
-                            .getBoolean(getString(R.string.key_owncloud_sync), false))) {
+                        if (!preferences.getBoolean(getString(R.string.key_owncloud_sync), false)) {
                             OwnCloudDialogFragment ocDialog = OwnCloudDialogFragment.newInstance(null);
                             ocDialog.show(getParentFragmentManager(), "ownCloud dialog");
                         }
@@ -445,16 +449,13 @@ public class ExportFormFragment extends MenuFragment implements
             }
         });
 
-        int position = PreferenceManager.getDefaultSharedPreferences(getActivity())
-            .getInt(getString(R.string.key_last_export_destination), 0);
+        int position = preferences.getInt(getString(R.string.key_last_export_destination), 0);
         mBinding.spinnerExportDestination.setSelection(position);
 
         //**************** export start time bindings ******************
-        Timestamp timestamp = PreferencesHelper.getLastExportTime();
+        Timestamp timestamp = PreferencesHelper.getLastExportTime(context);
         final long date = timestamp.getTime() - DateUtils.WEEK_IN_MILLIS;
         mExportStartCalendar.setTimeInMillis(date);
-        mBinding.exportStartDate.setText(TransactionFormFragment.DATE_FORMATTER.print(date));
-        mBinding.exportStartTime.setText(TransactionFormFragment.TIME_FORMATTER.print(date));
 
         mBinding.exportStartDate.setOnClickListener(new View.OnClickListener() {
 
@@ -465,6 +466,7 @@ public class ExportFormFragment extends MenuFragment implements
                     .show(getParentFragmentManager(), "date_picker_fragment");
             }
         });
+        mBinding.exportStartDate.setText(TransactionFormFragment.DATE_FORMATTER.print(date));
 
         mBinding.exportStartTime.setOnClickListener(new View.OnClickListener() {
 
@@ -475,8 +477,8 @@ public class ExportFormFragment extends MenuFragment implements
                     .show(getParentFragmentManager(), "time_picker_dialog_fragment");
             }
         });
+        mBinding.exportStartTime.setText(TransactionFormFragment.TIME_FORMATTER.print(date));
 
-        SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(getActivity());
         mBinding.switchExportAll.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
@@ -484,22 +486,29 @@ public class ExportFormFragment extends MenuFragment implements
                 mBinding.exportStartTime.setEnabled(!isChecked);
             }
         });
+        mBinding.switchExportAll.setChecked(preferences.getBoolean(getString(R.string.key_export_all_transactions), false));
 
-        mBinding.switchExportAll.setChecked(sharedPrefs.getBoolean(getString(R.string.key_export_all_transactions), false));
-        mBinding.checkboxPostExportDelete.setChecked(sharedPrefs.getBoolean(getString(R.string.key_delete_transactions_after_export), false));
         mBinding.checkboxPostExportDelete.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                 mExportParams.setDeleteTransactionsAfterExport(isChecked);
             }
         });
+        mBinding.checkboxPostExportDelete.setChecked(preferences.getBoolean(getString(R.string.key_delete_transactions_after_export), false));
 
-        AppCompatActivity activity = (AppCompatActivity) requireActivity();
+        mBinding.compression.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                mExportParams.isCompressed = isChecked;
+            }
+        });
+        mBinding.compression.setChecked(preferences.getBoolean(getString(R.string.key_compress_export), true));
+
         mBinding.inputRecurrence.setOnClickListener(new RecurrenceViewClickListener(activity, mRecurrenceRule, this));
 
         //this part (setting the export format) must come after the recurrence view bindings above
         String keyDefaultExportFormat = getString(R.string.key_default_export_format);
-        String defaultExportFormat = sharedPrefs.getString(keyDefaultExportFormat, ExportFormat.XML.value);
+        String defaultExportFormat = preferences.getString(keyDefaultExportFormat, ExportFormat.XML.value);
         mExportParams.setExportFormat(ExportFormat.of(defaultExportFormat));
 
         RadioButton.OnCheckedChangeListener radioClickListener = new RadioButton.OnCheckedChangeListener() {
@@ -586,24 +595,39 @@ public class ExportFormFragment extends MenuFragment implements
      */
     private void selectExportFile() {
         String bookName = BooksDbAdapter.getInstance().getActiveBookDisplayName();
-        String filename = Exporter.buildExportFilename(mExportParams.getExportFormat(), bookName);
+        String filename = Exporter.buildExportFilename(mExportParams.getExportFormat(), mExportParams.isCompressed, bookName);
 
         Intent createIntent = new Intent(Intent.ACTION_CREATE_DOCUMENT)
             .setType("*/*")
             .addCategory(Intent.CATEGORY_OPENABLE)
             .putExtra(Intent.EXTRA_TITLE, filename);
-        startActivityForResult(createIntent, REQUEST_EXPORT_FILE);
+        try {
+            startActivityForResult(createIntent, REQUEST_EXPORT_FILE);
+        } catch (ActivityNotFoundException e) {
+            Timber.e(e, "Cannot create document for export");
+            if (isVisible()) {
+                View view = getView();
+                assert view != null;
+                Snackbar.make(view, R.string.toast_install_file_manager, Snackbar.LENGTH_LONG).show();
+            } else {
+                Toast.makeText(requireContext(), R.string.toast_install_file_manager, Toast.LENGTH_LONG).show();
+            }
+        }
     }
 
     @Override
     public void onRecurrenceSet(String rrule) {
         Timber.i("Export reoccurs: %s", rrule);
         Context context = mBinding.inputRecurrence.getContext();
-        mRecurrenceRule = rrule;
         String repeatString = null;
         if (!TextUtils.isEmpty(rrule)) {
-            mEventRecurrence.parse(rrule);
-            repeatString = EventRecurrenceFormatter.getRepeatString(context, context.getResources(), mEventRecurrence, true);
+            try {
+                mEventRecurrence.parse(rrule);
+                mRecurrenceRule = rrule;
+                repeatString = EventRecurrenceFormatter.getRepeatString(context, context.getResources(), mEventRecurrence, true);
+            } catch (Exception e) {
+                Timber.e(e, "Bad recurrence for [%s]", rrule);
+            }
         }
         if (TextUtils.isEmpty(repeatString)) {
             repeatString = context.getString(R.string.label_tap_to_create_schedule);
@@ -616,14 +640,7 @@ public class ExportFormFragment extends MenuFragment implements
      */
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
-
         switch (requestCode) {
-            case BackupPreferenceFragment.REQUEST_RESOLVE_CONNECTION:
-                if (resultCode == Activity.RESULT_OK) {
-                    BackupPreferenceFragment.mGoogleApiClient.connect();
-                }
-                break;
-
             case REQUEST_EXPORT_FILE:
                 if (resultCode == Activity.RESULT_OK) {
                     if (data != null) {

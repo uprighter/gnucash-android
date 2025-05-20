@@ -21,6 +21,7 @@ import static org.gnucash.android.db.DatabaseSchema.ScheduledActionEntry;
 import static org.gnucash.android.db.DatabaseSchema.SplitEntry;
 import static org.gnucash.android.db.DatabaseSchema.TransactionEntry;
 import static org.gnucash.android.export.xml.GncXmlHelper.*;
+import static org.gnucash.android.math.MathExtKt.toBigDecimal;
 import static org.gnucash.android.model.Commodity.NO_CURRENCY_CODE;
 import static org.gnucash.android.model.Commodity.TEMPLATE;
 
@@ -53,12 +54,10 @@ import org.gnucash.android.util.TimestampHelper;
 import org.xmlpull.v1.XmlPullParserFactory;
 import org.xmlpull.v1.XmlSerializer;
 
-import java.io.BufferedOutputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -178,7 +177,7 @@ public class GncXmlExporter extends Exporter {
         ArrayList<String> slotValue = new ArrayList<>();
         slotKey.add(KEY_PLACEHOLDER);
         slotType.add(ATTR_VALUE_STRING);
-        slotValue.add(Boolean.toString(account.isPlaceholderAccount()));
+        slotValue.add(Boolean.toString(account.isPlaceholder()));
 
         String color = account.getColorHexString();
         if (!TextUtils.isEmpty(color)) {
@@ -244,30 +243,31 @@ public class GncXmlExporter extends Exporter {
      */
     private void exportTransactions(XmlSerializer xmlSerializer, boolean exportTemplates) throws IOException {
         Timber.i("export transactions");
+        String[] projection = new String[]{
+            TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_UID + " AS trans_uid",
+            TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_DESCRIPTION + " AS trans_desc",
+            TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_NOTES + " AS trans_notes",
+            TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_TIMESTAMP + " AS trans_time",
+            TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_EXPORTED + " AS trans_exported",
+            TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_CURRENCY + " AS trans_currency",
+            TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_CREATED_AT + " AS trans_date_posted",
+            TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_SCHEDX_ACTION_UID + " AS trans_from_sched_action",
+            SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_UID + " AS split_uid",
+            SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_MEMO + " AS split_memo",
+            SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_TYPE + " AS split_type",
+            SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_VALUE_NUM + " AS split_value_num",
+            SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_VALUE_DENOM + " AS split_value_denom",
+            SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_QUANTITY_NUM + " AS split_quantity_num",
+            SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_QUANTITY_DENOM + " AS split_quantity_denom",
+            SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_ACCOUNT_UID + " AS split_acct_uid"
+        };
         String where = TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_TEMPLATE + "=0";
         if (exportTemplates) {
             where = TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_TEMPLATE + "=1";
         }
-        final Cursor cursor = mTransactionsDbAdapter.fetchTransactionsWithSplits(
-            new String[]{
-                TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_UID + " AS trans_uid",
-                TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_DESCRIPTION + " AS trans_desc",
-                TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_NOTES + " AS trans_notes",
-                TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_TIMESTAMP + " AS trans_time",
-                TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_EXPORTED + " AS trans_exported",
-                TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_CURRENCY + " AS trans_currency",
-                TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_CREATED_AT + " AS trans_date_posted",
-                TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_SCHEDX_ACTION_UID + " AS trans_from_sched_action",
-                SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_UID + " AS split_uid",
-                SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_MEMO + " AS split_memo",
-                SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_TYPE + " AS split_type",
-                SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_VALUE_NUM + " AS split_value_num",
-                SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_VALUE_DENOM + " AS split_value_denom",
-                SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_QUANTITY_NUM + " AS split_quantity_num",
-                SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_QUANTITY_DENOM + " AS split_quantity_denom", SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_ACCOUNT_UID + " AS split_acct_uid"},
-            where, null,
-            TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_UID + " ASC , " +
-                TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_TIMESTAMP + " ASC ");
+        String orderBy = TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_UID + " ASC , " +
+            TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_TIMESTAMP + " ASC";
+        final Cursor cursor = mTransactionsDbAdapter.fetchTransactionsWithSplits(projection, where, null, orderBy);
         String lastTrxUID = "";
         Commodity trnCommodity = null;
 
@@ -295,7 +295,7 @@ public class GncXmlExporter extends Exporter {
         while (cursor.moveToNext()) {
             String curTrxUID = cursor.getString(cursor.getColumnIndexOrThrow("trans_uid"));
             if (!lastTrxUID.equals(curTrxUID)) { // new transaction starts
-                if (!lastTrxUID.equals("")) { // there's an old transaction, close it
+                if (!TextUtils.isEmpty(lastTrxUID)) { // there's an old transaction, close it
                     xmlSerializer.endTag(null, TAG_TRN_SPLITS);
                     xmlSerializer.endTag(null, TAG_TRANSACTION);
                 }
@@ -309,7 +309,7 @@ public class GncXmlExporter extends Exporter {
                 xmlSerializer.endTag(null, TAG_TRX_ID);
                 // currency
                 String currencyCode = cursor.getString(cursor.getColumnIndexOrThrow("trans_currency"));
-                trnCommodity = CommoditiesDbAdapter.getInstance().getCommodity(currencyCode);//Currency.getInstance(currencyCode);
+                trnCommodity = CommoditiesDbAdapter.getInstance().getCommodity(currencyCode);
                 xmlSerializer.startTag(null, TAG_TRX_CURRENCY);
                 xmlSerializer.startTag(null, TAG_COMMODITY_SPACE);
                 xmlSerializer.text(COMMODITY_CURRENCY);
@@ -387,7 +387,7 @@ public class GncXmlExporter extends Exporter {
             String trxType = cursor.getString(cursor.getColumnIndexOrThrow("split_type"));
             int splitValueNum = cursor.getInt(cursor.getColumnIndexOrThrow("split_value_num"));
             int splitValueDenom = cursor.getInt(cursor.getColumnIndexOrThrow("split_value_denom"));
-            BigDecimal splitAmount = Money.getBigDecimal(splitValueNum, splitValueDenom);
+            BigDecimal splitAmount = toBigDecimal(splitValueNum, splitValueDenom);
             String strValue = "0/100";
             if (!exportTemplates) { //when doing normal transaction export
                 strValue = (trxType.equals("CREDIT") ? "-" : "") + splitValueNum + "/" + splitValueDenom;
@@ -593,7 +593,7 @@ public class GncXmlExporter extends Exporter {
     private void serializeDate(XmlSerializer xmlSerializer, String tag, long timeMillis) throws IOException {
         xmlSerializer.startTag(null, tag);
         xmlSerializer.startTag(null, TAG_GDATE);
-        xmlSerializer.text(formatDateTime(timeMillis));
+        xmlSerializer.text(formatDate(timeMillis));
         xmlSerializer.endTag(null, TAG_GDATE);
         xmlSerializer.endTag(null, tag);
     }
@@ -773,76 +773,24 @@ public class GncXmlExporter extends Exporter {
         xmlSerializer.endTag(null, TAG_BUDGET_RECURRENCE);
 
         //export budget slots
-        List<String> slotKey = new ArrayList<>();
-        List<String> slotType = new ArrayList<>();
-        List<String> slotValue = new ArrayList<>();
-
         xmlSerializer.startTag(null, TAG_BUDGET_SLOTS);
-        for (BudgetAmount budgetAmount : budget.getExpandedBudgetAmounts()) {
-            xmlSerializer.startTag(null, TAG_SLOT);
-            xmlSerializer.startTag(null, TAG_SLOT_KEY);
-            xmlSerializer.text(budgetAmount.getAccountUID());
-            xmlSerializer.endTag(null, TAG_SLOT_KEY);
 
-            Money amount = budgetAmount.getAmount();
-            slotKey.clear();
-            slotType.clear();
-            slotValue.clear();
-            for (int period = 0; period < budget.getNumberOfPeriods(); period++) {
-                slotKey.add(String.valueOf(period));
-                slotType.add(ATTR_VALUE_NUMERIC);
-                slotValue.add(amount.getNumerator() + "/" + amount.getDenominator());
-            }
-            //budget slots
+        exportBudgetAmounts(xmlSerializer, budget);
 
-            xmlSerializer.startTag(null, TAG_SLOT_VALUE);
-            xmlSerializer.attribute(null, ATTR_KEY_TYPE, ATTR_VALUE_FRAME);
-            exportSlots(xmlSerializer, slotKey, slotType, slotValue);
-            xmlSerializer.endTag(null, TAG_SLOT_VALUE);
-            xmlSerializer.endTag(null, TAG_SLOT);
-        }
+        // Notes are grouped together.
+        exportBudgetNotes(xmlSerializer, budget);
 
         xmlSerializer.endTag(null, TAG_BUDGET_SLOTS);
         xmlSerializer.endTag(null, TAG_BUDGET);
-    }
-
-    @Override
-    public List<String> generateExport() throws ExporterException {
-        OutputStreamWriter writer = null;
-        String outputFile = getExportCacheFilePath();
-        try {
-            FileOutputStream fileOutputStream = new FileOutputStream(outputFile);
-            BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(fileOutputStream);
-            writer = new OutputStreamWriter(bufferedOutputStream);
-
-            generateExport(writer);
-            close();
-        } catch (IOException ex) {
-            Timber.e(ex, "Error exporting XML");
-        } finally {
-            if (writer != null) {
-                try {
-                    writer.close();
-                } catch (IOException e) {
-                    throw new ExporterException(mExportParams, e);
-                }
-            }
-        }
-
-        List<String> exportedFiles = new ArrayList<>();
-        exportedFiles.add(outputFile);
-
-        return exportedFiles;
     }
 
     /**
      * Generates an XML export of the database and writes it to the {@code writer} output stream
      *
      * @param writer Output stream
-     * @throws ExporterException
      */
-    public void generateExport(Writer writer) throws ExporterException {
-        Timber.i("generate export");
+    @Override
+    protected void writeExport(@NonNull ExportParams exportParams, @NonNull Writer writer) throws ExporterException {
         final long timeStart = SystemClock.elapsedRealtime();
         try {
             String[] namespaces = new String[]{"gnc", "act", "book", "cd", "cmdty", "price", "slot",
@@ -854,7 +802,7 @@ public class GncXmlExporter extends Exporter {
                 // Feature not supported. No problem
             }
             xmlSerializer.setOutput(writer);
-            xmlSerializer.startDocument("utf-8", true);
+            xmlSerializer.startDocument(StandardCharsets.UTF_8.name(), true);
             // root tag
             xmlSerializer.startTag(null, TAG_ROOT);
             for (String ns : namespaces) {
@@ -875,11 +823,6 @@ public class GncXmlExporter extends Exporter {
             xmlSerializer.endTag(null, TAG_BOOK_ID);
             //commodity count
             List<Commodity> commodities = mAccountsDbAdapter.getCommoditiesInUse();
-            for (int i = 0; i < commodities.size(); i++) {
-                if (commodities.get(i).getCurrencyCode().equals(NO_CURRENCY_CODE)) {
-                    commodities.remove(i);
-                }
-            }
             xmlSerializer.startTag(null, TAG_COUNT_DATA);
             xmlSerializer.attribute(null, ATTR_KEY_CD_TYPE, "commodity");
             xmlSerializer.text(String.valueOf(commodities.size()));
@@ -947,4 +890,81 @@ public class GncXmlExporter extends Exporter {
         return "text/xml";
     }
 
+    private void exportBudgetAmounts(XmlSerializer xmlSerializer, Budget budget) throws IOException {
+        List<String> slotKey = new ArrayList<>();
+        List<String> slotType = new ArrayList<>();
+        List<String> slotValue = new ArrayList<>();
+
+        for (String accountID : budget.getAccounts()) {
+            slotKey.clear();
+            slotType.clear();
+            slotValue.clear();
+
+            final long periodCount = budget.getNumberOfPeriods();
+            for (long period = 0; period < periodCount; period++) {
+                BudgetAmount budgetAmount = budget.getBudgetAmount(accountID, period);
+                if (budgetAmount == null) continue;
+                Money amount = budgetAmount.getAmount();
+                slotKey.add(String.valueOf(period));
+                slotType.add(ATTR_VALUE_NUMERIC);
+                slotValue.add(amount.getNumerator() + "/" + amount.getDenominator());
+            }
+
+            if (slotKey.isEmpty()) continue;
+
+            xmlSerializer.startTag(null, TAG_SLOT);
+            xmlSerializer.startTag(null, TAG_SLOT_KEY);
+            xmlSerializer.text(accountID);
+            xmlSerializer.endTag(null, TAG_SLOT_KEY);
+            xmlSerializer.startTag(null, TAG_SLOT_VALUE);
+            xmlSerializer.attribute(null, ATTR_KEY_TYPE, ATTR_VALUE_FRAME);
+            exportSlots(xmlSerializer, slotKey, slotType, slotValue);
+            xmlSerializer.endTag(null, TAG_SLOT_VALUE);
+            xmlSerializer.endTag(null, TAG_SLOT);
+        }
+    }
+
+    private void exportBudgetNotes(XmlSerializer xmlSerializer, Budget budget) throws IOException {
+        List<String> slotKey = new ArrayList<>();
+        List<String> slotType = new ArrayList<>();
+        List<String> slotValue = new ArrayList<>();
+
+        xmlSerializer.startTag(null, TAG_SLOT);
+        xmlSerializer.startTag(null, TAG_SLOT_KEY);
+        xmlSerializer.text(KEY_NOTES);
+        xmlSerializer.endTag(null, TAG_SLOT_KEY);
+        xmlSerializer.startTag(null, TAG_SLOT_VALUE);
+        xmlSerializer.attribute(null, ATTR_KEY_TYPE, ATTR_VALUE_FRAME);
+
+        for (String accountID : budget.getAccounts()) {
+            slotKey.clear();
+            slotType.clear();
+            slotValue.clear();
+
+            final long periodCount = budget.getNumberOfPeriods();
+            for (long period = 0; period < periodCount; period++) {
+                BudgetAmount budgetAmount = budget.getBudgetAmount(accountID, period);
+                if (budgetAmount == null) continue;
+                String notes = budgetAmount.getNotes();
+                if (TextUtils.isEmpty(notes)) continue;
+                slotKey.add(String.valueOf(period));
+                slotType.add(ATTR_VALUE_STRING);
+                slotValue.add(notes);
+            }
+
+            if (slotKey.isEmpty()) continue;
+            xmlSerializer.startTag(null, TAG_SLOT);
+            xmlSerializer.startTag(null, TAG_SLOT_KEY);
+            xmlSerializer.text(accountID);
+            xmlSerializer.endTag(null, TAG_SLOT_KEY);
+            xmlSerializer.startTag(null, TAG_SLOT_VALUE);
+            xmlSerializer.attribute(null, ATTR_KEY_TYPE, ATTR_VALUE_FRAME);
+            exportSlots(xmlSerializer, slotKey, slotType, slotValue);
+            xmlSerializer.endTag(null, TAG_SLOT_VALUE);
+            xmlSerializer.endTag(null, TAG_SLOT);
+        }
+
+        xmlSerializer.endTag(null, TAG_SLOT_VALUE);
+        xmlSerializer.endTag(null, TAG_SLOT);
+    }
 }

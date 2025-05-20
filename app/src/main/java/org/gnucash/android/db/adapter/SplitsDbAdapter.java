@@ -17,29 +17,31 @@
 
 package org.gnucash.android.db.adapter;
 
+import static org.gnucash.android.db.DatabaseSchema.AccountEntry;
+import static org.gnucash.android.db.DatabaseSchema.CommonColumns;
 import static org.gnucash.android.db.DatabaseSchema.SplitEntry;
 import static org.gnucash.android.db.DatabaseSchema.TransactionEntry;
-import static org.gnucash.android.model.Commodity.NO_CURRENCY_CODE;
+import static org.gnucash.android.math.MathExtKt.toBigDecimal;
+import static org.gnucash.android.model.PriceKt.isNullOrEmpty;
 
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteQueryBuilder;
 import android.database.sqlite.SQLiteStatement;
 import android.text.TextUtils;
-import android.util.Pair;
 
 import androidx.annotation.NonNull;
 
 import org.gnucash.android.app.GnuCashApplication;
-import org.gnucash.android.db.DatabaseSchema;
 import org.gnucash.android.model.Commodity;
 import org.gnucash.android.model.Money;
+import org.gnucash.android.model.Price;
 import org.gnucash.android.model.Split;
 import org.gnucash.android.model.TransactionType;
 import org.gnucash.android.util.TimestampHelper;
 
+import java.io.IOException;
 import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.List;
 
 import timber.log.Timber;
@@ -53,20 +55,37 @@ import timber.log.Timber;
  */
 public class SplitsDbAdapter extends DatabaseAdapter<Split> {
 
-    public SplitsDbAdapter(SQLiteDatabase db) {
-        super(db, SplitEntry.TABLE_NAME, new String[]{
-                SplitEntry.COLUMN_MEMO,
-                SplitEntry.COLUMN_TYPE,
-                SplitEntry.COLUMN_VALUE_NUM,
-                SplitEntry.COLUMN_VALUE_DENOM,
-                SplitEntry.COLUMN_QUANTITY_NUM,
-                SplitEntry.COLUMN_QUANTITY_DENOM,
-                SplitEntry.COLUMN_CREATED_AT,
-                SplitEntry.COLUMN_RECONCILE_STATE,
-                SplitEntry.COLUMN_RECONCILE_DATE,
-                SplitEntry.COLUMN_ACCOUNT_UID,
-                SplitEntry.COLUMN_TRANSACTION_UID
+    @NonNull
+    final CommoditiesDbAdapter commoditiesDbAdapter;
+    @NonNull
+    final PricesDbAdapter pricesDbAdapter;
+
+    private static final String credit = TransactionType.CREDIT.value;
+
+    public SplitsDbAdapter(@NonNull SQLiteDatabase db) {
+        this(new CommoditiesDbAdapter(db));
+    }
+
+    public SplitsDbAdapter(@NonNull CommoditiesDbAdapter commoditiesDbAdapter) {
+        this(new PricesDbAdapter(commoditiesDbAdapter));
+    }
+
+    public SplitsDbAdapter(@NonNull PricesDbAdapter pricesDbAdapter) {
+        super(pricesDbAdapter.mDb, SplitEntry.TABLE_NAME, new String[]{
+            SplitEntry.COLUMN_MEMO,
+            SplitEntry.COLUMN_TYPE,
+            SplitEntry.COLUMN_VALUE_NUM,
+            SplitEntry.COLUMN_VALUE_DENOM,
+            SplitEntry.COLUMN_QUANTITY_NUM,
+            SplitEntry.COLUMN_QUANTITY_DENOM,
+            SplitEntry.COLUMN_CREATED_AT,
+            SplitEntry.COLUMN_RECONCILE_STATE,
+            SplitEntry.COLUMN_RECONCILE_DATE,
+            SplitEntry.COLUMN_ACCOUNT_UID,
+            SplitEntry.COLUMN_TRANSACTION_UID
         });
+        this.pricesDbAdapter = pricesDbAdapter;
+        this.commoditiesDbAdapter = pricesDbAdapter.commoditiesDbAdapter;
     }
 
     /**
@@ -76,6 +95,13 @@ public class SplitsDbAdapter extends DatabaseAdapter<Split> {
      */
     public static SplitsDbAdapter getInstance() {
         return GnuCashApplication.getSplitsDbAdapter();
+    }
+
+    @Override
+    public void close() throws IOException {
+        commoditiesDbAdapter.close();
+        pricesDbAdapter.close();
+        super.close();
     }
 
     /**
@@ -91,20 +117,18 @@ public class SplitsDbAdapter extends DatabaseAdapter<Split> {
         long transactionId = getTransactionID(split.getTransactionUID());
         //when a split is updated, we want mark the transaction as not exported
         updateRecord(TransactionEntry.TABLE_NAME, transactionId,
-                TransactionEntry.COLUMN_EXPORTED, String.valueOf(0));
+            TransactionEntry.COLUMN_EXPORTED, String.valueOf(0));
 
         //modifying a split means modifying the accompanying transaction as well
         updateRecord(TransactionEntry.TABLE_NAME, transactionId,
-                TransactionEntry.COLUMN_MODIFIED_AT, TimestampHelper.getUtcStringFromTimestamp(TimestampHelper.getTimestampFromNow()));
+            TransactionEntry.COLUMN_MODIFIED_AT, TimestampHelper.getUtcStringFromTimestamp(TimestampHelper.getTimestampFromNow()));
     }
 
     @Override
-    protected @NonNull SQLiteStatement setBindings(@NonNull SQLiteStatement stmt, @NonNull final Split split) {
-        stmt.clearBindings();
+    protected @NonNull SQLiteStatement bind(@NonNull SQLiteStatement stmt, @NonNull final Split split) {
+        bindBaseModel(stmt, split);
         if (split.getMemo() != null) {
             stmt.bindString(1, split.getMemo());
-        } else {
-            stmt.bindNull(1);
         }
         stmt.bindString(2, split.getType().name());
         stmt.bindLong(3, split.getValue().getNumerator());
@@ -116,7 +140,6 @@ public class SplitsDbAdapter extends DatabaseAdapter<Split> {
         stmt.bindString(9, TimestampHelper.getUtcStringFromTimestamp(split.getReconcileDate()));
         stmt.bindString(10, split.getAccountUID());
         stmt.bindString(11, split.getTransactionUID());
-        stmt.bindString(12, split.getUID());
 
         return stmt;
     }
@@ -140,10 +163,11 @@ public class SplitsDbAdapter extends DatabaseAdapter<Split> {
         String reconcileState = cursor.getString(cursor.getColumnIndexOrThrow(SplitEntry.COLUMN_RECONCILE_STATE));
         String reconcileDate = cursor.getString(cursor.getColumnIndexOrThrow(SplitEntry.COLUMN_RECONCILE_DATE));
 
-        String transactionCurrency = getAttribute(TransactionEntry.TABLE_NAME, transxUID, TransactionEntry.COLUMN_CURRENCY);
+        String transactionCurrencyUID = getAttribute(TransactionEntry.TABLE_NAME, transxUID, TransactionEntry.COLUMN_COMMODITY_UID);
+        Commodity transactionCurrency = commoditiesDbAdapter.getRecord(transactionCurrencyUID);
         Money value = new Money(valueNum, valueDenom, transactionCurrency);
-        String currencyCode = getAccountCurrencyCode(accountUID);
-        Money quantity = new Money(quantityNum, quantityDenom, currencyCode);
+        Commodity commodity = getCommodity(accountUID);
+        Money quantity = new Money(quantityNum, quantityDenom, commodity);
 
         Split split = new Split(value, accountUID);
         populateBaseModelAttributes(cursor, split);
@@ -163,13 +187,12 @@ public class SplitsDbAdapter extends DatabaseAdapter<Split> {
      * This takes into account the kind of movement caused by the split in the account (which also depends on account type)
      * The Caller must make sure all accounts have the currency, which is passed in as currencyCode
      *
-     * @param accountUIDList        List of String unique IDs of given set of accounts
-     * @param currencyCode          currencyCode for all the accounts in the list
-     * @param hasDebitNormalBalance Does the final balance has normal debit credit meaning
+     * @param accountUIDList List of String unique IDs of given set of accounts
+     * @param currencyCode   currencyCode for all the accounts in the list
      * @return Balance of the splits for this account
      */
-    public Money computeSplitBalance(List<String> accountUIDList, String currencyCode, boolean hasDebitNormalBalance) {
-        return calculateSplitBalance(accountUIDList, currencyCode, hasDebitNormalBalance, -1, -1);
+    public Money computeSplitBalance(List<String> accountUIDList, String currencyCode) {
+        return calculateSplitBalance(accountUIDList, currencyCode, -1, -1);
     }
 
     /**
@@ -177,90 +200,87 @@ public class SplitsDbAdapter extends DatabaseAdapter<Split> {
      * This takes into account the kind of movement caused by the split in the account (which also depends on account type)
      * The Caller must make sure all accounts have the currency, which is passed in as currencyCode
      *
-     * @param accountUIDList        List of String unique IDs of given set of accounts
-     * @param currencyCode          currencyCode for all the accounts in the list
-     * @param hasDebitNormalBalance Does the final balance has normal debit credit meaning
-     * @param startTimestamp        the start timestamp of the time range
-     * @param endTimestamp          the end timestamp of the time range
+     * @param accountUIDList List of String unique IDs of given set of accounts
+     * @param currencyCode   currencyCode for all the accounts in the list
+     * @param startTimestamp the start timestamp of the time range
+     * @param endTimestamp   the end timestamp of the time range
      * @return Balance of the splits for this account within the specified time range
      */
-    public Money computeSplitBalance(List<String> accountUIDList, String currencyCode, boolean hasDebitNormalBalance,
-                                     long startTimestamp, long endTimestamp) {
-        return calculateSplitBalance(accountUIDList, currencyCode, hasDebitNormalBalance, startTimestamp, endTimestamp);
+    public Money computeSplitBalance(
+        List<String> accountUIDList,
+        String currencyCode,
+        long startTimestamp,
+        long endTimestamp
+    ) {
+        return calculateSplitBalance(accountUIDList, currencyCode, startTimestamp, endTimestamp);
     }
 
-
-    private Money calculateSplitBalance(List<String> accountUIDList, String currencyCode, boolean hasDebitNormalBalance,
-                                        long startTimestamp, long endTimestamp) {
+    private Money calculateSplitBalance(
+        List<String> accountUIDList,
+        String currencyCode,
+        long startTimestamp,
+        long endTimestamp
+    ) {
+        final Commodity currency = commoditiesDbAdapter.getCommodity(currencyCode);
+        final String currencyUID = currency.getUID();
+        BigDecimal total = BigDecimal.ZERO;
         if (accountUIDList.isEmpty()) {
-            return Money.createZeroInstance(currencyCode);
+            return new Money(total, currency);
         }
 
-        String[] selectionArgs = null;
-        String selection = DatabaseSchema.AccountEntry.TABLE_NAME + "_" + DatabaseSchema.CommonColumns.COLUMN_UID + " in ( '" + TextUtils.join("' , '", accountUIDList) + "' ) AND " +
-                TransactionEntry.TABLE_NAME + "_" + TransactionEntry.COLUMN_TEMPLATE + " = 0";
+        String selection = "a." + CommonColumns.COLUMN_UID + " IN ('" + TextUtils.join("','", accountUIDList) + "')"
+            + " AND t." + TransactionEntry.COLUMN_TEMPLATE + " = 0"
+            + " AND a." + AccountEntry.COLUMN_CURRENCY + " != '" + Commodity.TEMPLATE + "'"
+            + " AND s." + SplitEntry.COLUMN_QUANTITY_DENOM + " >= 1";
 
-        if (startTimestamp != -1 && endTimestamp != -1) {
-            selection += " AND " + TransactionEntry.TABLE_NAME + "_" + TransactionEntry.COLUMN_TIMESTAMP + " BETWEEN ? AND ? ";
-            selectionArgs = new String[]{String.valueOf(startTimestamp), String.valueOf(endTimestamp)};
-        } else if (startTimestamp == -1 && endTimestamp != -1) {
-            selection += " AND " + TransactionEntry.TABLE_NAME + "_" + TransactionEntry.COLUMN_TIMESTAMP + " <= ?";
-            selectionArgs = new String[]{String.valueOf(endTimestamp)};
-        } else if (startTimestamp != -1/* && endTimestamp == -1*/) {
-            selection += " AND " + TransactionEntry.TABLE_NAME + "_" + TransactionEntry.COLUMN_TIMESTAMP + " >= ?";
-            selectionArgs = new String[]{String.valueOf(startTimestamp)};
+        boolean validStart = startTimestamp != -1;
+        boolean validEnd = endTimestamp != -1;
+        if (validStart && validEnd) {
+            selection += " AND t." + TransactionEntry.COLUMN_TIMESTAMP + " BETWEEN " + startTimestamp + " AND " + endTimestamp;
+        } else if (validEnd) {
+            selection += " AND t." + TransactionEntry.COLUMN_TIMESTAMP + " <= " + endTimestamp;
+        } else if (validStart) {
+            selection += " AND t." + TransactionEntry.COLUMN_TIMESTAMP + " >= " + startTimestamp;
         }
 
-        String[] columns = new String[]{"TOTAL ( CASE WHEN " + SplitEntry.TABLE_NAME + "_" + SplitEntry.COLUMN_TYPE + " = 'DEBIT' THEN " +
-            SplitEntry.TABLE_NAME + "_" + SplitEntry.COLUMN_QUANTITY_NUM + " ELSE - " +
-            SplitEntry.TABLE_NAME + "_" + SplitEntry.COLUMN_QUANTITY_NUM + " END )",
-            SplitEntry.TABLE_NAME + "_" + SplitEntry.COLUMN_QUANTITY_DENOM,
-            DatabaseSchema.AccountEntry.TABLE_NAME + "_" + DatabaseSchema.AccountEntry.COLUMN_CURRENCY};
-        Cursor cursor = mDb.query("trans_split_acct", columns,
-                selection, selectionArgs, DatabaseSchema.AccountEntry.TABLE_NAME + "_" + DatabaseSchema.AccountEntry.COLUMN_CURRENCY, null, null);
+        String sql = "SELECT SUM(s." + SplitEntry.COLUMN_QUANTITY_NUM + ")"
+            + ", s." + SplitEntry.COLUMN_QUANTITY_DENOM
+            + ", s." + SplitEntry.COLUMN_TYPE
+            + ", a." + AccountEntry.COLUMN_COMMODITY_UID
+            + " FROM " + TransactionEntry.TABLE_NAME + " t, "
+            + SplitEntry.TABLE_NAME + " s ON t." + TransactionEntry.COLUMN_UID + "= s." + SplitEntry.COLUMN_TRANSACTION_UID + ", "
+            + AccountEntry.TABLE_NAME + " a ON s." + SplitEntry.COLUMN_ACCOUNT_UID + " = a." + AccountEntry.COLUMN_UID
+            + " WHERE " + selection
+            + " GROUP BY a.commodity_uid, s.type, s.quantity_denom";
+        Cursor cursor = mDb.rawQuery(sql, null);
 
         try {
-            Money total = Money.createZeroInstance(currencyCode);
-            CommoditiesDbAdapter commoditiesDbAdapter = null;
-            PricesDbAdapter pricesDbAdapter = null;
-            Commodity commodity = null;
-            String currencyUID = null;
             while (cursor.moveToNext()) {
+                //FIXME beware of 64-bit overflow - get as BigInteger
                 long amount_num = cursor.getLong(0);
                 long amount_denom = cursor.getLong(1);
-                String commodityCode = cursor.getString(2);
-                if (commodityCode.equals(NO_CURRENCY_CODE) || amount_num == 0) {
-                    // ignore custom currency
-                    continue;
-                }
-                if (!hasDebitNormalBalance) {
+                String splitType = cursor.getString(2);
+                String commodityUID = cursor.getString(3);
+
+                if (credit.equals(splitType)) {
                     amount_num = -amount_num;
                 }
-                if (commodityCode.equals(currencyCode)) {
-                    // currency matches
-                    total = total.plus(new Money(amount_num, amount_denom, currencyCode));
-                } else {
-                    // there is a second currency involved
-                    if (commoditiesDbAdapter == null) {
-                        commoditiesDbAdapter = new CommoditiesDbAdapter(mDb);
-                        pricesDbAdapter = new PricesDbAdapter(mDb, commoditiesDbAdapter);
-                        commodity = commoditiesDbAdapter.getCommodity(currencyCode);
-                        currencyUID = commoditiesDbAdapter.getCommodityUID(currencyCode);
-                    }
-                    // get price
-                    String commodityUID = commoditiesDbAdapter.getCommodityUID(commodityCode);
-                    Pair<Long, Long> price = pricesDbAdapter.getPrice(commodityUID, currencyUID);
-                    if (price.first <= 0 || price.second <= 0) {
+                BigDecimal amount = toBigDecimal(amount_num, amount_denom);
+                if (!commodityUID.equals(currencyUID)) {
+                    // there is a second currency involved - get price, e.g. EUR -> ILS
+                    // FIXME get the price for the transaction date.
+                    Commodity commodity = commoditiesDbAdapter.getRecord(commodityUID);
+                    Price price = pricesDbAdapter.getPrice(commodity, currency);
+                    if (isNullOrEmpty(price)) {
+                        // TODO Try with transaction currency, e.g. EUR -> ETB -> ILS
                         // no price exists, just ignore it
                         continue;
                     }
-                    BigDecimal amount = Money.getBigDecimal(amount_num, amount_denom);
-                    BigDecimal amountConverted = amount.multiply(new BigDecimal(price.first))
-                            .divide(new BigDecimal(price.second), commodity.getSmallestFractionDigits(), BigDecimal.ROUND_HALF_EVEN);
-                    total = total.plus(new Money(amountConverted, commodity));
+                    amount = amount.multiply(price.toBigDecimal());
                 }
+                total = total.add(amount);
             }
-            return total;
+            return new Money(total, currency);
         } finally {
             cursor.close();
         }
@@ -274,15 +294,7 @@ public class SplitsDbAdapter extends DatabaseAdapter<Split> {
      */
     public List<Split> getSplitsForTransaction(String transactionUID) {
         Cursor cursor = fetchSplitsForTransaction(transactionUID);
-        List<Split> splitList = new ArrayList<Split>();
-        try {
-            while (cursor.moveToNext()) {
-                splitList.add(buildModelInstance(cursor));
-            }
-        } finally {
-            cursor.close();
-        }
-        return splitList;
+        return getRecords(cursor);
     }
 
     /**
@@ -306,14 +318,7 @@ public class SplitsDbAdapter extends DatabaseAdapter<Split> {
      */
     public List<Split> getSplitsForTransactionInAccount(String transactionUID, String accountUID) {
         Cursor cursor = fetchSplitsForTransactionAndAccount(transactionUID, accountUID);
-        List<Split> splitList = new ArrayList<Split>();
-        if (cursor != null) {
-            while (cursor.moveToNext()) {
-                splitList.add(buildModelInstance(cursor));
-            }
-            cursor.close();
-        }
-        return splitList;
+        return getRecords(cursor);
     }
 
     /**
@@ -325,8 +330,7 @@ public class SplitsDbAdapter extends DatabaseAdapter<Split> {
      * @return Cursor to split records
      */
     public Cursor fetchSplits(String where, String[] whereArgs, String sortOrder) {
-        return mDb.query(SplitEntry.TABLE_NAME,
-                null, where, whereArgs, null, null, sortOrder);
+        return mDb.query(SplitEntry.TABLE_NAME, null, where, whereArgs, null, null, sortOrder);
     }
 
     /**
@@ -338,9 +342,9 @@ public class SplitsDbAdapter extends DatabaseAdapter<Split> {
     public Cursor fetchSplitsForTransaction(String transactionUID) {
         Timber.v("Fetching all splits for transaction UID %s", transactionUID);
         return mDb.query(SplitEntry.TABLE_NAME,
-                null, SplitEntry.COLUMN_TRANSACTION_UID + " = ?",
-                new String[]{transactionUID},
-                null, null, null);
+            null, SplitEntry.COLUMN_TRANSACTION_UID + " = ?",
+            new String[]{transactionUID},
+            null, null, null);
     }
 
     /**
@@ -356,13 +360,13 @@ public class SplitsDbAdapter extends DatabaseAdapter<Split> {
         // we need to *not* return any splits which belong to recurring transactions
         SQLiteQueryBuilder queryBuilder = new SQLiteQueryBuilder();
         queryBuilder.setTables(TransactionEntry.TABLE_NAME
-                + " INNER JOIN " + SplitEntry.TABLE_NAME + " ON "
-                + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_UID + " = "
-                + SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_TRANSACTION_UID);
+            + " INNER JOIN " + SplitEntry.TABLE_NAME + " ON "
+            + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_UID + " = "
+            + SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_TRANSACTION_UID);
         queryBuilder.setDistinct(true);
         String[] projectionIn = new String[]{SplitEntry.TABLE_NAME + ".*"};
         String selection = SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_ACCOUNT_UID + " = ?"
-                + " AND " + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_TEMPLATE + " = 0";
+            + " AND " + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_TEMPLATE + " = 0";
         String[] selectionArgs = new String[]{accountUID};
         String sortOrder = TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_TIMESTAMP + " DESC";
 
@@ -382,12 +386,12 @@ public class SplitsDbAdapter extends DatabaseAdapter<Split> {
             return null;
 
         Timber.v("Fetching all splits for transaction ID " + transactionUID
-                + "and account ID " + accountUID);
+            + "and account ID " + accountUID);
         return mDb.query(SplitEntry.TABLE_NAME,
-                null, SplitEntry.COLUMN_TRANSACTION_UID + " = ? AND "
-                        + SplitEntry.COLUMN_ACCOUNT_UID + " = ?",
-                new String[]{transactionUID, accountUID},
-                null, null, SplitEntry.COLUMN_VALUE_NUM + " ASC");
+            null, SplitEntry.COLUMN_TRANSACTION_UID + " = ? AND "
+                + SplitEntry.COLUMN_ACCOUNT_UID + " = ?",
+            new String[]{transactionUID, accountUID},
+            null, null, SplitEntry.COLUMN_VALUE_NUM + " ASC");
     }
 
     /**
@@ -398,9 +402,9 @@ public class SplitsDbAdapter extends DatabaseAdapter<Split> {
      */
     public String getTransactionUID(long transactionId) {
         Cursor cursor = mDb.query(TransactionEntry.TABLE_NAME,
-                new String[]{TransactionEntry.COLUMN_UID},
-                TransactionEntry._ID + " = " + transactionId,
-                null, null, null, null);
+            new String[]{TransactionEntry.COLUMN_UID},
+            TransactionEntry._ID + " = " + transactionId,
+            null, null, null, null);
 
         try {
             if (cursor.moveToFirst()) {
@@ -417,7 +421,7 @@ public class SplitsDbAdapter extends DatabaseAdapter<Split> {
     public boolean deleteRecord(long rowId) {
         Split split = getRecord(rowId);
         String transactionUID = split.getTransactionUID();
-        boolean result = mDb.delete(SplitEntry.TABLE_NAME, SplitEntry._ID + "=" + rowId, null) > 0;
+        boolean result = super.deleteRecord(rowId);
 
         if (!result) //we didn't delete for whatever reason, invalid rowId etc
             return false;
@@ -428,7 +432,7 @@ public class SplitsDbAdapter extends DatabaseAdapter<Split> {
             if (cursor.getCount() > 0) {
                 long transactionID = getTransactionID(transactionUID);
                 result = mDb.delete(TransactionEntry.TABLE_NAME,
-                        TransactionEntry._ID + "=" + transactionID, null) > 0;
+                    TransactionEntry._ID + "=" + transactionID, null) > 0;
             }
         } finally {
             cursor.close();
@@ -444,9 +448,9 @@ public class SplitsDbAdapter extends DatabaseAdapter<Split> {
      */
     public long getTransactionID(String transactionUID) {
         Cursor c = mDb.query(TransactionEntry.TABLE_NAME,
-                new String[]{TransactionEntry._ID},
-                TransactionEntry.COLUMN_UID + "=?",
-                new String[]{transactionUID}, null, null, null);
+            new String[]{TransactionEntry._ID},
+            TransactionEntry.COLUMN_UID + "=?",
+            new String[]{transactionUID}, null, null, null);
         try {
             if (c.moveToFirst()) {
                 return c.getLong(0);
@@ -458,4 +462,37 @@ public class SplitsDbAdapter extends DatabaseAdapter<Split> {
         }
     }
 
+    public void reassignAccount(@NonNull String accountUID, @NonNull String newParentAccountUID) {
+        updateRecords(
+            SplitEntry.COLUMN_ACCOUNT_UID + " = ?",
+            new String[]{accountUID},
+            SplitEntry.COLUMN_ACCOUNT_UID,
+            newParentAccountUID
+        );
+    }
+
+    /**
+     * Returns the commodity of the account
+     * with unique Identifier <code>accountUID</code>
+     *
+     * @param accountUID Unique Identifier of the account
+     * @return Commodity of the account.
+     */
+    public Commodity getCommodity(@NonNull String accountUID) {
+        Cursor cursor = mDb.query(
+            AccountEntry.TABLE_NAME,
+            new String[]{AccountEntry.COLUMN_COMMODITY_UID},
+            AccountEntry.COLUMN_UID + "= ?",
+            new String[]{accountUID}, null, null, null);
+        try {
+            if (cursor.moveToFirst()) {
+                String commodityUID = cursor.getString(0);
+                return commoditiesDbAdapter.getRecord(commodityUID);
+            } else {
+                throw new IllegalArgumentException("Account " + accountUID + " does not exist");
+            }
+        } finally {
+            cursor.close();
+        }
+    }
 }

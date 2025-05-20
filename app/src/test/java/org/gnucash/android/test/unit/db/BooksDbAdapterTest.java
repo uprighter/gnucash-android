@@ -18,6 +18,8 @@ package org.gnucash.android.test.unit.db;
 import static junit.framework.Assert.fail;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import android.content.Context;
+
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
 import org.gnucash.android.db.adapter.BooksDbAdapter;
@@ -30,10 +32,13 @@ import org.junit.Before;
 import org.junit.Test;
 import org.xml.sax.SAXException;
 
+import java.io.Console;
 import java.io.File;
 import java.io.IOException;
 
 import javax.xml.parsers.ParserConfigurationException;
+
+import timber.log.Timber;
 
 /**
  * Test the book database adapter
@@ -117,6 +122,7 @@ public class BooksDbAdapterTest extends GnuCashTest {
      */
     @Test
     public void deletingBook_shouldDeleteDbFile() {
+        Context context = GnuCashApplication.getAppContext();
         String bookUID = createNewBookWithDefaultAccounts();
         File dbPath = GnuCashApplication.getAppContext().getDatabasePath(bookUID);
         assertThat(dbPath).exists();
@@ -124,7 +130,7 @@ public class BooksDbAdapterTest extends GnuCashTest {
         assertThat(booksDbAdapter.getRecord(bookUID)).isNotNull();
 
         long booksCount = booksDbAdapter.getRecordsCount();
-        booksDbAdapter.deleteBook(bookUID);
+        booksDbAdapter.deleteBook(context, bookUID);
         assertThat(dbPath).doesNotExist();
         assertThat(booksDbAdapter.getRecordsCount()).isEqualTo(booksCount - 1);
     }
@@ -197,9 +203,10 @@ public class BooksDbAdapterTest extends GnuCashTest {
      */
     private String createNewBookWithDefaultAccounts() {
         try {
-            return GncXmlImporter.parse(GnuCashApplication.getAppContext().getResources().openRawResource(R.raw.default_accounts));
+            Context context = GnuCashApplication.getAppContext();
+            return GncXmlImporter.parse(context, context.getResources().openRawResource(R.raw.default_accounts));
         } catch (ParserConfigurationException | SAXException | IOException e) {
-            e.printStackTrace();
+            Timber.e(e);
             throw new RuntimeException("Could not create default accounts");
         }
     }

@@ -59,11 +59,6 @@ class Account : BaseModel {
     var description: String? = ""
 
     /**
-     * Commodity used by this account
-     */
-    private var _commodity: Commodity? = null
-
-    /**
      * Type of account
      * Defaults to [AccountType.CASH]
      */
@@ -72,7 +67,7 @@ class Account : BaseModel {
     /**
      * List of transactions in this account
      */
-    private var _transactionsList: MutableList<Transaction> = ArrayList()
+    private var _transactionsList = mutableListOf<Transaction>()
 
     /**
      * Account UID of the parent account. Can be null
@@ -89,7 +84,7 @@ class Account : BaseModel {
      * Flag for placeholder accounts.
      * These accounts cannot have transactions
      */
-    private var _isPlaceholderAccount = false
+    private var _isPlaceholder = false
 
     /**
      * `true` if this account is flagged as a favorite account, `false` if not
@@ -161,21 +156,6 @@ class Account : BaseModel {
         get() = _transactionsList.size
 
     /**
-     * Returns the aggregate of all transactions in this account.
-     * It takes into account debit and credit amounts, it does not however consider sub-accounts
-     *
-     * @return [Money] aggregate amount of all transactions in account.
-     */
-    val balance: Money
-        get() {
-            var balance = Money.createZeroInstance(commodity.currencyCode)
-            for (transaction in _transactionsList) {
-                balance += transaction.getBalance(uID!!)
-            }
-            return balance
-        }
-
-    /**
      * The color of the account.
      */
     @ColorInt
@@ -216,19 +196,15 @@ class Account : BaseModel {
     /**
      * The commodity for this account
      */
-    var commodity: Commodity
-        get() = _commodity!!
-        set(value) {
-            _commodity = value
-        }
+    var commodity: Commodity = Commodity.DEFAULT_COMMODITY
 
     /**
      * Returns `true` if this account is a placeholder account, `false` otherwise.
      *
      * @return `true` if this account is a placeholder account, `false` otherwise
      */
-    fun isPlaceholderAccount(): Boolean {
-        return _isPlaceholderAccount
+    fun isPlaceholder(): Boolean {
+        return _isPlaceholder
     }
 
     /**
@@ -260,7 +236,7 @@ class Account : BaseModel {
      * @param isPlaceholder Boolean flag indicating if the account is a placeholder account or not
      */
     fun setPlaceHolderFlag(isPlaceholder: Boolean) {
-        _isPlaceholderAccount = isPlaceholder
+        _isPlaceholder = isPlaceholder
     }
 
     /**
@@ -279,6 +255,17 @@ class Account : BaseModel {
      */
     fun setDefaultTransferAccountUID(defaultTransferAccountUID: String?) {
         _defaultTransferAccountUID = defaultTransferAccountUID
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is Account) return false
+        return super.equals(other)
+                && (this.name == other.name)
+                && (this.isFavorite == other.isFavorite)
+                && (this._isHidden == other._isHidden)
+                && (this._isPlaceholder == other._isPlaceholder)
+                && (this.commodity == other.commodity)
     }
 
     override fun toString(): String = fullName ?: name

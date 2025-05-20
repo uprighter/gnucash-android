@@ -35,7 +35,6 @@ import androidx.test.espresso.action.Press;
 import androidx.test.espresso.action.Tap;
 import androidx.test.rule.ActivityTestRule;
 import androidx.test.rule.GrantPermissionRule;
-import androidx.test.ext.junit.runners.AndroidJUnit4;
 
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
@@ -65,13 +64,11 @@ import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.Rule;
 import org.junit.Test;
-import org.junit.runner.RunWith;
 
 import java.math.BigDecimal;
 import java.util.Locale;
 
-@RunWith(AndroidJUnit4.class)
-public class PieChartReportTest {
+public class PieChartReportTest extends GnuAndroidTest {
 
     private static final String TRANSACTION_NAME = "Pizza";
     private static final double TRANSACTION_AMOUNT = 9.99;
@@ -122,7 +119,7 @@ public class PieChartReportTest {
     public static void prepareTestCase() throws Exception {
         Context context = GnuCashApplication.getAppContext();
         oldActiveBookUID = GnuCashApplication.getActiveBookUID();
-        testBookUID = GncXmlImporter.parse(context.getResources().openRawResource(R.raw.default_accounts));
+        testBookUID = GncXmlImporter.parse(context, context.getResources().openRawResource(R.raw.default_accounts));
 
         BookUtils.loadBook(context, testBookUID);
         mTransactionsDbAdapter = TransactionsDbAdapter.getInstance();
@@ -130,7 +127,7 @@ public class PieChartReportTest {
 
         commodity = CommoditiesDbAdapter.getInstance().getCommodity("USD");
 
-        PreferenceActivity.getActiveBookSharedPreferences().edit()
+        PreferenceActivity.getActiveBookSharedPreferences(context).edit()
                 .putString(context.getString(R.string.key_default_currency), commodity.getCurrencyCode())
                 .commit();
     }
@@ -276,6 +273,7 @@ public class PieChartReportTest {
                     mReportsActivity.refresh();
                 }
             });
+            sleep(1000);
         } catch (Throwable t) {
             System.err.println("Failed to refresh reports");
         }

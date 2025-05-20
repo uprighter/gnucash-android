@@ -6,6 +6,8 @@ import java.math.MathContext
 import java.sql.Timestamp
 import java.text.DecimalFormat
 import java.text.NumberFormat
+import kotlin.contracts.ExperimentalContracts
+import kotlin.contracts.contract
 
 /**
  * Model for commodity prices
@@ -42,6 +44,24 @@ class Price : BaseModel {
         setExchangeRate(exchangeRate)
     }
 
+    /**
+     * Create new instance with the GUIDs of the commodities and the specified exchange rate.
+     *
+     * @param commodity1 the origin commodity
+     * @param commodity2 the target commodity
+     * @param exchangeRateNumerator  exchange rate numerator between the commodities
+     * @param exchangeRateDenominator  exchange rate denominator between the commodities
+     */
+    constructor(
+        commodity1: Commodity,
+        commodity2: Commodity,
+        exchangeRateNumerator: Long,
+        exchangeRateDenominator: Long
+    ) :
+            this(commodity1, commodity2) {
+        setExchangeRate(exchangeRateNumerator, exchangeRateDenominator)
+    }
+
     private var _valueNum = 0L
     var valueNum: Long
         get() = _valueNum
@@ -49,7 +69,7 @@ class Price : BaseModel {
             _valueNum = value
             reduce(value, valueDenom)
         }
-    private var _valueDenom = 0L
+    private var _valueDenom = 1L
     var valueDenom: Long
         get() = _valueDenom
         set(value) {
@@ -107,8 +127,10 @@ class Price : BaseModel {
     override fun toString(): String {
         val numerator = BigDecimal(valueNum)
         val denominator = BigDecimal(valueDenom)
-        val formatter = NumberFormat.getNumberInstance() as DecimalFormat
-        formatter.maximumFractionDigits = 6
+        val precision = currency.smallestFractionDigits
+        val formatter = (NumberFormat.getNumberInstance() as DecimalFormat).apply {
+            maximumFractionDigits = precision
+        }
         return formatter.format(numerator.divide(denominator, MathContext.DECIMAL32))
     }
 
@@ -123,13 +145,19 @@ class Price : BaseModel {
         )
     }
 
-    val commodityUID: String? get() = commodity.uID
-    val currencyUID: String? get() = currency.uID
+    val commodityUID: String? get() = commodity.uid
+    val currencyUID: String? get() = currency.uid
 
     fun setExchangeRate(rate: BigDecimal) {
         // Store 0.1234 as 1234/10000
         valueNum = rate.unscaledValue().toLong()
         valueDenom = BigDecimal.ONE.scaleByPowerOfTen(rate.scale()).toLong()
+    }
+
+    fun setExchangeRate(numerator: Long, denominator: Long) {
+        // Store 0.1234 as 1234/10000
+        valueNum = numerator
+        valueDenom = denominator
     }
 
     companion object {
@@ -138,4 +166,13 @@ class Price : BaseModel {
          */
         const val SOURCE_USER = "user:xfer-dialog"
     }
+}
+
+@OptIn(ExperimentalContracts::class)
+fun Price?.isNullOrEmpty(): Boolean {
+    contract {
+        returns(false) implies (this@isNullOrEmpty != null)
+    }
+
+    return this == null || this.valueNum <= 0 || this.valueDenom <= 0
 }

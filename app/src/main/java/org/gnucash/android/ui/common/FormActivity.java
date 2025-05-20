@@ -19,12 +19,12 @@ package org.gnucash.android.ui.common;
 import android.content.Intent;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.view.MenuItem;
 
+import androidx.annotation.ColorInt;
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
-import androidx.appcompat.widget.Toolbar;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 
@@ -39,7 +39,6 @@ import org.gnucash.android.ui.export.ExportFormFragment;
 import org.gnucash.android.ui.passcode.PasscodeLockActivity;
 import org.gnucash.android.ui.transaction.SplitEditorFragment;
 import org.gnucash.android.ui.transaction.TransactionFormFragment;
-import org.gnucash.android.ui.util.widget.CalculatorKeyboard;
 import org.gnucash.android.util.BookUtils;
 
 /**
@@ -54,8 +53,6 @@ public class FormActivity extends PasscodeLockActivity {
     private String mAccountUID;
 
     private ActivityFormBinding binding;
-    @Nullable
-    private CalculatorKeyboard mOnBackListener;
 
     public enum FormType {
         ACCOUNT,
@@ -86,17 +83,16 @@ public class FormActivity extends PasscodeLockActivity {
         assert (actionBar != null);
         actionBar.setHomeButtonEnabled(true);
         actionBar.setDisplayHomeAsUpEnabled(true);
-        actionBar.setHomeAsUpIndicator(R.drawable.ic_close);
 
         Bundle args = intent.getExtras();
         if (args == null) args = new Bundle();
 
         mAccountUID = args.getString(UxArgument.SELECTED_ACCOUNT_UID);
-        if (mAccountUID == null) {
+        if (TextUtils.isEmpty(mAccountUID)) {
             mAccountUID = args.getString(UxArgument.PARENT_ACCOUNT_UID);
         }
-        if (mAccountUID != null) {
-            int colorCode = AccountsDbAdapter.getActiveAccountColorResource(mAccountUID);
+        if (!TextUtils.isEmpty(mAccountUID)) {
+            @ColorInt int colorCode = AccountsDbAdapter.getActiveAccountColorResource(this, mAccountUID);
             actionBar.setBackgroundDrawable(new ColorDrawable(colorCode));
             getWindow().setStatusBarColor(GnuCashApplication.darken(colorCode));
         }
@@ -231,20 +227,6 @@ public class FormActivity extends PasscodeLockActivity {
         fragmentManager.beginTransaction()
             .replace(R.id.fragment_container, fragment)
             .commit();
-    }
-
-
-    public void setOnBackListener(@Nullable CalculatorKeyboard keyboard) {
-        mOnBackListener = keyboard;
-    }
-
-    @Override
-    public void onBackPressed() {
-        if (mOnBackListener != null && mOnBackListener.onBackPressed()) {
-            return;
-        }
-
-        super.onBackPressed();
     }
 
 }

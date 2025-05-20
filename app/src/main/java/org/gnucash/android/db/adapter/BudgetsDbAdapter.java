@@ -31,6 +31,7 @@ import org.gnucash.android.model.BudgetAmount;
 import org.gnucash.android.model.Money;
 import org.gnucash.android.model.Recurrence;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -40,24 +41,38 @@ import java.util.List;
  */
 public class BudgetsDbAdapter extends DatabaseAdapter<Budget> {
 
-    private RecurrenceDbAdapter mRecurrenceDbAdapter;
-    private BudgetAmountsDbAdapter mBudgetAmountsDbAdapter;
+    @NonNull
+    public final RecurrenceDbAdapter recurrenceDbAdapter;
+    @NonNull
+    public final BudgetAmountsDbAdapter budgetAmountsDbAdapter;
 
     /**
      * Opens the database adapter with an existing database
-     *
-     * @param db SQLiteDatabase object
      */
-    public BudgetsDbAdapter(SQLiteDatabase db, BudgetAmountsDbAdapter budgetAmountsDbAdapter,
-                            RecurrenceDbAdapter recurrenceDbAdapter) {
-        super(db, BudgetEntry.TABLE_NAME, new String[]{
-                BudgetEntry.COLUMN_NAME,
-                BudgetEntry.COLUMN_DESCRIPTION,
-                BudgetEntry.COLUMN_RECURRENCE_UID,
-                BudgetEntry.COLUMN_NUM_PERIODS
+    public BudgetsDbAdapter(@NonNull BudgetAmountsDbAdapter budgetAmountsDbAdapter,
+                            @NonNull RecurrenceDbAdapter recurrenceDbAdapter) {
+        super(budgetAmountsDbAdapter.mDb, BudgetEntry.TABLE_NAME, new String[]{
+            BudgetEntry.COLUMN_NAME,
+            BudgetEntry.COLUMN_DESCRIPTION,
+            BudgetEntry.COLUMN_RECURRENCE_UID,
+            BudgetEntry.COLUMN_NUM_PERIODS
         });
-        mRecurrenceDbAdapter = recurrenceDbAdapter;
-        mBudgetAmountsDbAdapter = budgetAmountsDbAdapter;
+        this.budgetAmountsDbAdapter = budgetAmountsDbAdapter;
+        this.recurrenceDbAdapter = recurrenceDbAdapter;
+    }
+
+    /**
+     * Opens the database adapter with an existing database
+     */
+    public BudgetsDbAdapter(@NonNull RecurrenceDbAdapter recurrenceDbAdapter) {
+        this(new BudgetAmountsDbAdapter(recurrenceDbAdapter.mDb), recurrenceDbAdapter);
+    }
+
+    /**
+     * Opens the database adapter with an existing database
+     */
+    public BudgetsDbAdapter(@NonNull SQLiteDatabase db) {
+        this(new RecurrenceDbAdapter(db));
     }
 
     /**
@@ -70,15 +85,22 @@ public class BudgetsDbAdapter extends DatabaseAdapter<Budget> {
     }
 
     @Override
+    public void close() throws IOException {
+        super.close();
+        budgetAmountsDbAdapter.close();
+        recurrenceDbAdapter.close();
+    }
+
+    @Override
     public void addRecord(@NonNull Budget budget, UpdateMethod updateMethod) {
-        if (budget.getBudgetAmounts().size() == 0)
+        if (budget.getBudgetAmounts().isEmpty())
             throw new IllegalArgumentException("Budgets must have budget amounts");
 
-        mRecurrenceDbAdapter.addRecord(budget.getRecurrence(), updateMethod);
+        recurrenceDbAdapter.addRecord(budget.getRecurrence(), updateMethod);
         super.addRecord(budget, updateMethod);
-        mBudgetAmountsDbAdapter.deleteBudgetAmountsForBudget(budget.getUID());
+        budgetAmountsDbAdapter.deleteBudgetAmountsForBudget(budget.getUID());
         for (BudgetAmount budgetAmount : budget.getBudgetAmounts()) {
-            mBudgetAmountsDbAdapter.addRecord(budgetAmount, updateMethod);
+            budgetAmountsDbAdapter.addRecord(budgetAmount, updateMethod);
         }
     }
 
@@ -94,14 +116,14 @@ public class BudgetsDbAdapter extends DatabaseAdapter<Budget> {
         for (Budget budget : budgetList) {
             recurrenceList.add(budget.getRecurrence());
         }
-        mRecurrenceDbAdapter.bulkAddRecords(recurrenceList, updateMethod);
+        recurrenceDbAdapter.bulkAddRecords(recurrenceList, updateMethod);
 
         //now add the budgets themselves
         long nRow = super.bulkAddRecords(budgetList, updateMethod);
 
         //then add the budget amounts, they require the budgets to exist
         if (nRow > 0 && !budgetAmountList.isEmpty()) {
-            mBudgetAmountsDbAdapter.bulkAddRecords(budgetAmountList, updateMethod);
+            budgetAmountsDbAdapter.bulkAddRecords(budgetAmountList, updateMethod);
         }
 
         return nRow;
@@ -114,29 +136,25 @@ public class BudgetsDbAdapter extends DatabaseAdapter<Budget> {
         String recurrenceUID = cursor.getString(cursor.getColumnIndexOrThrow(BudgetEntry.COLUMN_RECURRENCE_UID));
         long numPeriods = cursor.getLong(cursor.getColumnIndexOrThrow(BudgetEntry.COLUMN_NUM_PERIODS));
 
-
         Budget budget = new Budget(name);
         populateBaseModelAttributes(cursor, budget);
         budget.setDescription(description);
-        budget.setRecurrence(mRecurrenceDbAdapter.getRecord(recurrenceUID));
+        budget.setRecurrence(recurrenceDbAdapter.getRecord(recurrenceUID));
         budget.setNumberOfPeriods(numPeriods);
-        budget.setBudgetAmounts(mBudgetAmountsDbAdapter.getBudgetAmountsForBudget(budget.getUID()));
+        budget.setBudgetAmounts(budgetAmountsDbAdapter.getBudgetAmountsForBudget(budget.getUID()));
 
         return budget;
     }
 
     @Override
-    protected @NonNull SQLiteStatement setBindings(@NonNull SQLiteStatement stmt, @NonNull final Budget budget) {
-        stmt.clearBindings();
+    protected @NonNull SQLiteStatement bind(@NonNull SQLiteStatement stmt, @NonNull final Budget budget) {
+        bindBaseModel(stmt, budget);
         stmt.bindString(1, budget.getName());
         if (budget.getDescription() != null) {
             stmt.bindString(2, budget.getDescription());
-        } else {
-            stmt.bindNull(2);
         }
         stmt.bindString(3, budget.getRecurrence().getUID());
         stmt.bindLong(4, budget.getNumberOfPeriods());
-        stmt.bindString(5, budget.getUID());
 
         return stmt;
     }
@@ -150,8 +168,8 @@ public class BudgetsDbAdapter extends DatabaseAdapter<Budget> {
     public Cursor fetchBudgetsForAccount(String accountUID) {
         SQLiteQueryBuilder queryBuilder = new SQLiteQueryBuilder();
         queryBuilder.setTables(BudgetEntry.TABLE_NAME + "," + BudgetAmountEntry.TABLE_NAME
-                + " ON " + BudgetEntry.TABLE_NAME + "." + BudgetEntry.COLUMN_UID + " = "
-                + BudgetAmountEntry.TABLE_NAME + "." + BudgetAmountEntry.COLUMN_BUDGET_UID);
+            + " ON " + BudgetEntry.TABLE_NAME + "." + BudgetEntry.COLUMN_UID + " = "
+            + BudgetAmountEntry.TABLE_NAME + "." + BudgetAmountEntry.COLUMN_BUDGET_UID);
 
         queryBuilder.setDistinct(true);
         String[] projectionIn = new String[]{BudgetEntry.TABLE_NAME + ".*"};
@@ -170,12 +188,7 @@ public class BudgetsDbAdapter extends DatabaseAdapter<Budget> {
      */
     public List<Budget> getAccountBudgets(String accountUID) {
         Cursor cursor = fetchBudgetsForAccount(accountUID);
-        List<Budget> budgets = new ArrayList<>();
-        while (cursor.moveToNext()) {
-            budgets.add(buildModelInstance(cursor));
-        }
-        cursor.close();
-        return budgets;
+        return getRecords(cursor);
     }
 
     /**
@@ -188,7 +201,7 @@ public class BudgetsDbAdapter extends DatabaseAdapter<Budget> {
      * @return Balance of all the accounts
      */
     public Money getAccountSum(String budgetUID, long periodStart, long periodEnd) {
-        List<BudgetAmount> budgetAmounts = mBudgetAmountsDbAdapter.getBudgetAmountsForBudget(budgetUID);
+        List<BudgetAmount> budgetAmounts = budgetAmountsDbAdapter.getBudgetAmountsForBudget(budgetUID);
         List<String> accountUIDs = new ArrayList<>();
         for (BudgetAmount budgetAmount : budgetAmounts) {
             accountUIDs.add(budgetAmount.getAccountUID());

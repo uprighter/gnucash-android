@@ -18,6 +18,7 @@ package org.gnucash.android.test.unit.export;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import android.content.Context;
+import android.net.Uri;
 
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
@@ -34,9 +35,10 @@ import org.xml.sax.SAXException;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.List;
 
 import javax.xml.parsers.ParserConfigurationException;
+
+import timber.log.Timber;
 
 /**
  * Test backup and restore functionality
@@ -53,10 +55,12 @@ public class BackupTest extends GnuCashTest {
         Context context = GnuCashApplication.getAppContext();
         String bookUID = GnuCashApplication.getActiveBookUID();
         Exporter exporter = new GncXmlExporter(context, new ExportParams(ExportFormat.XML), bookUID);
-        List<String> xmlFiles = exporter.generateExport();
+        Uri uriExported  = exporter.generateExport();
 
-        assertThat(xmlFiles).hasSize(1);
-        assertThat(new File(xmlFiles.get(0)))
+        assertThat(uriExported).isNotNull();
+        assertThat(uriExported.getScheme()).isEqualTo("file");
+        File file = new File(uriExported.getPath());
+        assertThat(file)
             .exists()
             .hasExtension(ExportFormat.XML.extension.substring(1));
     }
@@ -66,12 +70,13 @@ public class BackupTest extends GnuCashTest {
      */
     private void loadDefaultAccounts() {
         try {
-            String bookUID = GncXmlImporter.parse(GnuCashApplication.getAppContext().getResources().openRawResource(R.raw.default_accounts));
+            Context context = GnuCashApplication.getAppContext();
+            String bookUID = GncXmlImporter.parse(context, context.getResources().openRawResource(R.raw.default_accounts));
             BooksDbAdapter.getInstance().setActive(bookUID);
             assertThat(BooksDbAdapter.getInstance().getActiveBookUID()).isEqualTo(bookUID);
             assertThat(GnuCashApplication.getActiveBookUID()).isEqualTo(bookUID);
         } catch (ParserConfigurationException | SAXException | IOException e) {
-            e.printStackTrace();
+            Timber.e(e);
             throw new RuntimeException("Could not create default accounts");
         }
     }

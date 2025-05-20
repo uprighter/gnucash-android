@@ -18,9 +18,9 @@ package org.gnucash.android.test.unit.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.assertj.core.api.Assertions.within;
 import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertThrows;
 
 import org.gnucash.android.model.Commodity;
 import org.gnucash.android.model.Money;
@@ -36,14 +36,14 @@ import java.util.Locale;
 
 public class MoneyTest extends GnuCashTest {
 
-    private static final String CURRENCY_CODE = "EUR";
+    private static final String CURRENCY_EUR = "EUR";
     private Money mMoneyInEur;
     private int mHashcode;
     private String amountString = "15.75";
 
     @Before
     public void setUp() throws Exception {
-        mMoneyInEur = new Money(new BigDecimal(amountString), Commodity.getInstance(CURRENCY_CODE));
+        mMoneyInEur = new Money(new BigDecimal(amountString), Commodity.getInstance(CURRENCY_EUR));
         mHashcode = mMoneyInEur.hashCode();
     }
 
@@ -52,23 +52,23 @@ public class MoneyTest extends GnuCashTest {
         Locale.setDefault(Locale.US);
         String amount = "12.25";
 
-        Money temp = new Money(amount, CURRENCY_CODE);
-        assertThat("12.25").isEqualTo(temp.toPlainString());
+        Money temp = new Money(amount, CURRENCY_EUR);
+        assertThat(temp.toPlainString()).isEqualTo("12.25");
         assertThat(temp.getNumerator()).isEqualTo(1225L);
         assertThat(temp.getDenominator()).isEqualTo(100L);
 
-        Commodity commodity = Commodity.getInstance(CURRENCY_CODE);
+        Commodity commodity = Commodity.getInstance(CURRENCY_EUR);
         temp = new Money(BigDecimal.TEN, commodity);
 
-        assertEquals("10.00", temp.asBigDecimal().toPlainString()); //decimal places for EUR currency
-        assertEquals(commodity, temp.getCommodity());
-        assertThat("10").isNotEqualTo(temp.asBigDecimal().toPlainString());
+        assertThat(temp.asBigDecimal().toPlainString()).isEqualTo("10.00"); //decimal places for EUR currency
+        assertThat(temp.getCommodity()).isEqualTo(commodity);
+        assertThat(temp.asBigDecimal().toPlainString()).isNotEqualTo("10");
     }
 
     @Test
     public void testAddition() {
-        Money result = mMoneyInEur.plus(new Money("5", CURRENCY_CODE));
-        assertEquals("20.75", result.toPlainString());
+        Money result = mMoneyInEur.plus(new Money("5", CURRENCY_EUR));
+        assertThat(result.toPlainString()).isEqualTo("20.75");
         assertNotSame(result, mMoneyInEur);
         validateImmutability();
     }
@@ -81,8 +81,8 @@ public class MoneyTest extends GnuCashTest {
 
     @Test
     public void testSubtraction() {
-        Money result = mMoneyInEur.minus(new Money("2", CURRENCY_CODE));
-        assertEquals(new BigDecimal("13.75"), result.asBigDecimal());
+        Money result = mMoneyInEur.minus(new Money("2", CURRENCY_EUR));
+        assertThat(result.asBigDecimal()).isEqualTo(new BigDecimal("13.75"));
         assertNotSame(result, mMoneyInEur);
         validateImmutability();
     }
@@ -95,7 +95,7 @@ public class MoneyTest extends GnuCashTest {
 
     @Test
     public void testMultiplication() {
-        Money result = mMoneyInEur.times(new Money(BigDecimal.TEN, Commodity.getInstance(CURRENCY_CODE)));
+        Money result = mMoneyInEur.times(new Money(BigDecimal.TEN, Commodity.getInstance(CURRENCY_EUR)));
         assertThat("157.50").isEqualTo(result.toPlainString());
         assertThat(result).isNotEqualTo(mMoneyInEur);
         validateImmutability();
@@ -143,46 +143,46 @@ public class MoneyTest extends GnuCashTest {
     public void nonMatchingCommodityFraction_shouldThrowException() {
         Money money = new Money("12.345", "JPY");
         assertThat(money.getNumerator()).isEqualTo(12L);
-        assertThat(money.getDenominator()).isEqualTo(1);
+        assertThat(money.getDenominator()).isEqualTo(1L);
     }
 
     @Test
     public void testPrinting() {
-        assertEquals(mMoneyInEur.asString(), mMoneyInEur.toPlainString());
-        assertEquals(amountString, mMoneyInEur.asString());
+        assertThat(mMoneyInEur.toPlainString()).isEqualTo(mMoneyInEur.asString());
+        assertThat(mMoneyInEur.asString()).isEqualTo(amountString);
 
         // the unicode for Euro symbol is \u20AC
 
         String symbol = Currency.getInstance("EUR").getSymbol(Locale.GERMANY);
-        String actualOuputDE = mMoneyInEur.formattedString(Locale.GERMANY);
-        assertThat(actualOuputDE).isEqualTo("15,75 " + symbol);
+        String actualOutputDE = mMoneyInEur.formattedString(Locale.GERMANY);
+        assertThat(actualOutputDE).isEqualTo("15,75 " + symbol);
 
         symbol = Currency.getInstance("EUR").getSymbol(Locale.GERMANY);
-        String actualOuputUS = mMoneyInEur.formattedString(Locale.US);
-        assertThat(actualOuputUS).isEqualTo(symbol + "15.75");
+        String actualOutputUS = mMoneyInEur.formattedString(Locale.US);
+        assertThat(actualOutputUS).isEqualTo(symbol + "15.75");
 
         //always prints with 2 decimal places only
-        Money some = new Money("9.7469", CURRENCY_CODE);
-        assertEquals("9.75", some.asString());
+        Money some = new Money("9.7469", CURRENCY_EUR);
+        assertThat(some.asString()).isEqualTo("9.75");
     }
 
     public void validateImmutability() {
-        assertEquals(mHashcode, mMoneyInEur.hashCode());
-        assertEquals(amountString, mMoneyInEur.toPlainString());
-        assertNotNull(mMoneyInEur.getCommodity());
-        assertEquals(CURRENCY_CODE, mMoneyInEur.getCommodity().getCurrencyCode());
+        assertThat(mMoneyInEur.hashCode()).isEqualTo(mHashcode);
+        assertThat(mMoneyInEur.toPlainString()).isEqualTo(amountString);
+        assertThat(mMoneyInEur.getCommodity()).isNotNull();
+        assertThat(mMoneyInEur.getCommodity().getCurrencyCode()).isEqualTo(CURRENCY_EUR);
     }
 
     @Test
     public void overflow() {
-        Money rounding = new Money("12345678901234567.89", CURRENCY_CODE);
-        assertThat("12345678901234567.89").isEqualTo(rounding.toPlainString());
-        assertThat("€12,345,678,901,234,567.89").isEqualTo(rounding.formattedString(Locale.US));
+        Money rounding = new Money("12345678901234567.89", CURRENCY_EUR);
+        assertThat(rounding.toPlainString()).isEqualTo("12345678901234567.89");
         assertThat(rounding.getNumerator()).isEqualTo(1234567890123456789L);
         assertThat(rounding.getDenominator()).isEqualTo(100L);
+        assertThat(rounding.formattedString(Locale.US)).isEqualTo("€12,345,678,901,234,567.89");
 
-        Money overflow = new Money("1234567890123456789.00", CURRENCY_CODE);
-        assertThat("1234567890123456789.00").isEqualTo(overflow.toPlainString());
+        Money overflow = new Money("1234567890123456789.00", CURRENCY_EUR);
+        assertThat(overflow.toPlainString()).isEqualTo("1234567890123456789.00");
         assertThatThrownBy(() -> overflow.getNumerator()).isInstanceOf(ArithmeticException.class);
     }
 
@@ -190,17 +190,119 @@ public class MoneyTest extends GnuCashTest {
     @Config(sdk = 25)
     public void evaluate_25() {
         BigDecimal value = AmountParser.evaluate("123456789012345678.90");
-        assertNotNull(value);
-        assertEquals(123456789012345678.90, value.doubleValue(), 1e-2);
-        assertEquals(123456789012345680L, value.longValue());
+        assertThat(value).isNotNull();
+        assertThat(value.doubleValue()).isCloseTo(123456789012345678.90, within(1e-2));
+        assertThat(value.longValue()).isEqualTo(123456789012345680L);
     }
 
     @Test
     @Config(sdk = 26)
     public void evaluate_26() {
         BigDecimal value = AmountParser.evaluate("123456789012345678.90");
-        assertNotNull(value);
-        assertEquals(123456789012345678.90, value.doubleValue(), 1e-2);
-        assertEquals(123456789012345678L, value.longValue());
+        assertThat(value).isNotNull();
+        assertThat(value.doubleValue()).isCloseTo(123456789012345678.90, within(1e-2));
+        assertThat(value.longValue()).isEqualTo(123456789012345678L);
+    }
+
+    @Test
+    public void add_different_currencies() {
+        Commodity.DEFAULT_COMMODITY = Commodity.USD;
+        Money money = Money.createZeroInstance(Commodity.DEFAULT_COMMODITY);
+        Money addend = new Money(0.0, Commodity.USD);
+        Money sum = money.plus(addend);
+        assertThat(sum.isAmountZero()).isTrue();
+        assertThat(sum.toDouble()).isEqualTo(0.0);
+        assertThat(sum.getCommodity()).isEqualTo(Commodity.USD);
+
+        addend = new Money(123.45, Commodity.USD);
+        sum = money.plus(addend);
+        assertThat(sum.isAmountZero()).isFalse();
+        assertThat(sum.toDouble()).isEqualTo(123.45);
+        assertThat(sum.getCommodity()).isEqualTo(Commodity.USD);
+
+        addend = new Money(0.0, Commodity.EUR);
+        sum = money.plus(addend);
+        assertThat(sum.isAmountZero()).isTrue();
+        assertThat(sum.toDouble()).isEqualTo(0.0);
+        assertThat(sum.getCommodity()).isEqualTo(Commodity.EUR);
+
+        final Money money1 = new Money(100.00, Commodity.USD);
+        final Money money2 = new Money(123.45, Commodity.EUR);
+        assertThrows(Money.CurrencyMismatchException.class, () -> money1.plus(money2));
+    }
+
+    @Test
+    public void scale() {
+        final double d = 123.0;
+        final Money m0 = new Money(BigDecimal.valueOf(d).setScale(0), Commodity.TEMPLATE);
+        final Money m1 = new Money(BigDecimal.valueOf(d).setScale(1), Commodity.TEMPLATE);
+        final Money m2 = new Money(BigDecimal.valueOf(d).setScale(2), Commodity.TEMPLATE);
+        assertThat(m0.doubleValue()).isEqualTo(d);
+        assertThat(m1.doubleValue()).isEqualTo(d);
+        assertThat(m2.doubleValue()).isEqualTo(d);
+        assertThat(m0).isEqualTo(m1);
+        assertThat(m0).isEqualTo(m2);
+        assertThat(m1).isEqualTo(m0);
+        assertThat(m1).isEqualTo(m2);
+        assertThat(m2).isEqualTo(m0);
+        assertThat(m2).isEqualTo(m1);
+
+        final Money m3 = new Money(BigDecimal.valueOf(d + 0.4).setScale(1), Commodity.TEMPLATE);
+        assertThat(m3).isNotEqualTo(m0);
+        assertThat(m3).isNotEqualTo(m1);
+        assertThat(m3).isNotEqualTo(m2);
+    }
+
+    @Test
+    public void scale_1() {
+        Money money = new Money(123.0, Commodity.JPY);
+        assertThat(money.getCommodity().getSmallestFraction()).isEqualTo(1);
+        assertThat(money.getCommodity().getSmallestFractionDigits()).isEqualTo(0);
+        assertThat(money.getNumerator()).isEqualTo(123L);
+        assertThat(money.getDenominator()).isEqualTo(1L);
+
+        money = new Money(123.4, Commodity.JPY);
+        assertThat(money.getCommodity().getSmallestFraction()).isEqualTo(1);
+        assertThat(money.getCommodity().getSmallestFractionDigits()).isEqualTo(0);
+        assertThat(money.getNumerator()).isEqualTo(123L);
+        assertThat(money.getDenominator()).isEqualTo(1L);
+
+        money = new Money(123.45, Commodity.JPY);
+        assertThat(money.getCommodity().getSmallestFraction()).isEqualTo(1);
+        assertThat(money.getCommodity().getSmallestFractionDigits()).isEqualTo(0);
+        assertThat(money.getNumerator()).isEqualTo(123L);
+        assertThat(money.getDenominator()).isEqualTo(1L);
+
+        money = new Money(123.456, Commodity.JPY);
+        assertThat(money.getCommodity().getSmallestFraction()).isEqualTo(1);
+        assertThat(money.getCommodity().getSmallestFractionDigits()).isEqualTo(0);
+        assertThat(money.getNumerator()).isEqualTo(123L);
+        assertThat(money.getDenominator()).isEqualTo(1L);
+    }
+
+    @Test
+    public void scale_10() {
+        Commodity commodity = new Commodity("scale-10", "S10", 10);
+        final Money money = new Money(123.456, commodity);
+        assertThat(money.getCommodity().getSmallestFraction()).isEqualTo(10);
+        assertThat(money.getCommodity().getSmallestFractionDigits()).isEqualTo(1);
+        assertThat(money.getNumerator()).isEqualTo(1235L);
+        assertThat(money.getDenominator()).isEqualTo(10L);
+    }
+
+    @Test
+    public void scale_100() {
+        final Money money = new Money(123.456, Commodity.USD);
+        assertThat(money.getCommodity().getSmallestFraction()).isEqualTo(100);
+        assertThat(money.getCommodity().getSmallestFractionDigits()).isEqualTo(2);
+        assertThat(money.getNumerator()).isEqualTo(12346L);
+        assertThat(money.getDenominator()).isEqualTo(100L);
+    }
+
+    @Test
+    public void scale_template() {
+        final Money money = new Money(123456L, 1000L, Commodity.template);
+        assertThat(money.getNumerator()).isEqualTo(123456L);
+        assertThat(money.getDenominator()).isEqualTo(1000L);
     }
 }

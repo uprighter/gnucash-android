@@ -21,18 +21,15 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.database.sqlite.SQLiteDatabase;
 
-import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
 import org.gnucash.android.db.DatabaseSchema;
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
-import org.gnucash.android.db.adapter.CommoditiesDbAdapter;
 import org.gnucash.android.db.adapter.DatabaseAdapter;
 import org.gnucash.android.db.adapter.ScheduledActionDbAdapter;
 import org.gnucash.android.db.adapter.TransactionsDbAdapter;
 import org.gnucash.android.export.ExportFormat;
 import org.gnucash.android.export.ExportParams;
 import org.gnucash.android.export.Exporter;
-import org.gnucash.android.importer.GncXmlImporter;
 import org.gnucash.android.model.Account;
 import org.gnucash.android.model.Commodity;
 import org.gnucash.android.model.Money;
@@ -42,9 +39,7 @@ import org.gnucash.android.model.ScheduledAction;
 import org.gnucash.android.model.Split;
 import org.gnucash.android.model.Transaction;
 import org.gnucash.android.model.TransactionType;
-import org.gnucash.android.service.ScheduledActionService;
 import org.gnucash.android.test.unit.GnuCashTest;
-import org.gnucash.android.util.BookUtils;
 import org.gnucash.android.util.TimestampHelper;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeConstants;
@@ -52,78 +47,59 @@ import org.joda.time.LocalDateTime;
 import org.joda.time.Weeks;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Test;
-import org.xml.sax.SAXException;
 
 import java.io.File;
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
-import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
-import java.util.List;
 
-import javax.xml.parsers.ParserConfigurationException;
+import timber.log.Timber;
 
 /**
  * Test the the scheduled actions service runs as expected
  */
 public class ScheduledActionServiceTest extends GnuCashTest {
 
-    private static String mActionUID;
+    private String mActionUID;
     private SQLiteDatabase mDb;
 
-    private static Account mBaseAccount = new Account("Base Account");
-    private static Account mTransferAccount = new Account("Transfer Account");
+    private final Account mBaseAccount = new Account("Base Account");
+    private final Account mTransferAccount = new Account("Transfer Account");
 
-    private static Transaction mTemplateTransaction;
     private TransactionsDbAdapter mTransactionsDbAdapter;
-
-    public void createAccounts() {
-        try {
-            Context context = GnuCashApplication.getAppContext();
-            String bookUID = GncXmlImporter.parse(context.getResources().openRawResource(R.raw.default_accounts));
-            BookUtils.loadBook(context, bookUID);
-        } catch (ParserConfigurationException | SAXException | IOException e) {
-            e.printStackTrace();
-            throw new RuntimeException("Could not create default accounts");
-        }
-    }
-
-    @BeforeClass
-    public static void makeAccounts() {
-        mTemplateTransaction = new Transaction("Recurring Transaction");
-        mTemplateTransaction.setTemplate(true);
-
-        mActionUID = mTemplateTransaction.getUID();
-    }
 
     @Before
     public void setUp() {
         mDb = GnuCashApplication.getActiveDb();
-        new CommoditiesDbAdapter(mDb); //initializes commodity static values
         mBaseAccount.setCommodity(Commodity.DEFAULT_COMMODITY);
         mTransferAccount.setCommodity(Commodity.DEFAULT_COMMODITY);
-        mTemplateTransaction.setCommodity(Commodity.DEFAULT_COMMODITY);
+
+        Transaction templateTransaction = new Transaction("Recurring Transaction");
+        templateTransaction.setCommodity(Commodity.DEFAULT_COMMODITY);
+        templateTransaction.setTemplate(true);
 
         Split split1 = new Split(new Money(BigDecimal.TEN, Commodity.DEFAULT_COMMODITY), mBaseAccount.getUID());
         Split split2 = split1.createPair(mTransferAccount.getUID());
 
-        mTemplateTransaction.addSplit(split1);
-        mTemplateTransaction.addSplit(split2);
+        templateTransaction.addSplit(split1);
+        templateTransaction.addSplit(split2);
+
+        mActionUID = templateTransaction.getUID();
+        Timber.v("action ID: " + mActionUID);
 
         AccountsDbAdapter accountsDbAdapter = AccountsDbAdapter.getInstance();
         accountsDbAdapter.addRecord(mBaseAccount);
         accountsDbAdapter.addRecord(mTransferAccount);
 
         mTransactionsDbAdapter = TransactionsDbAdapter.getInstance();
-        mTransactionsDbAdapter.addRecord(mTemplateTransaction, DatabaseAdapter.UpdateMethod.insert);
+        mTransactionsDbAdapter.addRecord(templateTransaction, DatabaseAdapter.UpdateMethod.insert);
     }
 
     @Test
     public void disabledScheduledActions_shouldNotRun() {
+        Context context = GnuCashApplication.getAppContext();
         Recurrence recurrence = new Recurrence(PeriodType.WEEK);
         ScheduledAction scheduledAction1 = new ScheduledAction(ScheduledAction.ActionType.TRANSACTION);
         scheduledAction1.setStartTime(System.currentTimeMillis() - 100000);
@@ -134,12 +110,13 @@ public class ScheduledActionServiceTest extends GnuCashTest {
         TransactionsDbAdapter trxnAdapter = TransactionsDbAdapter.getInstance();
 
         assertThat(trxnAdapter.getRecordsCount()).isZero();
-        ScheduledActionService.processScheduledAction(scheduledAction1, mDb);
+        ScheduledActionService.processScheduledAction(context, scheduledAction1, mDb);
         assertThat(trxnAdapter.getRecordsCount()).isZero();
     }
 
     @Test
     public void futureScheduledActions_shouldNotRun() {
+        Context context = GnuCashApplication.getAppContext();
         ScheduledAction scheduledAction = new ScheduledAction(ScheduledAction.ActionType.TRANSACTION);
         scheduledAction.setStartTime(System.currentTimeMillis() + 100000);
         scheduledAction.setEnabled(true);
@@ -149,7 +126,7 @@ public class ScheduledActionServiceTest extends GnuCashTest {
         TransactionsDbAdapter trxnAdapter = TransactionsDbAdapter.getInstance();
 
         assertThat(trxnAdapter.getRecordsCount()).isZero();
-        ScheduledActionService.processScheduledAction(scheduledAction, mDb);
+        ScheduledActionService.processScheduledAction(context, scheduledAction, mDb);
         assertThat(trxnAdapter.getRecordsCount()).isZero();
     }
 
@@ -158,6 +135,7 @@ public class ScheduledActionServiceTest extends GnuCashTest {
      */
     @Test
     public void exceededExecutionCounts_shouldNotRun() {
+        Context context = GnuCashApplication.getAppContext();
         ScheduledAction scheduledAction = new ScheduledAction(ScheduledAction.ActionType.TRANSACTION);
         scheduledAction.setActionUID(mActionUID);
         scheduledAction.setStartTime(new DateTime(2015, 5, 31, 14, 0).getMillis());
@@ -168,7 +146,7 @@ public class ScheduledActionServiceTest extends GnuCashTest {
 
         TransactionsDbAdapter trxnAdapter = TransactionsDbAdapter.getInstance();
         assertThat(trxnAdapter.getRecordsCount()).isZero();
-        ScheduledActionService.processScheduledAction(scheduledAction, mDb);
+        ScheduledActionService.processScheduledAction(context, scheduledAction, mDb);
         assertThat(trxnAdapter.getRecordsCount()).isZero();
     }
 
@@ -177,6 +155,7 @@ public class ScheduledActionServiceTest extends GnuCashTest {
      */
     @Test
     public void missedScheduledTransactions_shouldBeGenerated() {
+        Context context = GnuCashApplication.getAppContext();
         ScheduledAction scheduledAction = new ScheduledAction(ScheduledAction.ActionType.TRANSACTION);
         DateTime startTime = new DateTime(2016, 6, 6, 9, 0);
         scheduledAction.setStartTime(startTime.getMillis());
@@ -194,12 +173,13 @@ public class ScheduledActionServiceTest extends GnuCashTest {
         TransactionsDbAdapter transactionsDbAdapter = TransactionsDbAdapter.getInstance();
         assertThat(transactionsDbAdapter.getRecordsCount()).isZero();
 
-        ScheduledActionService.processScheduledAction(scheduledAction, mDb);
+        ScheduledActionService.processScheduledAction(context, scheduledAction, mDb);
 
         assertThat(transactionsDbAdapter.getRecordsCount()).isEqualTo(7);
     }
 
     public void endTimeInTheFuture_shouldExecuteOnlyUntilPresent() {
+        Context context = GnuCashApplication.getAppContext();
         ScheduledAction scheduledAction = new ScheduledAction(ScheduledAction.ActionType.TRANSACTION);
         DateTime startTime = new DateTime(2016, 6, 6, 9, 0);
         scheduledAction.setStartTime(startTime.getMillis());
@@ -212,7 +192,7 @@ public class ScheduledActionServiceTest extends GnuCashTest {
         TransactionsDbAdapter transactionsDbAdapter = TransactionsDbAdapter.getInstance();
         assertThat(transactionsDbAdapter.getRecordsCount()).isZero();
 
-        ScheduledActionService.processScheduledAction(scheduledAction, mDb);
+        ScheduledActionService.processScheduledAction(context, scheduledAction, mDb);
 
         int weeks = Weeks.weeksBetween(startTime, new DateTime(2016, 8, 29, 10, 0)).getWeeks();
         int expectedTransactionCount = weeks / 2; //multiplier from the PeriodType
@@ -228,6 +208,7 @@ public class ScheduledActionServiceTest extends GnuCashTest {
      */
     @Test
     public void scheduledTransactionsWithEndTimeInPast_shouldBeExecuted() {
+        Context context = GnuCashApplication.getAppContext();
         ScheduledAction scheduledAction = new ScheduledAction(ScheduledAction.ActionType.TRANSACTION);
         DateTime startTime = new DateTime(2016, 6, 6, 9, 0);
         scheduledAction.setStartTime(startTime.getMillis());
@@ -243,7 +224,7 @@ public class ScheduledActionServiceTest extends GnuCashTest {
         TransactionsDbAdapter transactionsDbAdapter = TransactionsDbAdapter.getInstance();
         assertThat(transactionsDbAdapter.getRecordsCount()).isZero();
 
-        ScheduledActionService.processScheduledAction(scheduledAction, mDb);
+        ScheduledActionService.processScheduledAction(context, scheduledAction, mDb);
 
         int expectedCount = 5;
         assertThat(scheduledAction.getExecutionCount()).isEqualTo(expectedCount);
@@ -255,6 +236,7 @@ public class ScheduledActionServiceTest extends GnuCashTest {
      */
     @Test //(expected = IllegalArgumentException.class)
     public void recurringTransactions_shouldHaveScheduledActionUID() {
+        Context context = GnuCashApplication.getAppContext();
         ScheduledAction scheduledAction = new ScheduledAction(ScheduledAction.ActionType.TRANSACTION);
         DateTime startTime = new DateTime(2016, 7, 4, 12, 0);
         scheduledAction.setStartTime(startTime.getMillis());
@@ -263,7 +245,7 @@ public class ScheduledActionServiceTest extends GnuCashTest {
         TransactionsDbAdapter transactionsDbAdapter = TransactionsDbAdapter.getInstance();
         assertThat(transactionsDbAdapter.getRecordsCount()).isZero();
 
-        ScheduledActionService.processScheduledAction(scheduledAction, mDb);
+        ScheduledActionService.processScheduledAction(context, scheduledAction, mDb);
 
         //no change in the database since no action UID was specified
         assertThat(transactionsDbAdapter.getRecordsCount()).isZero();
@@ -282,6 +264,7 @@ public class ScheduledActionServiceTest extends GnuCashTest {
      */
     @Test
     public void scheduledBackups_shouldRunOnlyOnce() {
+        Context context = GnuCashApplication.getAppContext();
         ScheduledAction scheduledBackup = new ScheduledAction(ScheduledAction.ActionType.BACKUP);
         scheduledBackup.setStartTime(LocalDateTime.now()
                 .minusMonths(4).minusDays(2).toDate().getTime());
@@ -292,28 +275,28 @@ public class ScheduledActionServiceTest extends GnuCashTest {
 
         ExportParams backupParams = new ExportParams(ExportFormat.XML);
         backupParams.setExportTarget(ExportParams.ExportTarget.SD_CARD);
-        scheduledBackup.setTag(backupParams.toCsv());
+        scheduledBackup.setTag(backupParams.toTag());
 
-        File backupFolder = new File(Exporter.getExportFolderPath(GnuCashApplication.getActiveBookUID()));
+        File backupFolder = new File(Exporter.getExportFolderPath(context, GnuCashApplication.getActiveBookUID()));
         assertThat(backupFolder).exists();
         assertThat(backupFolder.listFiles()).isEmpty();
 
         // Check there's not a backup for each missed run
-        ScheduledActionService.processScheduledAction(scheduledBackup, mDb);
+        ScheduledActionService.processScheduledAction(context, scheduledBackup, mDb);
         assertThat(scheduledBackup.getExecutionCount()).isEqualTo(3);
         assertThat(scheduledBackup.getLastRunTime()).isGreaterThan(previousLastRun);
         File[] backupFiles = backupFolder.listFiles();
         assertThat(backupFiles).hasSize(1);
-        assertThat(backupFiles[0]).exists().hasExtension("gnca");
+        assertThat(backupFiles[0]).exists().hasExtension("xac");
 
         // Check also across service runs
         previousLastRun = scheduledBackup.getLastRunTime();
-        ScheduledActionService.processScheduledAction(scheduledBackup, mDb);
+        ScheduledActionService.processScheduledAction(context, scheduledBackup, mDb);
         assertThat(scheduledBackup.getExecutionCount()).isEqualTo(3);
         assertThat(scheduledBackup.getLastRunTime()).isEqualTo(previousLastRun);
         backupFiles = backupFolder.listFiles();
         assertThat(backupFiles).hasSize(1);
-        assertThat(backupFiles[0]).exists().hasExtension("gnca");
+        assertThat(backupFiles[0]).exists().hasExtension("xac");
     }
 
     /**
@@ -324,12 +307,13 @@ public class ScheduledActionServiceTest extends GnuCashTest {
      */
     @Test
     public void scheduledBackups_shouldNotRunBeforeNextScheduledExecution() {
+        Context context = GnuCashApplication.getAppContext();
         ScheduledAction scheduledBackup = new ScheduledAction(ScheduledAction.ActionType.BACKUP);
         scheduledBackup.setStartTime(
                 LocalDateTime.now().withDayOfWeek(DateTimeConstants.WEDNESDAY).toDate().getTime());
         scheduledBackup.setLastRunTime(scheduledBackup.getStartTime());
         long previousLastRun = scheduledBackup.getLastRunTime();
-        scheduledBackup.setExecutionCount(1);
+        scheduledBackup.setExecutionCount(0);
         Recurrence recurrence = new Recurrence(PeriodType.WEEK);
         recurrence.setMultiplier(1);
         recurrence.setByDays(Collections.singletonList(Calendar.MONDAY));
@@ -337,18 +321,18 @@ public class ScheduledActionServiceTest extends GnuCashTest {
 
         ExportParams backupParams = new ExportParams(ExportFormat.XML);
         backupParams.setExportTarget(ExportParams.ExportTarget.SD_CARD);
-        scheduledBackup.setTag(backupParams.toCsv());
+        scheduledBackup.setTag(backupParams.toTag());
 
         File backupFolder = new File(
-                Exporter.getExportFolderPath(GnuCashApplication.getActiveBookUID()));
+                Exporter.getExportFolderPath(context, GnuCashApplication.getActiveBookUID()));
         assertThat(backupFolder).exists();
         assertThat(backupFolder.listFiles()).isEmpty();
 
-        ScheduledActionService.processScheduledAction(scheduledBackup, mDb);
+        ScheduledActionService.processScheduledAction(context, scheduledBackup, mDb);
 
-        assertThat(scheduledBackup.getExecutionCount()).isEqualTo(1);
+        assertThat(scheduledBackup.getExecutionCount()).isEqualTo(0);
         assertThat(scheduledBackup.getLastRunTime()).isEqualTo(previousLastRun);
-        assertThat(backupFolder.listFiles()).hasSize(0);
+        assertThat(backupFolder.listFiles()).isEmpty();
     }
 
     /**
@@ -357,6 +341,7 @@ public class ScheduledActionServiceTest extends GnuCashTest {
      */
     @Test
     public void scheduledBackups_shouldNotIncludeTransactionsPreviousToTheLastRun() {
+        Context context = GnuCashApplication.getAppContext();
         ScheduledAction scheduledBackup = new ScheduledAction(ScheduledAction.ActionType.BACKUP);
         scheduledBackup.setStartTime(LocalDateTime.now().minusDays(15).toDate().getTime());
         scheduledBackup.setLastRunTime(LocalDateTime.now().minusDays(8).toDate().getTime());
@@ -369,7 +354,7 @@ public class ScheduledActionServiceTest extends GnuCashTest {
         ExportParams backupParams = new ExportParams(ExportFormat.QIF);
         backupParams.setExportTarget(ExportParams.ExportTarget.SD_CARD);
         backupParams.setExportStartTime(new Timestamp(scheduledBackup.getStartTime()));
-        scheduledBackup.setTag(backupParams.toCsv());
+        scheduledBackup.setTag(backupParams.toTag());
 
         // Create a transaction with a modified date previous to the last run
         Transaction transaction = new Transaction("Tandoori express");
@@ -381,32 +366,33 @@ public class ScheduledActionServiceTest extends GnuCashTest {
         mTransactionsDbAdapter.addRecord(transaction);
         // We set the date directly in the database as the corresponding field
         // is ignored when the object is stored. It's set through a trigger instead.
-        setTransactionInDbModifiedTimestamp(transaction.getUID(),
+        setTransactionInDbTimestamp(transaction.getUID(),
                 new Timestamp(LocalDateTime.now().minusDays(9).toDate().getTime()));
 
         File backupFolder = new File(
-                Exporter.getExportFolderPath(GnuCashApplication.getActiveBookUID()));
+                Exporter.getExportFolderPath(context, GnuCashApplication.getActiveBookUID()));
         assertThat(backupFolder).exists();
         assertThat(backupFolder.listFiles()).isEmpty();
 
-        ScheduledActionService.processScheduledAction(scheduledBackup, mDb);
+        ScheduledActionService.processScheduledAction(context, scheduledBackup, mDb);
 
         assertThat(scheduledBackup.getExecutionCount()).isEqualTo(1);
         assertThat(scheduledBackup.getLastRunTime()).isEqualTo(previousLastRun);
-        assertThat(backupFolder.listFiles()).hasSize(0);
+        File[] files = backupFolder.listFiles();
+        assertThat(files).isNotNull();
+        assertThat(files).isEmpty();
     }
 
     /**
-     * Sets the transaction modified timestamp directly in the database.
+     * Sets the transaction timestamp directly in the database.
      *
-     * @param transactionUID UID of the transaction to set the modified timestamp.
-     * @param timestamp      new modified timestamp.
+     * @param transactionUID UID of the transaction to set the timestamp.
+     * @param timestamp      the new timestamp.
      */
-    private void setTransactionInDbModifiedTimestamp(String transactionUID, Timestamp timestamp) {
+    private void setTransactionInDbTimestamp(String transactionUID, Timestamp timestamp) {
         ContentValues values = new ContentValues();
-        values.put(DatabaseSchema.TransactionEntry.COLUMN_MODIFIED_AT,
-                TimestampHelper.getUtcStringFromTimestamp(timestamp));
-        mTransactionsDbAdapter.updateTransaction(values, "uid = ?",
+        values.put(DatabaseSchema.TransactionEntry.COLUMN_TIMESTAMP, timestamp.getTime());
+        mTransactionsDbAdapter.updateTransaction(values, DatabaseSchema.TransactionEntry.COLUMN_UID + "=?",
                 new String[]{transactionUID});
     }
 
@@ -416,6 +402,7 @@ public class ScheduledActionServiceTest extends GnuCashTest {
      */
     @Test
     public void scheduledBackups_shouldIncludeTransactionsAfterTheLastRun() {
+        Context context = GnuCashApplication.getAppContext();
         ScheduledAction scheduledBackup = new ScheduledAction(ScheduledAction.ActionType.BACKUP);
         scheduledBackup.setStartTime(LocalDateTime.now().minusDays(15).toDate().getTime());
         scheduledBackup.setLastRunTime(LocalDateTime.now().minusDays(8).toDate().getTime());
@@ -428,7 +415,7 @@ public class ScheduledActionServiceTest extends GnuCashTest {
         ExportParams backupParams = new ExportParams(ExportFormat.QIF);
         backupParams.setExportTarget(ExportParams.ExportTarget.SD_CARD);
         backupParams.setExportStartTime(new Timestamp(scheduledBackup.getStartTime()));
-        scheduledBackup.setTag(backupParams.toCsv());
+        scheduledBackup.setTag(backupParams.toTag());
 
         Transaction transaction = new Transaction("Orient palace");
         Split split = new Split(new Money("10", Commodity.DEFAULT_COMMODITY.getCurrencyCode()),
@@ -439,16 +426,19 @@ public class ScheduledActionServiceTest extends GnuCashTest {
         mTransactionsDbAdapter.addRecord(transaction);
 
         File backupFolder = new File(
-                Exporter.getExportFolderPath(GnuCashApplication.getActiveBookUID()));
+                Exporter.getExportFolderPath(context, GnuCashApplication.getActiveBookUID()));
         assertThat(backupFolder).exists();
         assertThat(backupFolder.listFiles()).isEmpty();
 
-        ScheduledActionService.processScheduledAction(scheduledBackup, mDb);
+        ScheduledActionService.processScheduledAction(context, scheduledBackup, mDb);
 
         assertThat(scheduledBackup.getExecutionCount()).isEqualTo(2);
         assertThat(scheduledBackup.getLastRunTime()).isGreaterThan(previousLastRun);
-        assertThat(backupFolder.listFiles()).hasSize(1);
-        assertThat(backupFolder.listFiles()[0].getName()).endsWith(".qif");
+        File[] files = backupFolder.listFiles();
+        assertThat(files).isNotNull();
+        assertThat(files).hasSize(1);
+        assertThat(files[0]).isNotNull();
+        assertThat(files[0].getName()).endsWith(".qif");
     }
 
     @After

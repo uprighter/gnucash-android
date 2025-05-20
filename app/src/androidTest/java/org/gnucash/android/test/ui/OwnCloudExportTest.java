@@ -27,7 +27,6 @@ import static androidx.test.espresso.matcher.RootMatchers.withDecorView;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
-import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertTrue;
 import static org.gnucash.android.test.ui.AccountsActivityTest.preventFirstRunDialogs;
@@ -37,20 +36,16 @@ import static org.hamcrest.Matchers.not;
 import android.Manifest;
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.database.SQLException;
-import android.database.sqlite.SQLiteDatabase;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 
 import androidx.test.espresso.Espresso;
 import androidx.test.espresso.contrib.DrawerActions;
-import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.rule.ActivityTestRule;
 import androidx.test.rule.GrantPermissionRule;
 
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
-import org.gnucash.android.db.DatabaseHelper;
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.db.adapter.CommoditiesDbAdapter;
 import org.gnucash.android.db.adapter.DatabaseAdapter;
@@ -63,21 +58,13 @@ import org.gnucash.android.test.ui.util.DisableAnimationsRule;
 import org.gnucash.android.ui.account.AccountsActivity;
 import org.junit.Assume;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.ClassRule;
-import org.junit.FixMethodOrder;
 import org.junit.Rule;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.MethodSorters;
 
-import timber.log.Timber;
+public class OwnCloudExportTest extends GnuAndroidTest {
 
-
-@RunWith(AndroidJUnit4.class)
-@FixMethodOrder(MethodSorters.NAME_ASCENDING)
-public class OwnCloudExportTest {
-
-    private AccountsActivity mAccountsActivity;
     private SharedPreferences mPrefs;
 
     private String OC_SERVER = "https://demo.owncloud.org";
@@ -107,27 +94,20 @@ public class OwnCloudExportTest {
     @ClassRule
     public static DisableAnimationsRule disableAnimationsRule = new DisableAnimationsRule();
 
+    @BeforeClass
+    public static void prepareTestCase() {
+        Context context = GnuCashApplication.getAppContext();
+        preventFirstRunDialogs(context);
+    }
+
     @Before
     public void setUp() throws Exception {
-        mAccountsActivity = mActivityRule.getActivity();
-        mPrefs = mAccountsActivity.getSharedPreferences(
-            mAccountsActivity.getString(R.string.owncloud_pref), Context.MODE_PRIVATE);
+        Context context = GnuCashApplication.getAppContext();
+        mPrefs = context.getSharedPreferences(
+            context.getString(R.string.owncloud_pref), Context.MODE_PRIVATE);
 
-        preventFirstRunDialogs(getInstrumentation().getTargetContext());
+        GnuCashApplication.initializeDatabaseAdapters(context);
 
-        // creates Account and transaction
-        String activeBookUID = GnuCashApplication.getActiveBookUID();
-        DatabaseHelper mDbHelper = new DatabaseHelper(mAccountsActivity, activeBookUID);
-        SQLiteDatabase mDb;
-        try {
-            mDb = mDbHelper.getWritableDatabase();
-        } catch (SQLException e) {
-            Timber.e(e, "Error getting database: " + e.getMessage());
-            mDb = mDbHelper.getReadableDatabase();
-        }
-
-        @SuppressWarnings("unused") //this call initializes constants in Commodity
-        CommoditiesDbAdapter commoditiesDbAdapter = new CommoditiesDbAdapter(mDb);
         AccountsDbAdapter mAccountsDbAdapter = AccountsDbAdapter.getInstance();
         mAccountsDbAdapter.deleteAllRecords();
 
@@ -140,14 +120,14 @@ public class OwnCloudExportTest {
         Split split = new Split(new Money("11.11", currencyCode), account.getUID());
         transaction.addSplit(split);
         transaction.addSplit(split.createPair(
-            mAccountsDbAdapter.getOrCreateImbalanceAccountUID(Commodity.DEFAULT_COMMODITY)));
+            mAccountsDbAdapter.getOrCreateImbalanceAccountUID(context, Commodity.DEFAULT_COMMODITY)));
         account.addTransaction(transaction);
 
         mAccountsDbAdapter.addRecord(account, DatabaseAdapter.UpdateMethod.insert);
 
         mPrefs.edit()
-            .putBoolean(mAccountsActivity.getString(R.string.key_owncloud_sync), false)
-            .putInt(mAccountsActivity.getString(R.string.key_last_export_destination), 0)
+            .putBoolean(context.getString(R.string.key_owncloud_sync), false)
+            .putInt(context.getString(R.string.key_last_export_destination), 0)
             .apply();
     }
 
@@ -156,9 +136,9 @@ public class OwnCloudExportTest {
      *
      * @return {@code true} is an internet connection is available, {@code false} otherwise
      */
-    public static boolean hasActiveInternetConnection() {
+    public static boolean hasActiveInternetConnection(Context context) {
         ConnectivityManager connectivityManager
-            = (ConnectivityManager) GnuCashApplication.getAppContext().getSystemService(Context.CONNECTIVITY_SERVICE);
+            = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
         NetworkInfo activeNetworkInfo = connectivityManager.getActiveNetworkInfo();
         return activeNetworkInfo != null && activeNetworkInfo.isConnected();
     }
@@ -167,8 +147,9 @@ public class OwnCloudExportTest {
      * It might fail if it takes too long to connect to the server or if there is no network
      */
     @Test
-    public void OwnCloudCredentials() {
-        Assume.assumeTrue(hasActiveInternetConnection());
+    public void ownCloudCredentials() {
+        Context context = GnuCashApplication.getAppContext();
+        Assume.assumeTrue(hasActiveInternetConnection(context));
         onView(withId(R.id.drawer_layout)).perform(DrawerActions.open());
         onView(withText(R.string.title_settings)).perform(scrollTo());
         onView(withText(R.string.title_settings)).perform(click());
@@ -182,32 +163,33 @@ public class OwnCloudExportTest {
         onView(withId(R.id.owncloud_dir)).perform(clearText()).perform(typeText(OC_DIR), closeSoftKeyboard());
         // owncloud demo server is offline, so fake check data succeeded.
         if (OC_DEMO_DISABLED) return;
-        onView(withId(R.id.btn_save)).perform(click());
+        onView(withId(BUTTON_POSITIVE)).perform(click());
         sleep(5000);
-        onView(withId(R.id.btn_save)).perform(click());
+        onView(withId(BUTTON_POSITIVE)).perform(click());
 
-        assertEquals(mPrefs.getString(mAccountsActivity.getString(R.string.key_owncloud_server), null), OC_SERVER);
-        assertEquals(mPrefs.getString(mAccountsActivity.getString(R.string.key_owncloud_username), null), OC_USERNAME);
-        assertEquals(mPrefs.getString(mAccountsActivity.getString(R.string.key_owncloud_password), null), OC_PASSWORD);
-        assertEquals(mPrefs.getString(mAccountsActivity.getString(R.string.key_owncloud_dir), null), OC_DIR);
+        assertEquals(mPrefs.getString(context.getString(R.string.key_owncloud_server), null), OC_SERVER);
+        assertEquals(mPrefs.getString(context.getString(R.string.key_owncloud_username), null), OC_USERNAME);
+        assertEquals(mPrefs.getString(context.getString(R.string.key_owncloud_password), null), OC_PASSWORD);
+        assertEquals(mPrefs.getString(context.getString(R.string.key_owncloud_dir), null), OC_DIR);
 
-        assertTrue(mPrefs.getBoolean(mAccountsActivity.getString(R.string.key_owncloud_sync), false));
+        assertTrue(mPrefs.getBoolean(context.getString(R.string.key_owncloud_sync), false));
     }
 
     //// FIXME: 20.04.2017 This test now fails since introduction of SAF.
-    public void OwnCloudExport() {
-        Assume.assumeTrue(hasActiveInternetConnection());
-        mPrefs.edit().putBoolean(mAccountsActivity.getString(R.string.key_owncloud_sync), true).commit();
+    public void ownCloudExport() {
+        Context context = GnuCashApplication.getAppContext();
+        Assume.assumeTrue(hasActiveInternetConnection(context));
+        mPrefs.edit().putBoolean(context.getString(R.string.key_owncloud_sync), true).commit();
 
         onView(withId(R.id.drawer_layout)).perform(DrawerActions.open());
         onView(withText(R.string.nav_menu_export)).perform(click());
         Espresso.closeSoftKeyboard();
         Espresso.pressBack(); //close the SAF file picker window
         onView(withId(R.id.spinner_export_destination)).perform(click());
-        String[] destinations = mAccountsActivity.getResources().getStringArray(R.array.export_destinations);
+        String[] destinations = context.getResources().getStringArray(R.array.export_destinations);
         onView(withText(destinations[3])).perform(click());
         onView(withId(R.id.menu_save)).perform(click());
-        assertToastDisplayed(String.format(mAccountsActivity.getString(R.string.toast_exported_to), "ownCloud -> " + OC_DIR));
+        assertToastDisplayed(String.format(context.getString(R.string.toast_exported_to), "ownCloud -> " + OC_DIR));
     }
 
     /**
@@ -219,19 +201,6 @@ public class OwnCloudExportTest {
         onView(withText(toastString))
             .inRoot(withDecorView(not(is(mActivityRule.getActivity().getWindow().getDecorView()))))
             .check(matches(isDisplayed()));
-    }
-
-    /**
-     * Sleep the thread for a specified period
-     *
-     * @param millis Duration to sleep in milliseconds
-     */
-    private void sleep(long millis) {
-        try {
-            Thread.sleep(millis);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
     }
 }
 

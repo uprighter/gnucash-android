@@ -28,7 +28,7 @@ enum class TransactionType(
     DEBIT("DEBIT"),
     CREDIT("CREDIT");
 
-    private var opposite: TransactionType? = null
+    private lateinit var opposite: TransactionType
 
     /**
      * Inverts the transaction type.
@@ -37,7 +37,7 @@ enum class TransactionType(
      *
      * @return Inverted transaction type
      */
-    fun invert(): TransactionType? {
+    fun invert(): TransactionType {
         return opposite
     }
 
@@ -47,9 +47,11 @@ enum class TransactionType(
             CREDIT.opposite = DEBIT
         }
 
+        private val _values = values()
+
         @JvmStatic
         fun of(value: String?): TransactionType {
-            return values().firstOrNull { it.value == value } ?: DEBIT
+            return _values.firstOrNull { it.value == value } ?: DEBIT
         }
     }
 }

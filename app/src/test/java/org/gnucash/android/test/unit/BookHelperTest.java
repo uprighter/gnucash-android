@@ -10,17 +10,15 @@ import org.gnucash.android.app.GnuCashApplication;
 import org.gnucash.android.db.DatabaseHelper;
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.db.adapter.BooksDbAdapter;
+import org.gnucash.android.db.adapter.BudgetsDbAdapter;
 import org.gnucash.android.db.adapter.CommoditiesDbAdapter;
 import org.gnucash.android.db.adapter.RecurrenceDbAdapter;
 import org.gnucash.android.db.adapter.ScheduledActionDbAdapter;
-import org.gnucash.android.db.adapter.SplitsDbAdapter;
 import org.gnucash.android.db.adapter.TransactionsDbAdapter;
 import org.gnucash.android.importer.GncXmlHandler;
 import org.gnucash.android.util.ConsoleTree;
-import org.gnucash.android.util.LogTree;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.XMLReader;
@@ -42,6 +40,7 @@ public abstract class BookHelperTest extends GnuCashTest {
     protected AccountsDbAdapter mAccountsDbAdapter;
     protected ScheduledActionDbAdapter mScheduledActionDbAdapter;
     protected CommoditiesDbAdapter mCommoditiesDbAdapter;
+    protected BudgetsDbAdapter mBudgetsDbAdapter;
 
     static {
         Timber.plant((Timber.Tree) new ConsoleTree(BuildConfig.DEBUG));
@@ -70,11 +69,12 @@ public abstract class BookHelperTest extends GnuCashTest {
     private void setUpDbAdapters(String bookUID) {
         DatabaseHelper databaseHelper = new DatabaseHelper(GnuCashApplication.getAppContext(), bookUID);
         SQLiteDatabase mainDb = databaseHelper.getReadableDatabase();
-        mTransactionsDbAdapter = new TransactionsDbAdapter(mainDb, new SplitsDbAdapter(mainDb));
-        mAccountsDbAdapter = new AccountsDbAdapter(mainDb, mTransactionsDbAdapter);
-        RecurrenceDbAdapter recurrenceDbAdapter = new RecurrenceDbAdapter(mainDb);
-        mScheduledActionDbAdapter = new ScheduledActionDbAdapter(mainDb, recurrenceDbAdapter);
         mCommoditiesDbAdapter = new CommoditiesDbAdapter(mainDb);
+        mTransactionsDbAdapter = new TransactionsDbAdapter(mCommoditiesDbAdapter);
+        mAccountsDbAdapter = new AccountsDbAdapter(mTransactionsDbAdapter);
+        RecurrenceDbAdapter recurrenceDbAdapter = new RecurrenceDbAdapter(mainDb);
+        mScheduledActionDbAdapter = new ScheduledActionDbAdapter(recurrenceDbAdapter);
+        mBudgetsDbAdapter = new BudgetsDbAdapter(recurrenceDbAdapter);
         mImportedDb = mainDb;
     }
 
