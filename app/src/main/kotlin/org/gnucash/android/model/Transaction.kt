@@ -18,11 +18,7 @@ package org.gnucash.android.model
 import android.content.Intent
 import org.gnucash.android.BuildConfig
 import org.gnucash.android.db.adapter.AccountsDbAdapter
-import org.gnucash.android.export.ofx.OfxHelper
-import org.gnucash.android.model.Account.Companion.convertToOfxAccountType
-import org.gnucash.android.model.Money.Companion.createZeroInstance
-import org.w3c.dom.Document
-import org.w3c.dom.Element
+import org.gnucash.android.util.formatShortDate
 import java.util.Date
 
 /**
@@ -37,11 +33,6 @@ class Transaction : BaseModel {
      * GUID of commodity associated with this transaction
      */
     private var _commodity: Commodity? = null
-
-    /**
-     * The splits making up this transaction
-     */
-    private var _splitList: MutableList<Split> = ArrayList()
 
     /**
      * An extra note giving details about the transaction
@@ -92,19 +83,17 @@ class Transaction : BaseModel {
      * @param transaction    Transaction to be cloned
      * @param generateNewUID Flag to determine if new UID should be assigned or not
      */
-    constructor(transaction: Transaction, generateNewUID: Boolean) {
+    @JvmOverloads
+    constructor(transaction: Transaction, generateNewUID: Boolean = true) {
         initDefaults()
+        if (!generateNewUID) {
+            setUID(transaction.uid)
+        }
         description = transaction.description
         note = transaction.note
-        setTime(transaction.timeMillis)
+        timeMillis = transaction.timeMillis
         commodity = transaction.commodity
-        //exported flag is left at default value of false
-        for (split in transaction._splitList) {
-            addSplit(Split(split, generateNewUID))
-        }
-        if (!generateNewUID) {
-            uID = transaction.uID
-        }
+        splits = transaction.splits.map { Split(it, generateNewUID) }
     }
 
     /**
@@ -131,7 +120,7 @@ class Transaction : BaseModel {
         if (!imbalance.isAmountZero) {
             // yes, this is on purpose the account UID is set to the currency.
             // This should be overridden before saving to db
-            val split = Split(imbalance, commodity.currencyCode)
+            val split = Split(imbalance, accountUID = commodity.uid)
             split.type = if (imbalance.isNegative) TransactionType.CREDIT else TransactionType.DEBIT
             addSplit(split)
             return split
@@ -143,22 +132,26 @@ class Transaction : BaseModel {
      * The GUID of the transaction
      * If the transaction has Splits, their transactionGUID will be updated as well
      */
-    override var uID: String?
-        get() = super.uID
-        set(uid) {
-            super.uID = uid
-            for (split in _splitList) {
-                split.transactionUID = uid
-            }
+    override fun setUID(uid: String?) {
+        super.setUID(uid)
+        for (split in splits) {
+            split.transactionUID = uid
         }
+    }
+
+    private val _splits = mutableListOf<Split>()
 
     /**
-     * Returns list of splits for this transaction
-     *
-     * @return [java.util.List] of splits in the transaction
+     * The list of splits for this transaction
      */
-    val splits: List<Split>
-        get() = _splitList
+    var splits: List<Split>
+        get() = _splits
+        set(value) {
+            _splits.clear()
+            for (split in value) {
+                addSplit(split)
+            }
+        }
 
     /**
      * Returns the list of splits belonging to a specific account
@@ -167,27 +160,7 @@ class Transaction : BaseModel {
      * @return List of [org.gnucash.android.model.Split]s
      */
     fun getSplits(accountUID: String): List<Split> {
-        val splits: MutableList<Split> = ArrayList()
-        for (split in _splitList) {
-            if (split.accountUID == accountUID) {
-                splits.add(split)
-            }
-        }
-        return splits
-    }
-
-    /**
-     * Sets the splits for this transaction
-     *
-     * All the splits in the list will have their transaction UID set to this transaction
-     *
-     * @param splitList List of splits for this transaction
-     */
-    fun setSplits(splitList: MutableList<Split>) {
-        _splitList = splitList
-        for (split in splitList) {
-            split.transactionUID = uID
-        }
+        return splits.filter { it.accountUID == accountUID }
     }
 
     /**
@@ -199,8 +172,10 @@ class Transaction : BaseModel {
      */
     fun addSplit(split: Split) {
         //sets the currency of the split to the currency of the transaction
-        split.transactionUID = uID
-        _splitList.add(split)
+        split.transactionUID = uid
+        if (splits.none { it.uid == split.uid || it == split }) {
+            _splits.add(split)
+        }
     }
 
     /**
@@ -210,10 +185,23 @@ class Transaction : BaseModel {
      *
      * @param accountUID Unique Identifier of the account
      * @return Money balance of the transaction for the specified account
-     * @see .computeBalance
+     * @see computeBalance
      */
     fun getBalance(accountUID: String): Money {
-        return computeBalance(accountUID, _splitList)
+        return computeBalance(accountUID, splits)
+    }
+
+    /**
+     * Returns the balance of this transaction for only those splits which relate to the account.
+     *
+     * Uses a call to [.getBalance] with the appropriate parameters
+     *
+     * @param account The account
+     * @return Money balance of the transaction for the specified account
+     * @see computeBalance
+     */
+    fun getBalance(account: Account): Money {
+        return computeBalance(account, splits)
     }
 
     /**
@@ -227,17 +215,17 @@ class Transaction : BaseModel {
     private val imbalance: Money
         get() {
             val commodity = this.commodity
-            var imbalance = createZeroInstance(commodity.currencyCode)
+            var imbalance = Money.createZeroInstance(commodity)
             for (split in splits) {
-                if (split.quantity!!.commodity != commodity) {
+                if (split.quantity.commodity != commodity) {
                     // this may happen when importing XML exported from GNCA before 2.0.0
                     // these transactions should only be imported from XML exported from GNC desktop
                     // so imbalance split should not be generated for them
-                    return createZeroInstance(commodity.currencyCode)
+                    return Money.createZeroInstance(commodity)
                 }
-                val amount = split.value!!
+                val amount = split.value
                 if (amount.commodity != commodity) {
-                    return createZeroInstance(commodity.currencyCode)
+                    return Money.createZeroInstance(commodity)
                 }
                 imbalance = if (split.type === TransactionType.DEBIT) {
                     imbalance - amount
@@ -253,6 +241,7 @@ class Transaction : BaseModel {
      *
      * @return ISO 4217 currency code string
      */
+    @Deprecated("use commodity")
     val currencyCode: String
         get() = commodity.currencyCode
 
@@ -291,87 +280,19 @@ class Transaction : BaseModel {
         timeMillis = timeInMillis
     }
 
-    /**
-     * Converts transaction to XML DOM corresponding to OFX Statement transaction and
-     * returns the element node for the transaction.
-     * The Unique ID of the account is needed in order to properly export double entry transactions
-     *
-     * @param doc        XML document to which transaction should be added
-     * @param accountUID Unique Identifier of the account which called the method.  @return Element in DOM corresponding to transaction
-     */
-    fun toOFX(doc: Document, accountUID: String): Element {
-        val balance = getBalance(accountUID)
-        val transactionType = if (balance.isNegative) {
-            TransactionType.DEBIT
-        } else {
-            TransactionType.CREDIT
-        }
+    override fun toString(): String {
+        return "{description: $description, date: ${formatShortDate(timeMillis)}}"
+    }
 
-        val transactionNode = doc.createElement(OfxHelper.TAG_STATEMENT_TRANSACTION)
-        val typeNode = doc.createElement(OfxHelper.TAG_TRANSACTION_TYPE)
-        typeNode.appendChild(doc.createTextNode(transactionType.toString()))
-        transactionNode.appendChild(typeNode)
-
-        val datePosted = doc.createElement(OfxHelper.TAG_DATE_POSTED)
-        datePosted.appendChild(doc.createTextNode(OfxHelper.getOfxFormattedTime(timeMillis)))
-        transactionNode.appendChild(datePosted)
-
-        val dateUser = doc.createElement(OfxHelper.TAG_DATE_USER)
-        dateUser.appendChild(doc.createTextNode(OfxHelper.getOfxFormattedTime(timeMillis)))
-        transactionNode.appendChild(dateUser)
-
-        val amount = doc.createElement(OfxHelper.TAG_TRANSACTION_AMOUNT)
-        amount.appendChild(doc.createTextNode(balance.toPlainString()))
-        transactionNode.appendChild(amount)
-
-        val transID = doc.createElement(OfxHelper.TAG_TRANSACTION_FITID)
-        transID.appendChild(doc.createTextNode(uID))
-        transactionNode.appendChild(transID)
-
-        val name = doc.createElement(OfxHelper.TAG_NAME)
-        name.appendChild(doc.createTextNode(description))
-        transactionNode.appendChild(name)
-
-        if (note != null && note!!.isNotEmpty()) {
-            val memo = doc.createElement(OfxHelper.TAG_MEMO)
-            memo.appendChild(doc.createTextNode(note))
-            transactionNode.appendChild(memo)
-        }
-
-        if (_splitList.size == 2) { //if we have exactly one other split, then treat it like a transfer
-            var transferAccountUID = accountUID
-            for (split in _splitList) {
-                if (split.accountUID != accountUID) {
-                    transferAccountUID = split.accountUID!!
-                    break
-                }
-            }
-            val bankId = doc.createElement(OfxHelper.TAG_BANK_ID)
-            bankId.appendChild(doc.createTextNode(OfxHelper.APP_ID))
-
-            val acctId = doc.createElement(OfxHelper.TAG_ACCOUNT_ID)
-            acctId.appendChild(doc.createTextNode(transferAccountUID))
-
-            val accttype = doc.createElement(OfxHelper.TAG_ACCOUNT_TYPE)
-            val acctDbAdapter = AccountsDbAdapter.getInstance()
-            val ofxAccountType = convertToOfxAccountType(
-                acctDbAdapter.getAccountType(transferAccountUID)
-            )
-            accttype.appendChild(doc.createTextNode(ofxAccountType.toString()))
-
-            val bankAccountTo = doc.createElement(OfxHelper.TAG_BANK_ACCOUNT_TO)
-            bankAccountTo.appendChild(bankId)
-            bankAccountTo.appendChild(acctId)
-            bankAccountTo.appendChild(accttype)
-
-            transactionNode.appendChild(bankAccountTo)
-        }
-        return transactionNode
+    fun getTransferSplit(accountUID: String): Split? {
+        val amount: Money? = splits.firstOrNull { it.accountUID == accountUID }?.value
+        return splits.firstOrNull { it.accountUID != accountUID && (it.value == amount) }
+            ?: splits.firstOrNull { it.accountUID != accountUID }
     }
 
     companion object {
         /**
-         * Mime type for transactions in Gnucash.
+         * Mime type for transactions in GnuCash.
          * Used for recording transactions through intents
          */
         const val MIME_TYPE =
@@ -389,7 +310,8 @@ class Transaction : BaseModel {
          *
          */
         @Deprecated("use {@link Split}s instead")
-        const val EXTRA_DOUBLE_ACCOUNT_UID = "${BuildConfig.APPLICATION_ID}.extra.double_account_uid"
+        const val EXTRA_DOUBLE_ACCOUNT_UID =
+            "${BuildConfig.APPLICATION_ID}.extra.double_account_uid"
 
         /**
          * Key for identifying the amount of the transaction through an Intent
@@ -421,35 +343,48 @@ class Transaction : BaseModel {
          * zero is returned (for balanced transactions) or the imbalance amount will be returned.
          *
          * @param accountUID Unique Identifier of the account
-         * @param splitList  List of splits
+         * @param splits  List of splits
          * @return Money list of splits
          */
         @JvmStatic
-        fun computeBalance(accountUID: String, splitList: List<Split>): Money {
+        fun computeBalance(accountUID: String, splits: List<Split>): Money {
             val accountsDbAdapter = AccountsDbAdapter.getInstance()
-            val accountType = accountsDbAdapter.getAccountType(accountUID)
-            val accountCurrencyCode = accountsDbAdapter.getAccountCurrencyCode(accountUID)
-            val isDebitAccount = accountType.hasDebitNormalBalance()
-            var balance = createZeroInstance(accountCurrencyCode)
-            for (split in splitList) {
+            val account = accountsDbAdapter.getSimpleRecord(accountUID)!!
+            return computeBalance(account, splits)
+        }
+
+        /**
+         * Computes the balance of the splits belonging to a particular account.
+         *
+         * Only those splits which belong to the account will be considered.
+         * If the `accountUID` is null, then the imbalance of the transaction is computed. This means that either
+         * zero is returned (for balanced transactions) or the imbalance amount will be returned.
+         *
+         * @param account The account
+         * @param splits  List of splits
+         * @return Money list of splits
+         */
+        @JvmStatic
+        fun computeBalance(account: Account, splits: List<Split>): Money {
+            val accountUID = account.uid
+            val accountType = account.accountType
+            val accountCommodity = account.commodity
+            val isDebitAccount = accountType.hasDebitDisplayBalance
+            var balance = Money.createZeroInstance(accountCommodity)
+            for (split in splits) {
                 if (split.accountUID != accountUID) continue
-                val amount: Money = if (split.value!!.commodity.currencyCode == accountCurrencyCode) {
-                    split.value!!
+                val amount: Money = if (split.value.commodity == accountCommodity) {
+                    split.value
                 } else { //if this split belongs to the account, then either its value or quantity is in the account currency
-                    split.quantity!!
+                    split.quantity
                 }
                 val isDebitSplit = split.type === TransactionType.DEBIT
-                balance = if (isDebitAccount) {
-                    if (isDebitSplit) {
+                balance =
+                    if ((isDebitAccount && isDebitSplit) || (!isDebitAccount && !isDebitSplit)) {
                         balance + amount
                     } else {
                         balance - amount
                     }
-                } else if (isDebitSplit) {
-                    balance - amount
-                } else {
-                    balance + amount
-                }
             }
             return balance
         }
@@ -467,28 +402,12 @@ class Transaction : BaseModel {
             accountType: AccountType,
             shouldReduceBalance: Boolean
         ): TransactionType {
-            val type: TransactionType = if (accountType.hasDebitNormalBalance()) {
+            val type: TransactionType = if (accountType.hasDebitNormalBalance) {
                 if (shouldReduceBalance) TransactionType.CREDIT else TransactionType.DEBIT
             } else {
                 if (shouldReduceBalance) TransactionType.DEBIT else TransactionType.CREDIT
             }
             return type
-        }
-
-        /**
-         * Returns true if the transaction type represents a decrease for the account balance for the `accountType`, false otherwise
-         *
-         * @return true if the amount represents a decrease in the account balance, false otherwise
-         * @see .getTypeForBalance
-         */
-        @JvmStatic
-        fun shouldDecreaseBalance(
-            accountType: AccountType,
-            transactionType: TransactionType
-        ): Boolean {
-            return if (accountType.hasDebitNormalBalance()) {
-                transactionType === TransactionType.CREDIT
-            } else transactionType === TransactionType.DEBIT
         }
 
         /**
@@ -500,16 +419,16 @@ class Transaction : BaseModel {
          */
         @JvmStatic
         fun createIntent(transaction: Transaction): Intent {
-            val intent = Intent(Intent.ACTION_INSERT)
-            intent.type = MIME_TYPE
-            intent.putExtra(Intent.EXTRA_TITLE, transaction.description)
-            intent.putExtra(Intent.EXTRA_TEXT, transaction.note)
-            intent.putExtra(Account.EXTRA_CURRENCY_CODE, transaction.currencyCode)
             val stringBuilder = StringBuilder()
             for (split in transaction.splits) {
                 stringBuilder.append(split.toCsv()).append("\n")
             }
-            intent.putExtra(EXTRA_SPLITS, stringBuilder.toString())
+            val intent = Intent(Intent.ACTION_INSERT)
+                .setType(MIME_TYPE)
+                .putExtra(Intent.EXTRA_TITLE, transaction.description)
+                .putExtra(Intent.EXTRA_TEXT, transaction.note)
+                .putExtra(Account.EXTRA_CURRENCY_CODE, transaction.currencyCode)
+                .putExtra(EXTRA_SPLITS, stringBuilder.toString())
             return intent
         }
     }

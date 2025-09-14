@@ -16,14 +16,15 @@
 
 package org.gnucash.android.ui.settings;
 
-import static org.gnucash.android.app.IntentExtKt.takePersistableUriPermission;
+import static androidx.recyclerview.widget.RecyclerView.NO_POSITION;
+import static org.gnucash.android.util.DocumentExtKt.chooseDocument;
+import static org.gnucash.android.util.DocumentExtKt.openBook;
 
 import android.app.Activity;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -33,6 +34,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.ListAdapter;
 import android.widget.ListView;
 import android.widget.TextView;
 
@@ -47,19 +49,18 @@ import androidx.cursoradapter.widget.SimpleCursorAdapter;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentResultListener;
 import androidx.fragment.app.ListFragment;
-import androidx.loader.app.LoaderManager;
-import androidx.loader.content.Loader;
 
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
-import org.gnucash.android.db.DatabaseCursorLoader;
 import org.gnucash.android.db.DatabaseHelper;
+import org.gnucash.android.db.DatabaseHolder;
 import org.gnucash.android.db.DatabaseSchema.BookEntry;
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.db.adapter.BooksDbAdapter;
-import org.gnucash.android.db.adapter.SplitsDbAdapter;
 import org.gnucash.android.db.adapter.TransactionsDbAdapter;
+import org.gnucash.android.importer.AccountsTemplate;
 import org.gnucash.android.ui.account.AccountsActivity;
+import org.gnucash.android.ui.adapter.AccountsTemplatesAdapter;
 import org.gnucash.android.ui.common.Refreshable;
 import org.gnucash.android.ui.settings.dialog.DeleteBookConfirmationDialog;
 import org.gnucash.android.util.BookUtils;
@@ -73,11 +74,12 @@ import timber.log.Timber;
  * Fragment for managing the books in the database
  */
 public class BookManagerFragment extends ListFragment implements
-        LoaderManager.LoaderCallbacks<Cursor>, Refreshable, FragmentResultListener {
+    Refreshable, FragmentResultListener {
 
     private static final int REQUEST_OPEN_DOCUMENT = 0x20;
 
-    private SimpleCursorAdapter mCursorAdapter;
+    private BooksAdapter booksAdapter;
+    private AccountsTemplatesAdapter accountsTemplatesAdapter;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -89,11 +91,15 @@ public class BookManagerFragment extends ListFragment implements
         super.onCreate(savedInstanceState);
         setHasOptionsMenu(true);
 
-        mCursorAdapter = new BooksCursorAdapter(requireContext(), R.layout.cardview_book,
-                null, new String[]{BookEntry.COLUMN_DISPLAY_NAME, BookEntry.COLUMN_SOURCE_URI},
-                new int[]{R.id.primary_text, R.id.secondary_text});
+        booksAdapter = new BooksAdapter(requireContext());
+        setListAdapter(booksAdapter);
+    }
 
-        setListAdapter(mCursorAdapter);
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        booksAdapter = null;
+        accountsTemplatesAdapter = null;
     }
 
     @Override
@@ -127,18 +133,12 @@ public class BookManagerFragment extends ListFragment implements
                     Timber.w("Activity expected");
                     return false;
                 }
-                AccountsActivity.createDefaultAccounts(GnuCashApplication.getDefaultCurrencyCode(), activity);
+                createBook(activity);
                 return true;
             }
 
             case R.id.menu_open:
-                String[] mimeTypes = {"text/*", "application/*"};
-                //use the storage access framework
-                Intent openDocument = new Intent(Intent.ACTION_OPEN_DOCUMENT)
-                    .addCategory(Intent.CATEGORY_OPENABLE)
-                    .setType("text/*|application/*")
-                    .putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes);
-                startActivityForResult(openDocument, REQUEST_OPEN_DOCUMENT);
+                chooseDocument(this, REQUEST_OPEN_DOCUMENT);
                 return true;
 
             default:
@@ -149,32 +149,15 @@ public class BookManagerFragment extends ListFragment implements
 
     @Override
     public void refresh() {
-        getLoaderManager().restartLoader(0, null, this);
+        if (isDetached() || getFragmentManager() == null) return;
+        BooksDbAdapter booksDbAdapter = BooksDbAdapter.getInstance();
+        Cursor cursor = booksDbAdapter.fetchAllRecords();
+        booksAdapter.swapCursor(cursor);
     }
 
     @Override
     public void refresh(String uid) {
         refresh();
-    }
-
-    @NonNull
-    @Override
-    public Loader<Cursor> onCreateLoader(int id, Bundle args) {
-        Timber.d("Creating loader for books");
-        return new BooksCursorLoader(requireContext());
-    }
-
-    @Override
-    public void onLoadFinished(@NonNull Loader<Cursor> loader, Cursor data) {
-        Timber.d("Finished loading books from database");
-        mCursorAdapter.swapCursor(data);
-        mCursorAdapter.notifyDataSetChanged();
-    }
-
-    @Override
-    public void onLoaderReset(@NonNull Loader<Cursor> loader) {
-        Timber.d("Resetting books list loader");
-        mCursorAdapter.swapCursor(null);
     }
 
     @Override
@@ -189,23 +172,54 @@ public class BookManagerFragment extends ListFragment implements
     public void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         if (resultCode == Activity.RESULT_OK) {
             if (requestCode == REQUEST_OPEN_DOCUMENT) {
-                Activity context = requireActivity();
-                final int takeFlags = data.getFlags() & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-                context.getContentResolver().takePersistableUriPermission(data.getData(), takeFlags);
-                AccountsActivity.importXmlFileFromIntent(context, data, null);
-                takePersistableUriPermission(context, data);
+                openBook(requireActivity(), data);
                 return;
             }
         }
         super.onActivityResult(requestCode, resultCode, data);
     }
 
-    private class BooksCursorAdapter extends SimpleCursorAdapter {
+    private void createBook(@NonNull final Activity activity) {
+        if (accountsTemplatesAdapter == null) {
+            accountsTemplatesAdapter = new AccountsTemplatesAdapter(activity);
+        }
+        final ListAdapter adapter = accountsTemplatesAdapter;
+
+        new AlertDialog.Builder(activity)
+            .setTitle(R.string.title_create_default_accounts)
+            .setCancelable(true)
+            .setSingleChoiceItems(adapter, NO_POSITION, new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    AccountsTemplate.Header item = (AccountsTemplate.Header) adapter.getItem(which);
+                    String fileId = item.assetId;
+                    dialog.dismiss();
+                    String currencyCode = GnuCashApplication.getDefaultCurrencyCode();
+                    AccountsActivity.createDefaultAccounts(activity, currencyCode, fileId, null);
+                }
+            })
+            .setNegativeButton(R.string.alert_dialog_cancel, new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    dialog.dismiss();
+                }
+            })
+            .show();
+    }
+
+    private class BooksAdapter extends SimpleCursorAdapter {
 
         private final String activeBookUID = GnuCashApplication.getActiveBookUID();
 
-        BooksCursorAdapter(Context context, int layout, Cursor c, String[] from, int[] to) {
-            super(context, layout, c, from, to, 0);
+        BooksAdapter(Context context) {
+            super(
+                context,
+                R.layout.cardview_book,
+                null,
+                new String[]{BookEntry.COLUMN_DISPLAY_NAME, BookEntry.COLUMN_SOURCE_URI},
+                new int[]{R.id.primary_text, R.id.secondary_text},
+                0
+            );
         }
 
         @Override
@@ -237,8 +251,8 @@ public class BookManagerFragment extends ListFragment implements
 
         private void setUpMenu(View view, final Context context, Cursor cursor, final String bookUID) {
             final String bookName = cursor.getString(
-                    cursor.getColumnIndexOrThrow(BookEntry.COLUMN_DISPLAY_NAME));
-            ImageView optionsMenu = (ImageView) view.findViewById(R.id.options_menu);
+                cursor.getColumnIndexOrThrow(BookEntry.COLUMN_DISPLAY_NAME));
+            ImageView optionsMenu = view.findViewById(R.id.options_menu);
             optionsMenu.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
@@ -252,9 +266,6 @@ public class BookManagerFragment extends ListFragment implements
                             switch (item.getItemId()) {
                                 case R.id.menu_rename:
                                     return handleMenuRenameBook(bookName, bookUID);
-                                case R.id.menu_sync:
-                                    //TODO implement sync
-                                    return false;
                                 case R.id.menu_delete:
                                     return handleMenuDeleteBook(bookUID);
                                 default:
@@ -288,38 +299,38 @@ public class BookManagerFragment extends ListFragment implements
          * @return {@code true}
          */
         private boolean handleMenuRenameBook(String bookName, final String bookUID) {
-            AlertDialog.Builder dialogBuilder = new AlertDialog.Builder(getActivity());
-            dialogBuilder.setTitle(R.string.title_rename_book)
-                    .setView(R.layout.dialog_rename_book)
-                    .setPositiveButton(R.string.btn_rename, new DialogInterface.OnClickListener() {
-                        @Override
-                        public void onClick(DialogInterface dialog, int which) {
-                            EditText bookTitle = (EditText) ((AlertDialog) dialog).findViewById(R.id.input_book_title);
-                            BooksDbAdapter.getInstance()
-                                    .updateRecord(bookUID,
-                                            BookEntry.COLUMN_DISPLAY_NAME,
-                                            bookTitle.getText().toString().trim());
-                            refresh();
-                        }
-                    })
-                    .setNegativeButton(R.string.btn_cancel, new DialogInterface.OnClickListener() {
-                        @Override
-                        public void onClick(DialogInterface dialog, int which) {
-                            dialog.dismiss();
-                        }
-                    });
-            AlertDialog dialog = dialogBuilder.create();
-            dialog.show();
+            AlertDialog dialog = new AlertDialog.Builder(getActivity())
+                .setTitle(R.string.title_rename_book)
+                .setView(R.layout.dialog_rename_book)
+                .setPositiveButton(R.string.btn_rename, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        EditText bookTitle = ((AlertDialog) dialog).findViewById(R.id.input_book_title);
+                        BooksDbAdapter.getInstance()
+                            .updateRecord(bookUID,
+                                BookEntry.COLUMN_DISPLAY_NAME,
+                                bookTitle.getText().toString().trim());
+                        refresh();
+                    }
+                })
+                .setNegativeButton(R.string.btn_cancel, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.dismiss();
+                    }
+                })
+                .show();
             ((TextView) dialog.findViewById(R.id.input_book_title)).setText(bookName);
             return true;
         }
 
         private void setLastExportedText(View view, String bookUID) {
-            TextView labelLastSync = (TextView) view.findViewById(R.id.label_last_sync);
+            Context context = view.getContext();
+            TextView labelLastSync = view.findViewById(R.id.label_last_sync);
             labelLastSync.setText(R.string.label_last_export_time);
 
-            Timestamp lastSyncTime = PreferencesHelper.getLastExportTime(bookUID);
-            TextView lastSyncText = (TextView) view.findViewById(R.id.last_sync_time);
+            Timestamp lastSyncTime = PreferencesHelper.getLastExportTime(context, bookUID);
+            TextView lastSyncText = view.findViewById(R.id.last_sync_time);
             if (lastSyncTime.equals(new Timestamp(0)))
                 lastSyncText.setText(R.string.last_export_time_never);
             else
@@ -329,38 +340,18 @@ public class BookManagerFragment extends ListFragment implements
         private void setStatisticsText(View view, String bookUID) {
             final Context context = view.getContext();
             DatabaseHelper dbHelper = new DatabaseHelper(context, bookUID);
-            SQLiteDatabase db = dbHelper.getReadableDatabase();
-            TransactionsDbAdapter trnAdapter = new TransactionsDbAdapter(db, new SplitsDbAdapter(db));
+            DatabaseHolder holder = dbHelper.getHolder();
+            TransactionsDbAdapter trnAdapter = new TransactionsDbAdapter(holder);
             int transactionCount = (int) trnAdapter.getRecordsCount();
-            String transactionStats = getResources().getQuantityString(R.plurals.book_transaction_stats, transactionCount, transactionCount);
-
-            AccountsDbAdapter accountsDbAdapter = new AccountsDbAdapter(db, trnAdapter);
+            AccountsDbAdapter accountsDbAdapter = new AccountsDbAdapter(trnAdapter);
             int accountsCount = (int) accountsDbAdapter.getRecordsCount();
+            dbHelper.close();
+
+            String transactionStats = getResources().getQuantityString(R.plurals.book_transaction_stats, transactionCount, transactionCount);
             String accountStats = getResources().getQuantityString(R.plurals.book_account_stats, accountsCount, accountsCount);
             String stats = accountStats + ", " + transactionStats;
-            TextView statsText = (TextView) view.findViewById(R.id.secondary_text);
+            TextView statsText = view.findViewById(R.id.secondary_text);
             statsText.setText(stats);
-        }
-    }
-
-    /**
-     * {@link DatabaseCursorLoader} for loading the book list from the database
-     *
-     * @author Ngewi Fet <ngewif@gmail.com>
-     */
-    private static class BooksCursorLoader extends DatabaseCursorLoader<BooksDbAdapter> {
-        BooksCursorLoader(Context context) {
-            super(context);
-        }
-
-        @Override
-        public Cursor loadInBackground() {
-            BooksDbAdapter dbAdapter = BooksDbAdapter.getInstance();
-            if (dbAdapter == null) return null;
-            databaseAdapter = dbAdapter;
-            Cursor cursor = dbAdapter.fetchAllRecords();
-            registerContentObserver(cursor);
-            return cursor;
         }
     }
 }

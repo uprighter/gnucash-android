@@ -21,9 +21,10 @@ import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.WindowManager.LayoutParams;
 
-import androidx.appcompat.app.AppCompatActivity;
+import androidx.annotation.Nullable;
 
-import org.gnucash.android.ui.common.UxArgument;
+import org.gnucash.android.app.GnuCashActivity;
+import org.gnucash.android.ui.settings.ThemeHelper;
 
 import timber.log.Timber;
 
@@ -32,7 +33,13 @@ import timber.log.Timber;
  *
  * @author Oleksandr Tyshkovets <olexandr.tyshkovets@gmail.com>
  */
-public class PasscodeLockActivity extends AppCompatActivity {
+public class PasscodeLockActivity extends GnuCashActivity {
+
+    @Override
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        ThemeHelper.apply(this);
+    }
 
     @Override
     protected void onResume() {

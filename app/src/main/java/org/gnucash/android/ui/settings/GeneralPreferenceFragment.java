@@ -16,20 +16,17 @@
 
 package org.gnucash.android.ui.settings;
 
+import static org.gnucash.android.app.ActivityExtKt.restart;
+
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
-import android.view.View;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.appcompat.app.ActionBar;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.preference.Preference;
-import androidx.preference.PreferenceFragmentCompat;
-import androidx.preference.SwitchPreference;
+import androidx.preference.TwoStatePreference;
 
 import org.gnucash.android.R;
 import org.gnucash.android.ui.passcode.PasscodePreferenceActivity;
@@ -39,7 +36,7 @@ import org.gnucash.android.ui.passcode.PasscodePreferenceActivity;
  *
  * @author Oleksandr Tyshkovets <olexandr.tyshkovets@gmail.com>
  */
-public class GeneralPreferenceFragment extends PreferenceFragmentCompat {
+public class GeneralPreferenceFragment extends GnuPreferenceFragment {
 
     /**
      * Request code for retrieving passcode to store
@@ -54,24 +51,24 @@ public class GeneralPreferenceFragment extends PreferenceFragmentCompat {
      */
     public static final int REQUEST_CHANGE_PASSCODE = 0x4;
 
-    private SwitchPreference preferencePasscode;
+    private TwoStatePreference preferencePasscode;
 
     @Override
-    public void onCreatePreferences(Bundle bundle, String s) {
+    protected int getTitleId() {
+        return R.string.title_general_prefs;
+    }
+
+    @Override
+    public void onCreatePreferences(Bundle bundle, String rootKey) {
         addPreferencesFromResource(R.xml.fragment_general_preferences);
-    }
 
-    @Override
-    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
-        ActionBar actionBar = ((AppCompatActivity) requireActivity()).getSupportActionBar();
-        assert actionBar != null;
-        actionBar.setTitle(R.string.title_general_prefs);
-    }
-
-    @Override
-    public void onResume() {
-        super.onResume();
+        findPreference(getString(R.string.key_theme)).setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+            @Override
+            public boolean onPreferenceChange(@NonNull Preference preference, Object newValue) {
+                restart(requireActivity());
+                return true;
+            }
+        });
 
         preferencePasscode = findPreference(getString(R.string.key_enable_passcode));
         preferencePasscode.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {

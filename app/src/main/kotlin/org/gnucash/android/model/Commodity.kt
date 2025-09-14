@@ -15,22 +15,30 @@
  */
 package org.gnucash.android.model
 
-import java.util.TimeZone
+import android.os.Build
+import android.os.Parcel
+import android.os.Parcelable
+import org.gnucash.android.app.GnuCashApplication
 import org.gnucash.android.db.adapter.CommoditiesDbAdapter
+import org.gnucash.android.math.numberOfTrailingZeros
+import timber.log.Timber
+import java.util.Currency
+import java.util.TimeZone
 
 /**
  * Commodities are the currencies used in the application.
  * At the moment only ISO4217 currencies are supported
  */
-class Commodity(
+class Commodity @JvmOverloads constructor(
     /**
      * Official full name of the currency
      */
-    var fullname: String?,
+    var fullname: String? = null,
     /**
      * This is the currency code for ISO4217 currencies
      */
     var mnemonic: String,
+    namespace: String = COMMODITY_CURRENCY,
     /**
      * The smallest fraction supported by the commodity as a power of 10.
      *
@@ -39,8 +47,8 @@ class Commodity(
      * The fraction is a power of 10. So commodities with 2 fraction digits, have fraction of 10^2 = 100.<br />
      * If the parameter is any other value, a default fraction of 100 will be set
      */
-    var smallestFraction: Int = 100
-) : BaseModel() {
+    var smallestFraction: Int = DEFAULT_SMALLEST_FRACTION
+) : BaseModel(), Parcelable {
 
     var namespace = COMMODITY_CURRENCY
         set(value) {
@@ -51,6 +59,9 @@ class Commodity(
 
     val isCurrency: Boolean
         get() = (COMMODITY_CURRENCY == namespace || COMMODITY_ISO4217 == namespace)
+
+    val isTemplate: Boolean
+        get() = (TEMPLATE == namespace) || (TEMPLATE == mnemonic) || (TEMPLATE == cusip)
 
     /**
      * Returns the mnemonic, or currency code for ISO4217 currencies
@@ -73,6 +84,8 @@ class Commodity(
     val currencyCode: String
         get() = mnemonic
 
+    val currency: Currency by lazy { Currency.getInstance(currencyCode) }
+
     /**
      * Returns the symbol for this commodity.
      *
@@ -91,21 +104,44 @@ class Commodity(
      * Supported values for the smallest fraction are powers of 10 i.e. 1, 10, 100 etc
      *
      * @return Number of digits in fraction
-     * @see .getSmallestFraction
+     * @see smallestFraction
      */
     val smallestFractionDigits: Int
-        get() = if (smallestFraction == 0) {
-            0
-        } else {
-            Integer.numberOfTrailingZeros(smallestFraction)
-        }
+        get() = smallestFraction.numberOfTrailingZeros
+
+    init {
+        this.namespace = namespace
+    }
+
+    constructor(parcel: Parcel) : this(
+        parcel.readString(),
+        parcel.readString()!!,
+        parcel.readString()!!,
+        parcel.readInt()
+    ) {
+        id = parcel.readLong()
+        setUID(parcel.readString())
+        localSymbol = parcel.readString()
+    }
+
+    override fun describeContents(): Int = 0
+
+    override fun writeToParcel(dest: Parcel, flags: Int) {
+        dest.writeString(fullname)
+        dest.writeString(mnemonic)
+        dest.writeString(namespace)
+        dest.writeInt(smallestFraction)
+        dest.writeLong(id)
+        dest.writeString(uid)
+        dest.writeString(localSymbol)
+    }
 
     /**
      * Returns the full name of the currency, or the currency code if there is no full name
      * @return String representation of the commodity
      */
     override fun toString(): String {
-        return if (fullname == null || fullname!!.isEmpty()) mnemonic else fullname!!
+        return key
     }
 
     /**
@@ -127,6 +163,8 @@ class Commodity(
         return mnemonic.hashCode()
     }
 
+    val key: String get() = "${namespace}::${mnemonic}"
+
     fun setQuoteTimeZone(id: String?) {
         if (id.isNullOrEmpty()) {
             this.quoteTimeZone = null
@@ -141,6 +179,7 @@ class Commodity(
         const val COMMODITY_CURRENCY = "CURRENCY"
         const val COMMODITY_ISO4217 = "ISO4217"
         const val TEMPLATE = "template"
+        const val DEFAULT_SMALLEST_FRACTION = 100
 
         /**
          * ISO 4217 currency code for "No Currency"
@@ -148,25 +187,25 @@ class Commodity(
         const val NO_CURRENCY_CODE = "XXX"
 
         @JvmField
-        var USD = Commodity("", "USD", 100)
+        var USD = Commodity("US Dollar", "USD")
 
         @JvmField
-        var EUR = Commodity("", "EUR", 100)
+        var EUR = Commodity("Euro", "EUR")
 
         @JvmField
-        var GBP = Commodity("", "GBP", 100)
+        var GBP = Commodity("Pound Sterling", "GBP")
 
         @JvmField
-        var CHF = Commodity("", "CHF", 100)
+        var CHF = Commodity("Swiss Franc", "CHF")
 
         @JvmField
-        var CAD = Commodity("", "CAD", 100)
+        var CAD = Commodity("Canadian Dollar", "CAD")
 
         @JvmField
-        var JPY = Commodity("", "JPY", 1)
+        var JPY = Commodity("Yen", "JPY", smallestFraction = 1)
 
         @JvmField
-        var AUD = Commodity("", "AUD", 100)
+        var AUD = Commodity("Australian Dollar", "AUD")
 
         /**
          * Default commodity for device locale
@@ -178,8 +217,15 @@ class Commodity(
         var DEFAULT_COMMODITY = Commodity(
             USD.fullname,
             USD.mnemonic,
+            USD.namespace,
             USD.smallestFraction
         ) //this value is a stub. Will be overwritten when the app is launched
+
+        @JvmField
+        val template = Commodity(TEMPLATE, TEMPLATE, TEMPLATE, 1).apply {
+            cusip = TEMPLATE
+            localSymbol = TEMPLATE
+        }
 
         /**
          * Returns an instance of commodity for the specified currencyCode
@@ -203,7 +249,7 @@ class Commodity(
             }
 
             val adapter = CommoditiesDbAdapter.getInstance()
-            return adapter?.getCommodity(currencyCode) ?: DEFAULT_COMMODITY
+            return adapter?.getCurrency(currencyCode) ?: DEFAULT_COMMODITY
         }
 
         @JvmStatic
@@ -213,9 +259,45 @@ class Commodity(
             }
             return "$currencyCode ($name)"
         }
+
+        @JvmStatic
+        fun getLocaleCurrencyCode(): String? {
+            return try {
+                val locale = GnuCashApplication.getDefaultLocale()
+                Currency.getInstance(locale).currencyCode
+            } catch (e: Throwable) {
+                Timber.e(e)
+                null
+            }
+        }
+
+        @JvmField
+        val CREATOR = object : Parcelable.Creator<Commodity> {
+            override fun createFromParcel(parcel: Parcel): Commodity {
+                return Commodity(parcel)
+            }
+
+            override fun newArray(size: Int): Array<Commodity?> {
+                return arrayOfNulls(size)
+            }
+        }
     }
 
     fun formatListItem(): String {
         return formatListItem(currencyCode, fullname)
+    }
+}
+
+fun Parcel.writeCommodity(value: Commodity?, flags: Int) {
+    writeParcelable(value, flags)
+}
+
+fun Parcel.readCommodity(): Commodity? {
+    val clazz = Commodity::class.java
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        readParcelable(clazz.classLoader, clazz)
+    } else {
+        @Suppress("DEPRECATION")
+        readParcelable(clazz.classLoader)
     }
 }

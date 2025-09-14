@@ -18,16 +18,18 @@ package org.gnucash.android.db.adapter;
 import static org.gnucash.android.db.DatabaseSchema.BudgetAmountEntry;
 
 import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteStatement;
 
 import androidx.annotation.NonNull;
 
 import org.gnucash.android.app.GnuCashApplication;
+import org.gnucash.android.db.DatabaseHolder;
+import org.gnucash.android.db.DatabaseSchema;
 import org.gnucash.android.model.BudgetAmount;
+import org.gnucash.android.model.Commodity;
 import org.gnucash.android.model.Money;
 
-import java.util.ArrayList;
+import java.io.IOException;
 import java.util.List;
 
 /**
@@ -35,24 +37,33 @@ import java.util.List;
  */
 public class BudgetAmountsDbAdapter extends DatabaseAdapter<BudgetAmount> {
 
+    @NonNull
+    final CommoditiesDbAdapter commoditiesDbAdapter;
 
-    /**
-     * Opens the database adapter with an existing database
-     *
-     * @param db SQLiteDatabase object
-     */
-    public BudgetAmountsDbAdapter(SQLiteDatabase db) {
-        super(db, BudgetAmountEntry.TABLE_NAME, new String[]{
-                BudgetAmountEntry.COLUMN_BUDGET_UID,
-                BudgetAmountEntry.COLUMN_ACCOUNT_UID,
-                BudgetAmountEntry.COLUMN_AMOUNT_NUM,
-                BudgetAmountEntry.COLUMN_AMOUNT_DENOM,
-                BudgetAmountEntry.COLUMN_PERIOD_NUM
+    public BudgetAmountsDbAdapter(@NonNull DatabaseHolder holder) {
+        this(new CommoditiesDbAdapter(holder));
+    }
+
+    public BudgetAmountsDbAdapter(@NonNull CommoditiesDbAdapter commoditiesDbAdapter) {
+        super(commoditiesDbAdapter.holder, BudgetAmountEntry.TABLE_NAME, new String[]{
+            BudgetAmountEntry.COLUMN_BUDGET_UID,
+            BudgetAmountEntry.COLUMN_ACCOUNT_UID,
+            BudgetAmountEntry.COLUMN_AMOUNT_NUM,
+            BudgetAmountEntry.COLUMN_AMOUNT_DENOM,
+            BudgetAmountEntry.COLUMN_PERIOD_NUM,
+            BudgetAmountEntry.COLUMN_NOTES
         });
+        this.commoditiesDbAdapter = commoditiesDbAdapter;
     }
 
     public static BudgetAmountsDbAdapter getInstance() {
         return GnuCashApplication.getBudgetAmountsDbAdapter();
+    }
+
+    @Override
+    public void close() throws IOException {
+        commoditiesDbAdapter.close();
+        super.close();
     }
 
     @Override
@@ -62,24 +73,28 @@ public class BudgetAmountsDbAdapter extends DatabaseAdapter<BudgetAmount> {
         long amountNum = cursor.getLong(cursor.getColumnIndexOrThrow(BudgetAmountEntry.COLUMN_AMOUNT_NUM));
         long amountDenom = cursor.getLong(cursor.getColumnIndexOrThrow(BudgetAmountEntry.COLUMN_AMOUNT_DENOM));
         long periodNum = cursor.getLong(cursor.getColumnIndexOrThrow(BudgetAmountEntry.COLUMN_PERIOD_NUM));
+        String notes = cursor.getString(cursor.getColumnIndexOrThrow(BudgetAmountEntry.COLUMN_NOTES));
 
         BudgetAmount budgetAmount = new BudgetAmount(budgetUID, accountUID);
         populateBaseModelAttributes(cursor, budgetAmount);
-        budgetAmount.setAmount(new Money(amountNum, amountDenom, getAccountCurrencyCode(accountUID)));
+        budgetAmount.setAmount(new Money(amountNum, amountDenom, getCommodity(accountUID)));
         budgetAmount.setPeriodNum(periodNum);
+        budgetAmount.setNotes(notes);
 
         return budgetAmount;
     }
 
     @Override
-    protected @NonNull SQLiteStatement setBindings(@NonNull SQLiteStatement stmt, @NonNull final BudgetAmount budgetAmount) {
-        stmt.clearBindings();
+    protected @NonNull SQLiteStatement bind(@NonNull SQLiteStatement stmt, @NonNull final BudgetAmount budgetAmount) {
+        bindBaseModel(stmt, budgetAmount);
         stmt.bindString(1, budgetAmount.getBudgetUID());
         stmt.bindString(2, budgetAmount.getAccountUID());
         stmt.bindLong(3, budgetAmount.getAmount().getNumerator());
         stmt.bindLong(4, budgetAmount.getAmount().getDenominator());
         stmt.bindLong(5, budgetAmount.getPeriodNum());
-        stmt.bindString(6, budgetAmount.getUID());
+        if (budgetAmount.getNotes() != null) {
+            stmt.bindString(6, budgetAmount.getNotes());
+        }
 
         return stmt;
     }
@@ -92,14 +107,8 @@ public class BudgetAmountsDbAdapter extends DatabaseAdapter<BudgetAmount> {
      */
     public List<BudgetAmount> getBudgetAmountsForBudget(String budgetUID) {
         Cursor cursor = fetchAllRecords(BudgetAmountEntry.COLUMN_BUDGET_UID + "=?",
-                new String[]{budgetUID}, null);
-
-        List<BudgetAmount> budgetAmounts = new ArrayList<>();
-        while (cursor.moveToNext()) {
-            budgetAmounts.add(buildModelInstance(cursor));
-        }
-        cursor.close();
-        return budgetAmounts;
+            new String[]{budgetUID}, null);
+        return getRecords(cursor);
     }
 
     /**
@@ -110,7 +119,7 @@ public class BudgetAmountsDbAdapter extends DatabaseAdapter<BudgetAmount> {
      */
     public int deleteBudgetAmountsForBudget(String budgetUID) {
         return mDb.delete(mTableName, BudgetAmountEntry.COLUMN_BUDGET_UID + "=?",
-                new String[]{budgetUID});
+            new String[]{budgetUID});
     }
 
     /**
@@ -121,12 +130,7 @@ public class BudgetAmountsDbAdapter extends DatabaseAdapter<BudgetAmount> {
      */
     public List<BudgetAmount> getBudgetAmounts(String accountUID) {
         Cursor cursor = fetchAllRecords(BudgetAmountEntry.COLUMN_ACCOUNT_UID + " = ?", new String[]{accountUID}, null);
-        List<BudgetAmount> budgetAmounts = new ArrayList<>();
-        while (cursor.moveToNext()) {
-            budgetAmounts.add(buildModelInstance(cursor));
-        }
-        cursor.close();
-        return budgetAmounts;
+        return getRecords(cursor);
     }
 
     /**
@@ -137,10 +141,35 @@ public class BudgetAmountsDbAdapter extends DatabaseAdapter<BudgetAmount> {
      */
     public Money getBudgetAmountSum(String accountUID) {
         List<BudgetAmount> budgetAmounts = getBudgetAmounts(accountUID);
-        Money sum = Money.createZeroInstance(getAccountCurrencyCode(accountUID));
+        Money sum = Money.createZeroInstance(getCommodity(accountUID));
         for (BudgetAmount budgetAmount : budgetAmounts) {
             sum = sum.plus(budgetAmount.getAmount());
         }
         return sum;
+    }
+
+    /**
+     * Returns the commodity of the account
+     * with unique Identifier <code>accountUID</code>
+     *
+     * @param accountUID Unique Identifier of the account
+     * @return Commodity of the account.
+     */
+    public Commodity getCommodity(@NonNull String accountUID) {
+        Cursor cursor = mDb.query(
+            DatabaseSchema.AccountEntry.TABLE_NAME,
+            new String[]{DatabaseSchema.AccountEntry.COLUMN_COMMODITY_UID},
+            DatabaseSchema.AccountEntry.COLUMN_UID + "= ?",
+            new String[]{accountUID}, null, null, null);
+        try {
+            if (cursor.moveToFirst()) {
+                String commodityUID = cursor.getString(0);
+                return commoditiesDbAdapter.getRecord(commodityUID);
+            } else {
+                throw new IllegalArgumentException("Account not found");
+            }
+        } finally {
+            cursor.close();
+        }
     }
 }

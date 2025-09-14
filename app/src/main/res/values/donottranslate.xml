@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="btn_cancel" translatable="false">@android:string/cancel</string>
+    <string name="alert_dialog_cancel" translatable="false">@android:string/cancel</string>
     <string name="key_default_currency" translatable="false">default_currency</string>
     <string name="key_first_run" translatable="false">key_first_run</string>
     <string name="key_license" translatable="false">app_license</string>
@@ -9,10 +11,10 @@
     <string name="key_default_transaction_type" translatable="false">default_transaction_type</string>
     <string name="key_export_all_transactions" translatable="false">export_all_transactions</string>
     <string name="key_delete_transactions_after_export" translatable="false">delete_transactions_after_export</string>
+    <string name="key_compress_export" translatable="false">compress_export</string>
     <string name="key_default_export_email" translatable="false">export_email_target</string>
     <string name="key_use_double_entry" translatable="false">use_double_entry</string>
     <string name="key_xml_ofx_header" translatable="false">xml_ofx_header</string>
-    <string name="key_previous_minor_version" translatable="false">previous_minor_version</string>
     <string name="key_import_accounts" translatable="false">import_gnucash_accounts</string>
     <string name="key_delete_all_accounts" translatable="false">delete_all_accounts</string>
     <string name="key_delete_all_transactions" translatable="false">delete_all_transactions</string>
@@ -22,6 +24,7 @@
     <string name="key_restore_backup" translatable="false">restore_backup</string>
     <string name="key_dropbox_sync" translatable="false">dropbox_sync</string>
     <string name="key_owncloud_sync" translatable="false">owncloud_sync</string>
+    <string name="owncloud_pref" translatable="false">owncloud</string>
     <string name="owncloud_sync" translatable="false">owncloud_sync</string>
     <string name="key_owncloud_server" translatable="false">owncloud_server_address</string>
     <string name="key_owncloud_dir" translatable="false">owncloud_upload_dir</string>
@@ -38,6 +41,7 @@
     <string name="key_backup_location" translatable="false">backup_location</string>
     <string name="key_export_accounts_csv" translatable="false">export_accounts_csv_key</string>
     <string name="key_delete_transaction_backup" translatable="false">delete_transaction_backup</string>
+    <string name="key_import_book_backup" translatable="false">import_book_backup</string>
     <!-- This is the filename for default backups. So use only simple characters and no spaces. Do not change the extension -->
     <string name="label_backup_filename" translatable="false">gnucash_pocket_backup.gnca</string>
     <string-array name="key_account_type_entries" translatable="false">
@@ -245,6 +249,45 @@
         <item>ZWL</item>
         <item>PLN</item>
     </string-array>
-    <string name="schedule_export_description" translatable="false">"%1$s %2$s %3$s"</string>
+    <string name="schedule_export_description" translatable="false">"%1$s %2$s"</string>
     <string name="owncloud_server" translatable="false">https://owncloud.com</string>
+
+    <!-- Theme. -->
+    <string name="pref_appearance_title" translatable="false">@string/category_name_appearance</string>
+    <string name="theme_title" translatable="false">@string/settings_screen_theme</string>
+    <string name="theme_dark" translatable="false">@string/dark_ui_title</string>
+    <string name="theme_light" translatable="false">@string/light_ui_title</string>
+    <string name="theme_default" translatable="false">@string/default_theme</string>
+    <string-array name="list_theme_values" translatable="false">
+        <item>@string/theme_value_default</item>
+        <item>@string/theme_value_dark</item>
+        <item>@string/theme_value_light</item>
+    </string-array>
+    <string-array name="list_theme_entries" translatable="false">
+        <item>@string/theme_default</item>
+        <item>@string/theme_dark</item>
+        <item>@string/theme_light</item>
+    </string-array>
+    <string name="hint_description" translatable="false">@string/description</string>
+    <string name="hint_notes" translatable="false">@string/notes</string>
+    <string name="label_account_color" translatable="false">@string/account_color</string>
+    <string name="label_account_type" translatable="false">@string/type</string>
+    <string name="label_account_name" translatable="false">@string/account_name</string>
+    <string name="label_transaction_name" translatable="false">@string/description</string>
+    <string name="label_placeholder_account" translatable="false">@string/placeholder</string>
+    <string name="label_hidden" translatable="false">@string/hidden</string>
+    <string name="csv_transaction_header_account_full_name" translatable="false">@string/csv_account_header_account_full_name</string>
+    <string name="csv_transaction_header_account_name" translatable="false">@string/account_name</string>
+    <string name="csv_transaction_header_description" translatable="false">@string/description</string>
+    <string name="csv_account_header_description" translatable="false">@string/description</string>
+    <string name="csv_account_header_account_name" translatable="false">@string/account_name</string>
+    <string name="csv_account_header_account_code" translatable="false">@string/account_code</string>
+    <string name="csv_account_header_colour" translatable="false">@string/account_color</string>
+    <string name="csv_account_header_type" translatable="false">@string/type</string>
+    <string name="csv_account_header_notes" translatable="false">@string/notes</string>
+    <string name="csv_account_header_hidden" translatable="false">@string/hidden</string>
+    <string name="csv_account_header_placeholder" translatable="false">@string/placeholder</string>
+    <string name="default_color" translatable="false">@string/default_theme</string>
+    <string name="menu_accounts_hidden" translatable="false">@string/hidden</string>
+    <string name="exchange_rate_example">1 %1$s = %2$s %3$s</string>
 </resources>

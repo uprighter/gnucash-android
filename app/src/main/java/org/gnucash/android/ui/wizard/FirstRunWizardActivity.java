@@ -17,6 +17,10 @@
 
 package org.gnucash.android.ui.wizard;
 
+import static org.gnucash.android.ui.account.AccountsActivity.createDefaultAccounts;
+import static org.gnucash.android.ui.account.AccountsActivity.startXmlFileChooser;
+import static org.gnucash.android.util.DocumentExtKt.openBook;
+
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
@@ -30,7 +34,7 @@ import android.view.View;
 import android.widget.Button;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
+import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
 import androidx.viewpager2.widget.ViewPager2;
@@ -43,21 +47,25 @@ import com.tech.freak.wizardpager.ui.PageFragmentCallbacks;
 import com.tech.freak.wizardpager.ui.StepPagerStrip;
 
 import org.gnucash.android.R;
+import org.gnucash.android.app.GnuCashActivity;
 import org.gnucash.android.app.GnuCashApplication;
 import org.gnucash.android.databinding.ActivityFirstRunWizardBinding;
 import org.gnucash.android.db.adapter.BooksDbAdapter;
+import org.gnucash.android.importer.ImportBookCallback;
 import org.gnucash.android.model.Book;
 import org.gnucash.android.ui.account.AccountsActivity;
-import org.gnucash.android.ui.util.TaskDelegate;
+import org.gnucash.android.ui.settings.ThemeHelper;
 import org.gnucash.android.ui.util.widget.FragmentStateAdapter;
 
 import java.util.ArrayList;
 import java.util.List;
 
+import timber.log.Timber;
+
 /**
  * Activity for managing the wizard displayed upon first run of the application
  */
-public class FirstRunWizardActivity extends AppCompatActivity implements
+public class FirstRunWizardActivity extends GnuCashActivity implements
     PageFragmentCallbacks, ReviewFragment.Callbacks, ModelCallbacks {
 
     private static final String STATE_MODEL = "model";
@@ -85,6 +93,7 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
         mWizardModel = createWizardModel(savedInstanceState);
 
         super.onCreate(savedInstanceState);
+        ThemeHelper.apply(this);
         mBinding = ActivityFirstRunWizardBinding.inflate(getLayoutInflater());
         setContentView(mBinding.getRoot());
 
@@ -143,7 +152,17 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
         if (savedInstanceState != null) {
             Bundle savedValues = savedInstanceState.getBundle(STATE_MODEL);
             if (savedValues != null) {
-                model.load(savedValues);
+                boolean hasAllPages = true;
+                for (String key : savedValues.keySet()) {
+                    if (model.findByKey(key) == null) {
+                        hasAllPages = false;
+                        Timber.w("Saved model page not found: %s", key);
+                        break;
+                    }
+                }
+                if (hasAllPages) {
+                    model.load(savedValues);
+                }
             }
         }
         model.registerListener(this);
@@ -154,28 +173,30 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
      * Create accounts depending on the user preference (import or default set) and finish this activity
      * <p>This method also removes the first run flag from the application</p>
      */
-    private void createAccountsAndFinish(@NonNull String accountOption, String currencyCode) {
-        if (accountOption.equals(mWizardModel.optionAccountDefault)) {
+    private void createAccountsAndFinish(@NonNull String accountOption, @Nullable String currencyCode) {
+        if (accountOption.equals(mWizardModel.optionAccountImport)) {
+            startXmlFileChooser(this);
+        } else if (accountOption.equals(mWizardModel.optionAccountUser)) {
+            //user prefers to handle account creation themselves
+            AccountsActivity.start(this);
+            finish();
+        } else {
+            String accountAssetId = mWizardModel.getAccountsByLabel(accountOption);
+            if (TextUtils.isEmpty(accountAssetId)) {
+                return;
+            }
+
+            final Activity activity = FirstRunWizardActivity.this;
             //save the UID of the active book, and then delete it after successful import
-            final BooksDbAdapter dbAdapter = BooksDbAdapter.getInstance();
-            final String bookUID = dbAdapter.getActiveBookUID();
-            Book bookOld = dbAdapter.getRecord(bookUID);
-            final String bookName = bookOld.getDisplayName();
-            TaskDelegate callbackAfterImport = (!TextUtils.isEmpty(bookUID)) ? new TaskDelegate() {
+            final BooksDbAdapter booksDbAdapter = BooksDbAdapter.getInstance();
+            final String bookOldUID = booksDbAdapter.getActiveBookUID();
+            ImportBookCallback callbackAfterImport = !TextUtils.isEmpty(bookOldUID) ? new ImportBookCallback() {
                 @Override
-                public void onTaskComplete() {
-                    dbAdapter.deleteBook(bookUID);
-                    Book book = dbAdapter.getActiveBook();
-                    book.setDisplayName(bookName);
-                    dbAdapter.updateRecord(book);
+                public void onBookImported(@Nullable String bookUID) {
+                    maybeDeleteOldBook(activity, bookOldUID, bookUID);
                 }
             } : null;
-            AccountsActivity.createDefaultAccounts(currencyCode, FirstRunWizardActivity.this, callbackAfterImport);
-            finish();
-        } else if (accountOption.equals(mWizardModel.optionAccountImport)) {
-            AccountsActivity.startXmlFileChooser(this);
-        } else { //user prefers to handle account creation themselves
-            AccountsActivity.start(this);
+            createDefaultAccounts(activity, currencyCode, accountAssetId, callbackAfterImport);
             finish();
         }
 
@@ -210,12 +231,7 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == AccountsActivity.REQUEST_PICK_ACCOUNTS_FILE) {
             if (resultCode == Activity.RESULT_OK && data != null) {
-                AccountsActivity.importXmlFileFromIntent(this, data, new TaskDelegate() {
-                    @Override
-                    public void onTaskComplete() {
-                        finish();
-                    }
-                });
+                importFileAndFinish(data);
             }
             return;
         }
@@ -315,7 +331,7 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
         }
 
         String currencyLabel = null;
-        String accountOption = mWizardModel.optionAccountUser;
+        String accountLabel = mWizardModel.optionAccountUser;
         String feedbackOption = "";
         for (ReviewItem reviewItem : reviewItems) {
             String title = reviewItem.getTitle();
@@ -324,13 +340,15 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
             } else if (title.equals(mWizardModel.titleOtherCurrency)) {
                 currencyLabel = reviewItem.getDisplayValue();
             } else if (title.equals(mWizardModel.titleAccount)) {
-                accountOption = reviewItem.getDisplayValue();
+                accountLabel = reviewItem.getDisplayValue();
+            } else if (title.equals(mWizardModel.optionAccountDefault)) {
+                accountLabel = reviewItem.getDisplayValue();
             } else if (title.equals(mWizardModel.titleFeedback)) {
                 feedbackOption = reviewItem.getDisplayValue();
             }
         }
 
-        if (TextUtils.isEmpty(currencyLabel) || TextUtils.isEmpty(accountOption)) {
+        if (TextUtils.isEmpty(currencyLabel) || TextUtils.isEmpty(accountLabel)) {
             return;
         }
         String currencyCode = mWizardModel.getCurrencyByLabel(currencyLabel);
@@ -339,13 +357,42 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
         }
 
         Context context = FirstRunWizardActivity.this;
-        GnuCashApplication.setDefaultCurrencyCode(context, currencyCode);
+        GnuCashApplication.setDefaultCurrencyCode(currencyCode);
         PreferenceManager.getDefaultSharedPreferences(context)
             .edit()
             .putBoolean(getString(R.string.key_enable_crashlytics), feedbackOption.equals(mWizardModel.optionFeedbackSend))
             .apply();
 
-        createAccountsAndFinish(accountOption, currencyCode);
+        createAccountsAndFinish(accountLabel, currencyCode);
+    }
+
+    private void importFileAndFinish(Intent data) {
+        final Activity activity = this;
+        final BooksDbAdapter booksDbAdapter = BooksDbAdapter.getInstance();
+        final String bookOldUID = booksDbAdapter.getActiveBookUID();
+        ImportBookCallback callbackAfterImport = new ImportBookCallback() {
+            @Override
+            public void onBookImported(@Nullable String bookUID) {
+                maybeDeleteOldBook(activity, bookOldUID, bookUID);
+                finish();
+            }
+        };
+        openBook(this, data, callbackAfterImport);
+    }
+
+    private void maybeDeleteOldBook(@NonNull Context context, @Nullable String bookOldUID, @Nullable String bookNewUID) {
+        if (TextUtils.isEmpty(bookOldUID)) return;
+        if (TextUtils.isEmpty(bookNewUID)) return;
+        if (bookOldUID.equals(bookNewUID)) return;
+
+        final BooksDbAdapter booksDbAdapter = BooksDbAdapter.getInstance();
+        Book bookOld = booksDbAdapter.getRecord(bookOldUID);
+        Book bookNew = booksDbAdapter.getRecord(bookNewUID);
+
+        final String bookName = bookOld.getDisplayName();
+        booksDbAdapter.deleteBook(context, bookOldUID);
+        bookNew.setDisplayName(bookName);
+        booksDbAdapter.updateRecord(bookNew);
     }
 
     public class WizardPagerAdapter extends FragmentStateAdapter {

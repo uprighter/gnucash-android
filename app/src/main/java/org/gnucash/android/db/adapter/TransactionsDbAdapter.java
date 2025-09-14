@@ -1,3 +1,4 @@
+
 /*
  * Copyright (c) 2012 - 2015 Ngewi Fet <ngewif@gmail.com>
  * Copyright (c) 2014 Yongxin Wang <fefe.wyx@gmail.com>
@@ -17,17 +18,17 @@
 
 package org.gnucash.android.db.adapter;
 
-import static org.gnucash.android.db.DatabaseHelper.escapeForLike;
+import static org.gnucash.android.db.DatabaseHelper.sqlEscapeLike;
 import static org.gnucash.android.db.DatabaseSchema.AccountEntry;
 import static org.gnucash.android.db.DatabaseSchema.ScheduledActionEntry;
 import static org.gnucash.android.db.DatabaseSchema.SplitEntry;
 import static org.gnucash.android.db.DatabaseSchema.TransactionEntry;
 
 import android.content.ContentValues;
+import android.content.Context;
 import android.database.Cursor;
 import android.database.DatabaseUtils;
 import android.database.SQLException;
-import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteQueryBuilder;
 import android.database.sqlite.SQLiteStatement;
 import android.text.TextUtils;
@@ -36,6 +37,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import org.gnucash.android.app.GnuCashApplication;
+import org.gnucash.android.db.DatabaseHolder;
 import org.gnucash.android.model.AccountType;
 import org.gnucash.android.model.Money;
 import org.gnucash.android.model.Split;
@@ -59,29 +61,44 @@ import timber.log.Timber;
  */
 public class TransactionsDbAdapter extends DatabaseAdapter<Transaction> {
 
-    private final SplitsDbAdapter mSplitsDbAdapter;
+    public static final long INVALID_DATE = Long.MIN_VALUE;
 
-    private final CommoditiesDbAdapter mCommoditiesDbAdapter;
+    @NonNull
+    public final SplitsDbAdapter splitsDbAdapter;
+
+    @NonNull
+    public final CommoditiesDbAdapter commoditiesDbAdapter;
 
     /**
      * Overloaded constructor. Creates adapter for already open db
      *
-     * @param db SQlite db instance
+     * @param holder Database holder
      */
-    public TransactionsDbAdapter(SQLiteDatabase db, SplitsDbAdapter splitsDbAdapter) {
-        super(db, TransactionEntry.TABLE_NAME, new String[]{
-                TransactionEntry.COLUMN_DESCRIPTION,
-                TransactionEntry.COLUMN_NOTES,
-                TransactionEntry.COLUMN_TIMESTAMP,
-                TransactionEntry.COLUMN_EXPORTED,
-                TransactionEntry.COLUMN_CURRENCY,
-                TransactionEntry.COLUMN_COMMODITY_UID,
-                TransactionEntry.COLUMN_CREATED_AT,
-                TransactionEntry.COLUMN_SCHEDX_ACTION_UID,
-                TransactionEntry.COLUMN_TEMPLATE
+    public TransactionsDbAdapter(@NonNull DatabaseHolder holder) {
+        this(new SplitsDbAdapter(holder));
+    }
+
+    /**
+     * Overloaded constructor. Creates adapter for already open db
+     */
+    public TransactionsDbAdapter(@NonNull SplitsDbAdapter splitsDbAdapter) {
+        super(splitsDbAdapter.holder, TransactionEntry.TABLE_NAME, new String[]{
+            TransactionEntry.COLUMN_DESCRIPTION,
+            TransactionEntry.COLUMN_NOTES,
+            TransactionEntry.COLUMN_TIMESTAMP,
+            TransactionEntry.COLUMN_EXPORTED,
+            TransactionEntry.COLUMN_CURRENCY,
+            TransactionEntry.COLUMN_COMMODITY_UID,
+            TransactionEntry.COLUMN_CREATED_AT,
+            TransactionEntry.COLUMN_SCHEDX_ACTION_UID,
+            TransactionEntry.COLUMN_TEMPLATE
         });
-        mSplitsDbAdapter = splitsDbAdapter;
-        mCommoditiesDbAdapter = new CommoditiesDbAdapter(db);
+        this.splitsDbAdapter = splitsDbAdapter;
+        this.commoditiesDbAdapter = splitsDbAdapter.commoditiesDbAdapter;
+    }
+
+    public TransactionsDbAdapter(@NonNull CommoditiesDbAdapter commoditiesDbAdapter) {
+        this(new SplitsDbAdapter(commoditiesDbAdapter));
     }
 
     /**
@@ -93,10 +110,6 @@ public class TransactionsDbAdapter extends DatabaseAdapter<Transaction> {
         return GnuCashApplication.getTransactionDbAdapter();
     }
 
-    public SplitsDbAdapter getSplitDbAdapter() {
-        return mSplitsDbAdapter;
-    }
-
     /**
      * Adds an transaction to the database.
      * If a transaction already exists in the database with the same unique ID,
@@ -105,40 +118,41 @@ public class TransactionsDbAdapter extends DatabaseAdapter<Transaction> {
      * @param transaction {@link Transaction} to be inserted to database
      */
     @Override
-    public void addRecord(@NonNull Transaction transaction, UpdateMethod updateMethod) {
-        Timber.d("Adding transaction to the db via %s", updateMethod.name());
+    public void addRecord(@NonNull Transaction transaction, UpdateMethod updateMethod) throws SQLException {
+        // Did the transaction have any splits before?
+        final boolean didChange = transaction.id != 0;
         try {
             beginTransaction();
             Split imbalanceSplit = transaction.createAutoBalanceSplit();
             if (imbalanceSplit != null) {
-                String imbalanceAccountUID = new AccountsDbAdapter(mDb, this)
-                        .getOrCreateImbalanceAccountUID(transaction.getCommodity());
+                Context context = GnuCashApplication.getAppContext();
+                String imbalanceAccountUID = new AccountsDbAdapter(this)
+                    .getOrCreateImbalanceAccountUID(context, transaction.getCommodity());
                 imbalanceSplit.setAccountUID(imbalanceAccountUID);
             }
             super.addRecord(transaction, updateMethod);
 
-            Timber.d("Adding splits for transaction");
-            ArrayList<String> splitUIDs = new ArrayList<>(transaction.getSplits().size());
-            for (Split split : transaction.getSplits()) {
-                Timber.d("Replace transaction split in db");
+            List<Split> splits = transaction.getSplits();
+            Timber.d("Adding %d splits for transaction", splits.size());
+            List<String> splitUIDs = new ArrayList<>(splits.size());
+            for (Split split : splits) {
                 if (imbalanceSplit == split) {
-                    mSplitsDbAdapter.addRecord(split, UpdateMethod.insert);
+                    splitsDbAdapter.addRecord(split, UpdateMethod.insert);
                 } else {
-                    mSplitsDbAdapter.addRecord(split, updateMethod);
+                    splitsDbAdapter.addRecord(split, updateMethod);
                 }
                 splitUIDs.add(split.getUID());
             }
-            Timber.d("%d splits added", transaction.getSplits().size());
 
-            long deleted = mDb.delete(SplitEntry.TABLE_NAME,
-                    SplitEntry.COLUMN_TRANSACTION_UID + " = ? AND "
-                            + SplitEntry.COLUMN_UID + " NOT IN ('" + TextUtils.join("' , '", splitUIDs) + "')",
-                    new String[]{transaction.getUID()});
-            Timber.d("%d splits deleted", deleted);
+            if (didChange) {
+                String deleteWhere = SplitEntry.COLUMN_TRANSACTION_UID + " = ? AND "
+                    + SplitEntry.COLUMN_UID + " NOT IN ('" + TextUtils.join("','", splitUIDs) + "')";
+                String[] deleteArgs = new String[]{transaction.getUID()};
+                long deleted = mDb.delete(SplitEntry.TABLE_NAME, deleteWhere, deleteArgs);
+                Timber.d("%d splits deleted", deleted);
+            }
 
             setTransactionSuccessful();
-        } catch (SQLException e) {
-            Timber.e(e);
         } finally {
             endTransaction();
         }
@@ -155,7 +169,7 @@ public class TransactionsDbAdapter extends DatabaseAdapter<Transaction> {
      * @return Number of transactions inserted
      */
     @Override
-    public long bulkAddRecords(@NonNull List<Transaction> transactionList, UpdateMethod updateMethod) {
+    public long bulkAddRecords(@NonNull List<Transaction> transactionList, UpdateMethod updateMethod) throws SQLException {
         long start = System.nanoTime();
         long rowInserted = super.bulkAddRecords(transactionList, updateMethod);
         long end = System.nanoTime();
@@ -167,14 +181,14 @@ public class TransactionsDbAdapter extends DatabaseAdapter<Transaction> {
         if (rowInserted != 0 && !splitList.isEmpty()) {
             try {
                 start = System.nanoTime();
-                long nSplits = mSplitsDbAdapter.bulkAddRecords(splitList, updateMethod);
+                long nSplits = splitsDbAdapter.bulkAddRecords(splitList, updateMethod);
                 Timber.d("%d splits inserted in %d ns", nSplits, System.nanoTime() - start);
             } finally {
                 SQLiteStatement deleteEmptyTransaction = mDb.compileStatement("DELETE FROM " +
-                        TransactionEntry.TABLE_NAME + " WHERE NOT EXISTS ( SELECT * FROM " +
-                        SplitEntry.TABLE_NAME +
-                        " WHERE " + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_UID +
-                        " = " + SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_TRANSACTION_UID + " ) ");
+                    TransactionEntry.TABLE_NAME + " WHERE NOT EXISTS ( SELECT * FROM " +
+                    SplitEntry.TABLE_NAME +
+                    " WHERE " + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_UID +
+                    " = " + SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_TRANSACTION_UID + " ) ");
                 deleteEmptyTransaction.execute();
             }
         }
@@ -182,8 +196,8 @@ public class TransactionsDbAdapter extends DatabaseAdapter<Transaction> {
     }
 
     @Override
-    protected @NonNull SQLiteStatement setBindings(@NonNull SQLiteStatement stmt, @NonNull Transaction transaction) {
-        stmt.clearBindings();
+    protected @NonNull SQLiteStatement bind(@NonNull SQLiteStatement stmt, @NonNull Transaction transaction) {
+        bindBaseModel(stmt, transaction);
         stmt.bindString(1, transaction.getDescription());
         stmt.bindString(2, transaction.getNote());
         stmt.bindLong(3, transaction.getTimeMillis());
@@ -191,14 +205,10 @@ public class TransactionsDbAdapter extends DatabaseAdapter<Transaction> {
         stmt.bindString(5, transaction.getCurrencyCode());
         stmt.bindString(6, transaction.getCommodity().getUID());
         stmt.bindString(7, TimestampHelper.getUtcStringFromTimestamp(transaction.getCreatedTimestamp()));
-
-        if (transaction.getScheduledActionUID() == null) {
-            stmt.bindNull(8);
-        } else {
+        if (transaction.getScheduledActionUID() != null) {
             stmt.bindString(8, transaction.getScheduledActionUID());
         }
         stmt.bindLong(9, transaction.isTemplate() ? 1 : 0);
-        stmt.bindString(10, transaction.getUID());
 
         return stmt;
     }
@@ -213,16 +223,16 @@ public class TransactionsDbAdapter extends DatabaseAdapter<Transaction> {
      */
     public Cursor fetchAllTransactionsForAccount(String accountUID) {
         SQLiteQueryBuilder queryBuilder = new SQLiteQueryBuilder();
-        queryBuilder.setTables(TransactionEntry.TABLE_NAME
-                + " INNER JOIN " + SplitEntry.TABLE_NAME + " ON "
-                + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_UID + " = "
-                + SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_TRANSACTION_UID);
+        queryBuilder.setTables(TransactionEntry.TABLE_NAME + " t"
+            + " INNER JOIN " + SplitEntry.TABLE_NAME + " s ON "
+            + "t." + TransactionEntry.COLUMN_UID + " = "
+            + "s." + SplitEntry.COLUMN_TRANSACTION_UID);
         queryBuilder.setDistinct(true);
-        String[] projectionIn = new String[]{TransactionEntry.TABLE_NAME + ".*"};
-        String selection = SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_ACCOUNT_UID + " = ?"
-                + " AND " + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_TEMPLATE + " = 0";
+        String[] projectionIn = new String[]{"t.*"};
+        String selection = "s." + SplitEntry.COLUMN_ACCOUNT_UID + " = ?"
+            + " AND t." + TransactionEntry.COLUMN_TEMPLATE + " = 0";
         String[] selectionArgs = new String[]{accountUID};
-        String sortOrder = TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_TIMESTAMP + " DESC";
+        String sortOrder = "t." + TransactionEntry.COLUMN_TIMESTAMP + " DESC";
 
         return queryBuilder.query(mDb, projectionIn, selection, selectionArgs, null, null, sortOrder);
     }
@@ -237,13 +247,13 @@ public class TransactionsDbAdapter extends DatabaseAdapter<Transaction> {
     public Cursor fetchScheduledTransactionsForAccount(String accountUID) {
         SQLiteQueryBuilder queryBuilder = new SQLiteQueryBuilder();
         queryBuilder.setTables(TransactionEntry.TABLE_NAME
-                + " INNER JOIN " + SplitEntry.TABLE_NAME + " ON "
-                + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_UID + " = "
-                + SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_TRANSACTION_UID);
+            + " INNER JOIN " + SplitEntry.TABLE_NAME + " ON "
+            + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_UID + " = "
+            + SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_TRANSACTION_UID);
         queryBuilder.setDistinct(true);
         String[] projectionIn = new String[]{TransactionEntry.TABLE_NAME + ".*"};
         String selection = SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_ACCOUNT_UID + " = ?"
-                + " AND " + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_TEMPLATE + " = 1";
+            + " AND " + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_TEMPLATE + " = 1";
         String[] selectionArgs = new String[]{accountUID};
         String sortOrder = TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_TIMESTAMP + " DESC";
 
@@ -259,8 +269,8 @@ public class TransactionsDbAdapter extends DatabaseAdapter<Transaction> {
      */
     public void deleteTransactionsForAccount(String accountUID) {
         String rawDeleteQuery = "DELETE FROM " + TransactionEntry.TABLE_NAME + " WHERE " + TransactionEntry.COLUMN_UID + " IN "
-                + " (SELECT " + SplitEntry.COLUMN_TRANSACTION_UID + " FROM " + SplitEntry.TABLE_NAME + " WHERE "
-                + SplitEntry.COLUMN_ACCOUNT_UID + " = ?)";
+            + " (SELECT " + SplitEntry.COLUMN_TRANSACTION_UID + " FROM " + SplitEntry.TABLE_NAME + " WHERE "
+            + SplitEntry.COLUMN_ACCOUNT_UID + " = ?)";
         mDb.execSQL(rawDeleteQuery, new String[]{accountUID});
     }
 
@@ -271,11 +281,11 @@ public class TransactionsDbAdapter extends DatabaseAdapter<Transaction> {
      */
     public int deleteTransactionsWithNoSplits() {
         return mDb.delete(
-                TransactionEntry.TABLE_NAME,
-                "NOT EXISTS ( SELECT * FROM " + SplitEntry.TABLE_NAME +
-                        " WHERE " + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_UID +
-                        " = " + SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_TRANSACTION_UID + " ) ",
-                null
+            TransactionEntry.TABLE_NAME,
+            "NOT EXISTS ( SELECT * FROM " + SplitEntry.TABLE_NAME +
+                " WHERE " + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_UID +
+                " = " + SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_TRANSACTION_UID + " ) ",
+            null
         );
     }
 
@@ -288,11 +298,11 @@ public class TransactionsDbAdapter extends DatabaseAdapter<Transaction> {
     public Cursor fetchAllScheduledTransactions() {
         SQLiteQueryBuilder queryBuilder = new SQLiteQueryBuilder();
         queryBuilder.setTables(TransactionEntry.TABLE_NAME + " INNER JOIN " + ScheduledActionEntry.TABLE_NAME + " ON "
-                + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_UID + " = "
-                + ScheduledActionEntry.TABLE_NAME + "." + ScheduledActionEntry.COLUMN_ACTION_UID);
+            + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_UID + " = "
+            + ScheduledActionEntry.TABLE_NAME + "." + ScheduledActionEntry.COLUMN_ACTION_UID);
 
         String[] projectionIn = new String[]{TransactionEntry.TABLE_NAME + ".*",
-                ScheduledActionEntry.TABLE_NAME + "." + ScheduledActionEntry.COLUMN_UID + " AS " + "origin_scheduled_action_uid"};
+            ScheduledActionEntry.TABLE_NAME + "." + ScheduledActionEntry.COLUMN_UID + " AS " + "origin_scheduled_action_uid"};
         String sortOrder = TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_DESCRIPTION + " ASC";
 
         return queryBuilder.query(mDb, projectionIn, null, null, null, null, sortOrder);
@@ -305,16 +315,8 @@ public class TransactionsDbAdapter extends DatabaseAdapter<Transaction> {
      * @return List of {@link Transaction}s for account with UID <code>accountUID</code>
      */
     public List<Transaction> getAllTransactionsForAccount(String accountUID) {
-        Cursor c = fetchAllTransactionsForAccount(accountUID);
-        ArrayList<Transaction> transactionsList = new ArrayList<>();
-        try {
-            while (c.moveToNext()) {
-                transactionsList.add(buildModelInstance(c));
-            }
-        } finally {
-            c.close();
-        }
-        return transactionsList;
+        Cursor cursor = fetchAllTransactionsForAccount(accountUID);
+        return getRecords(cursor);
     }
 
     /**
@@ -328,12 +330,11 @@ public class TransactionsDbAdapter extends DatabaseAdapter<Transaction> {
     }
 
     public Cursor fetchTransactionsWithSplits(String[] columns, @Nullable String where, @Nullable String[] whereArgs, @Nullable String orderBy) {
-        return mDb.query(TransactionEntry.TABLE_NAME + " , " + SplitEntry.TABLE_NAME +
-                        " ON " + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_UID +
-                        " = " + SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_TRANSACTION_UID +
-                        " , trans_extra_info ON trans_extra_info.trans_acct_t_uid = " + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_UID,
-                columns, where, whereArgs, null, null,
-                orderBy);
+        String table = TransactionEntry.TABLE_NAME + ", " + SplitEntry.TABLE_NAME +
+            " ON " + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_UID +
+            " = " + SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_TRANSACTION_UID +
+            ", trans_extra_info ON trans_extra_info.trans_acct_t_uid = " + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_UID;
+        return mDb.query(table, columns, where, whereArgs, null, null, orderBy);
     }
 
     /**
@@ -345,14 +346,15 @@ public class TransactionsDbAdapter extends DatabaseAdapter<Transaction> {
     public Cursor fetchTransactionsModifiedSince(Timestamp timestamp) {
         SQLiteQueryBuilder queryBuilder = new SQLiteQueryBuilder();
         queryBuilder.setTables(TransactionEntry.TABLE_NAME);
-        String startTimeString = TimestampHelper.getUtcStringFromTimestamp(timestamp);
-        return queryBuilder.query(mDb, null, TransactionEntry.COLUMN_MODIFIED_AT + " >= ?",
-                new String[]{startTimeString}, null, null, TransactionEntry.COLUMN_TIMESTAMP + " ASC", null);
+        String where = TransactionEntry.COLUMN_TEMPLATE + "=0 AND " + TransactionEntry.COLUMN_TIMESTAMP + " >= ?";
+        String[] whereArgs = new String[]{Long.toString(timestamp.getTime())};
+        String orderBy = TransactionEntry.COLUMN_TIMESTAMP + " ASC, " + TransactionEntry.COLUMN_ID + " ASC";
+        return queryBuilder.query(mDb, null, where, whereArgs, null, null, orderBy, null);
     }
 
     public Cursor fetchTransactionsWithSplitsWithTransactionAccount(String[] columns, String where, String[] whereArgs, String orderBy) {
         // table is :
-        // trans_split_acct , trans_extra_info ON trans_extra_info.trans_acct_t_uid = transactions_uid ,
+        // trans_split_acct, trans_extra_info ON trans_extra_info.trans_acct_t_uid = transactions_uid ,
         // accounts AS account1 ON account1.uid = trans_extra_info.trans_acct_a_uid
         //
         // views effectively simplified this query
@@ -362,48 +364,24 @@ public class TransactionsDbAdapter extends DatabaseAdapter<Transaction> {
         //
         // Account, transaction and split Information can be retrieve in a single query.
         return mDb.query(
-                "trans_split_acct , trans_extra_info ON trans_extra_info.trans_acct_t_uid = trans_split_acct." +
-                        TransactionEntry.TABLE_NAME + "_" + TransactionEntry.COLUMN_UID + " , " +
-                        AccountEntry.TABLE_NAME + " AS account1 ON account1." + AccountEntry.COLUMN_UID +
-                        " = trans_extra_info.trans_acct_a_uid",
-                columns, where, whereArgs, null, null, orderBy);
+            "trans_split_acct, trans_extra_info ON trans_extra_info.trans_acct_t_uid = trans_split_acct." +
+                TransactionEntry.TABLE_NAME + "_" + TransactionEntry.COLUMN_UID + ", " +
+                AccountEntry.TABLE_NAME + " AS account1 ON account1." + AccountEntry.COLUMN_UID +
+                " = trans_extra_info.trans_acct_a_uid",
+            columns, where, whereArgs, null, null, orderBy);
     }
 
-    /**
-     * Return number of transactions in the database (excluding templates)
-     *
-     * @return Number of transactions
-     */
+    @Override
     public long getRecordsCount() {
         return DatabaseUtils.queryNumEntries(mDb, TransactionEntry.TABLE_NAME, TransactionEntry.COLUMN_TEMPLATE + "=0");
     }
 
-    /**
-     * Returns the number of transactions in the database which fulfill the conditions
-     *
-     * @param where     SQL WHERE clause without the "WHERE" itself
-     * @param whereArgs Arguments to substitute question marks for
-     * @return Number of records in the databases
-     */
+    @Override
     public long getRecordsCount(@Nullable String where, @Nullable String[] whereArgs) {
-        Cursor cursor = mDb.query(true, TransactionEntry.TABLE_NAME + " , trans_extra_info ON "
-                        + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_UID
-                        + " = trans_extra_info.trans_acct_t_uid",
-                new String[]{"COUNT(*)"},
-                where,
-                whereArgs,
-                null,
-                null,
-                null,
-                null);
-        try {
-            if (cursor != null && cursor.moveToFirst()) {
-                return cursor.getLong(0);
-            }
-        } finally {
-            cursor.close();
-        }
-        return 0L;
+        String table = mTableName + ", trans_extra_info ON "
+            + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_UID
+            + " = trans_extra_info.trans_acct_t_uid";
+        return DatabaseUtils.queryNumEntries(mDb, table, where, whereArgs);
     }
 
     /**
@@ -423,11 +401,10 @@ public class TransactionsDbAdapter extends DatabaseAdapter<Transaction> {
         transaction.setNote(c.getString(c.getColumnIndexOrThrow(TransactionEntry.COLUMN_NOTES)));
         transaction.setExported(c.getInt(c.getColumnIndexOrThrow(TransactionEntry.COLUMN_EXPORTED)) != 0);
         transaction.setTemplate(c.getInt(c.getColumnIndexOrThrow(TransactionEntry.COLUMN_TEMPLATE)) != 0);
-        String currencyCode = c.getString(c.getColumnIndexOrThrow(TransactionEntry.COLUMN_CURRENCY));
-        transaction.setCommodity(mCommoditiesDbAdapter.getCommodity(currencyCode));
+        String commodityUID = c.getString(c.getColumnIndexOrThrow(TransactionEntry.COLUMN_COMMODITY_UID));
+        transaction.setCommodity(commoditiesDbAdapter.getRecord(commodityUID));
         transaction.setScheduledActionUID(c.getString(c.getColumnIndexOrThrow(TransactionEntry.COLUMN_SCHEDX_ACTION_UID)));
-        long transactionID = c.getLong(c.getColumnIndexOrThrow(TransactionEntry._ID));
-        transaction.setSplits(mSplitsDbAdapter.getSplitsForTransaction(transactionID));
+        transaction.setSplits(splitsDbAdapter.getSplitsForTransaction(transaction.getUID()));
 
         return transaction;
     }
@@ -441,8 +418,8 @@ public class TransactionsDbAdapter extends DatabaseAdapter<Transaction> {
      * @return {@link org.gnucash.android.model.Money} balance of the transaction for that account
      */
     public Money getBalance(String transactionUID, String accountUID) {
-        List<Split> splitList = mSplitsDbAdapter.getSplitsForTransactionInAccount(
-                transactionUID, accountUID);
+        List<Split> splitList = splitsDbAdapter.getSplitsForTransactionInAccount(
+            transactionUID, accountUID);
 
         return Transaction.computeBalance(accountUID, splitList);
     }
@@ -457,13 +434,13 @@ public class TransactionsDbAdapter extends DatabaseAdapter<Transaction> {
      */
     public int moveTransaction(String transactionUID, String srcAccountUID, String dstAccountUID) {
         Timber.i("Moving transaction ID " + transactionUID
-                + " splits from " + srcAccountUID + " to account " + dstAccountUID);
+            + " splits from " + srcAccountUID + " to account " + dstAccountUID);
 
-        List<Split> splits = mSplitsDbAdapter.getSplitsForTransactionInAccount(transactionUID, srcAccountUID);
+        List<Split> splits = splitsDbAdapter.getSplitsForTransactionInAccount(transactionUID, srcAccountUID);
         for (Split split : splits) {
             split.setAccountUID(dstAccountUID);
         }
-        mSplitsDbAdapter.bulkAddRecords(splits, UpdateMethod.update);
+        splitsDbAdapter.bulkAddRecords(splits, UpdateMethod.update);
         return splits.size();
     }
 
@@ -500,13 +477,8 @@ public class TransactionsDbAdapter extends DatabaseAdapter<Transaction> {
      * @return List of all scheduled transactions
      */
     public List<Transaction> getScheduledTransactionsForAccount(String accountUID) {
-        try (Cursor cursor = fetchScheduledTransactionsForAccount(accountUID)) {
-            List<Transaction> scheduledTransactions = new ArrayList<>();
-            while (cursor.moveToNext()) {
-                scheduledTransactions.add(buildModelInstance(cursor));
-            }
-            return scheduledTransactions;
-        }
+        Cursor cursor = fetchScheduledTransactionsForAccount(accountUID);
+        return getRecords(cursor);
     }
 
     /**
@@ -537,25 +509,20 @@ public class TransactionsDbAdapter extends DatabaseAdapter<Transaction> {
      */
     public Cursor fetchTransactionSuggestions(String prefix, String accountUID) {
         SQLiteQueryBuilder queryBuilder = new SQLiteQueryBuilder();
-        queryBuilder.setTables(TransactionEntry.TABLE_NAME
-                + " INNER JOIN " + SplitEntry.TABLE_NAME + " ON "
-                + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_UID + " = "
-                + SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_TRANSACTION_UID);
-        queryBuilder.setDistinct(true);
-        String[] projectionIn = new String[]{TransactionEntry.TABLE_NAME + ".*"};
-        String selection = "(" + SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_ACCOUNT_UID + " = ?"
-                + " OR " + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_TEMPLATE + "=1 )"
-                + " AND " + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_DESCRIPTION + " LIKE '" + escapeForLike(prefix) + "%'";
+        queryBuilder.setTables(
+            TransactionEntry.TABLE_NAME + " t"
+            + " INNER JOIN " + SplitEntry.TABLE_NAME + " s ON "
+            + "t." + TransactionEntry.COLUMN_UID + " = s." + SplitEntry.COLUMN_TRANSACTION_UID
+        );
+        String[] projectionIn = new String[]{"t.*", "MAX(t." + TransactionEntry.COLUMN_TIMESTAMP + ")"};
+        String selection = "s." + SplitEntry.COLUMN_ACCOUNT_UID + " = ?"
+            + " AND t." + TransactionEntry.COLUMN_TEMPLATE + " = 0"
+            + " AND t." + TransactionEntry.COLUMN_DESCRIPTION + " LIKE " + sqlEscapeLike(prefix);
         String[] selectionArgs = new String[]{accountUID};
-        String sortOrder = TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_TIMESTAMP + " DESC";
-        String subquery = queryBuilder.buildQuery(projectionIn, selection, null, null, sortOrder, null);
-
-        // Need to use inner subquery because ORDER BY must be before GROUP BY!
-        SQLiteQueryBuilder queryBuilder2 = new SQLiteQueryBuilder();
-        queryBuilder2.setTables("(" + subquery + ")");
         String groupBy = TransactionEntry.COLUMN_DESCRIPTION;
-        String limit = Integer.toString(5);
-        return queryBuilder2.query(mDb, null, null, selectionArgs, groupBy, null, null, limit);
+        String sortOrder = "t." + TransactionEntry.COLUMN_TIMESTAMP + " DESC";
+        String limit = Integer.toString(10);
+        return queryBuilder.query(mDb, projectionIn, selection, selectionArgs, groupBy, null, sortOrder, limit);
     }
 
     /**
@@ -568,30 +535,6 @@ public class TransactionsDbAdapter extends DatabaseAdapter<Transaction> {
      */
     public int updateTransaction(ContentValues contentValues, String whereClause, String[] whereArgs) {
         return mDb.update(TransactionEntry.TABLE_NAME, contentValues, whereClause, whereArgs);
-    }
-
-    /**
-     * Return the number of currencies used in the transaction.
-     * For example if there are different splits with different currencies
-     *
-     * @param transactionUID GUID of the transaction
-     * @return Number of currencies within the transaction
-     */
-    public int getNumCurrencies(String transactionUID) {
-        Cursor cursor = mDb.query("trans_extra_info",
-                new String[]{"trans_currency_count"},
-                "trans_acct_t_uid=?",
-                new String[]{transactionUID},
-                null, null, null);
-        int numCurrencies = 0;
-        try {
-            if (cursor.moveToFirst()) {
-                numCurrencies = cursor.getInt(0);
-            }
-        } finally {
-            cursor.close();
-        }
-        return numCurrencies;
     }
 
     /**
@@ -609,22 +552,22 @@ public class TransactionsDbAdapter extends DatabaseAdapter<Transaction> {
      * Returns a timestamp of the earliest transaction for a specified account type and currency
      *
      * @param type         the account type
-     * @param currencyCode the currency code
-     * @return the earliest transaction's timestamp. Returns 1970-01-01 00:00:00.000 if no transaction found
+     * @param commodityUID the currency UID
+     * @return the earliest transaction's timestamp. Returns {@code #INVALID_DATE} if no transaction found
      */
-    public long getTimestampOfEarliestTransaction(AccountType type, String currencyCode) {
-        return getTimestamp("MIN", type, currencyCode);
+    public long getTimestampOfEarliestTransaction(@NonNull AccountType type, @NonNull String commodityUID) {
+        return getTimestamp("MIN", type, commodityUID);
     }
 
     /**
      * Returns a timestamp of the latest transaction for a specified account type and currency
      *
      * @param type         the account type
-     * @param currencyCode the currency code
-     * @return the latest transaction's timestamp. Returns 1970-01-01 00:00:00.000 if no transaction found
+     * @param commodityUID the currency UID
+     * @return the latest transaction's timestamp. Returns {@code #INVALID_DATE} if no transaction found
      */
-    public long getTimestampOfLatestTransaction(AccountType type, String currencyCode) {
-        return getTimestamp("MAX", type, currencyCode);
+    public long getTimestampOfLatestTransaction(@NonNull AccountType type, @NonNull String commodityUID) {
+        return getTimestamp("MAX", type, commodityUID);
     }
 
     /**
@@ -634,17 +577,20 @@ public class TransactionsDbAdapter extends DatabaseAdapter<Transaction> {
      */
     public Timestamp getTimestampOfLastModification() {
         Cursor cursor = mDb.query(TransactionEntry.TABLE_NAME,
-                new String[]{"MAX(" + TransactionEntry.COLUMN_MODIFIED_AT + ")"},
-                null, null, null, null, null);
+            new String[]{"MAX(" + TransactionEntry.COLUMN_MODIFIED_AT + ")"},
+            null, null, null, null, null);
 
         Timestamp timestamp = TimestampHelper.getTimestampFromNow();
-        if (cursor.moveToFirst()) {
-            String timeString = cursor.getString(0);
-            if (timeString != null) { //in case there were no transactions in the XML file (account structure only)
-                timestamp = TimestampHelper.getTimestampFromUtcString(timeString);
+        try {
+            if (cursor.moveToFirst()) {
+                String timeString = cursor.getString(0);
+                if (timeString != null) { //in case there were no transactions in the XML file (account structure only)
+                    timestamp = TimestampHelper.getTimestampFromUtcString(timeString);
+                }
             }
+        } finally {
+            cursor.close();
         }
-        cursor.close();
         return timestamp;
     }
 
@@ -653,29 +599,28 @@ public class TransactionsDbAdapter extends DatabaseAdapter<Transaction> {
      *
      * @param mod          Mode (either MAX or MIN)
      * @param type         AccountType
-     * @param currencyCode the currency code
-     * @return earliest or latest timestamp of transactions
+     * @param commodityUID the currency UID
+     * @return earliest or latest timestamp of transactions - {@code #INVALID_DATE} otherwise.
      * @see #getTimestampOfLatestTransaction(AccountType, String)
      * @see #getTimestampOfEarliestTransaction(AccountType, String)
      */
-    private long getTimestamp(String mod, AccountType type, String currencyCode) {
-        String sql = "SELECT " + mod + "(" + TransactionEntry.COLUMN_TIMESTAMP + ")"
-                + " FROM " + TransactionEntry.TABLE_NAME
-                + " INNER JOIN " + SplitEntry.TABLE_NAME + " ON "
-                + SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_TRANSACTION_UID + " = "
-                + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_UID
-                + " INNER JOIN " + AccountEntry.TABLE_NAME + " ON "
-                + AccountEntry.TABLE_NAME + "." + AccountEntry.COLUMN_UID + " = "
-                + SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_ACCOUNT_UID
-                + " WHERE " + AccountEntry.TABLE_NAME + "." + AccountEntry.COLUMN_TYPE + " = ? AND "
-                + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_CURRENCY + " = ? AND "
-                + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_TEMPLATE + " = 0";
-        Cursor cursor = mDb.rawQuery(sql, new String[]{type.name(), currencyCode});
-        long timestamp = 0;
-        if (cursor != null) {
+    private long getTimestamp(String mod, AccountType type, String commodityUID) {
+        String sql = "SELECT " + mod + "(t." + TransactionEntry.COLUMN_TIMESTAMP + ")"
+            + " FROM " + TransactionEntry.TABLE_NAME + " t"
+            + " INNER JOIN " + SplitEntry.TABLE_NAME + " s ON"
+            + " s." + SplitEntry.COLUMN_TRANSACTION_UID + " = t." + TransactionEntry.COLUMN_UID
+            + " INNER JOIN " + AccountEntry.TABLE_NAME + " a ON"
+            + " a." + AccountEntry.COLUMN_UID + " = s." + SplitEntry.COLUMN_ACCOUNT_UID
+            + " WHERE a." + AccountEntry.COLUMN_TYPE + " = ?"
+            + " AND a." + AccountEntry.COLUMN_COMMODITY_UID + " = ?"
+            + " AND t." + TransactionEntry.COLUMN_TEMPLATE + " = 0";
+        Cursor cursor = mDb.rawQuery(sql, new String[]{type.name(), commodityUID});
+        long timestamp = INVALID_DATE;
+        try {
             if (cursor.moveToFirst()) {
                 timestamp = cursor.getLong(0);
             }
+        } finally {
             cursor.close();
         }
         return timestamp;
@@ -685,9 +630,9 @@ public class TransactionsDbAdapter extends DatabaseAdapter<Transaction> {
         SQLiteQueryBuilder queryBuilder = new SQLiteQueryBuilder();
         queryBuilder.setTables(
             TransactionEntry.TABLE_NAME + " t "
-                + " INNER JOIN " + SplitEntry.TABLE_NAME + " s ON "
-                + "t." + TransactionEntry.COLUMN_UID + " = "
-                + "s." + SplitEntry.COLUMN_TRANSACTION_UID
+                + " INNER JOIN " + SplitEntry.TABLE_NAME + " s ON"
+                + " t." + TransactionEntry.COLUMN_UID + " ="
+                + " s." + SplitEntry.COLUMN_TRANSACTION_UID
         );
         String[] projectionIn = new String[]{"COUNT(*)"};
         String selection = "s." + SplitEntry.COLUMN_ACCOUNT_UID + " = ?";
@@ -706,12 +651,8 @@ public class TransactionsDbAdapter extends DatabaseAdapter<Transaction> {
 
     @Override
     public void close() throws IOException {
-        if (mSplitsDbAdapter != null) {
-            mSplitsDbAdapter.close();
-        }
-        if (mCommoditiesDbAdapter != null) {
-            mCommoditiesDbAdapter.close();
-        }
+        commoditiesDbAdapter.close();
+        splitsDbAdapter.close();
         super.close();
     }
 }

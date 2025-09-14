@@ -23,8 +23,11 @@ import android.os.AsyncTask;
 import android.widget.TextView;
 
 import androidx.annotation.ColorInt;
+import androidx.annotation.Nullable;
 
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
+import org.gnucash.android.model.Account;
+import org.gnucash.android.model.AccountType;
 import org.gnucash.android.model.Money;
 
 import java.lang.ref.WeakReference;
@@ -43,9 +46,10 @@ public class AccountBalanceTask extends AsyncTask<String, Void, Money> {
     @ColorInt
     private final int colorBalanceZero;
 
-    public AccountBalanceTask(TextView balanceTextView, @ColorInt int colorZero) {
+    public AccountBalanceTask(AccountsDbAdapter accountsDbAdapter, TextView balanceTextView, @ColorInt int colorZero) {
+        super();
+        this.accountsDbAdapter = accountsDbAdapter;
         accountBalanceTextViewReference = new WeakReference<>(balanceTextView);
-        accountsDbAdapter = AccountsDbAdapter.getInstance();
         colorBalanceZero = colorZero;
     }
 
@@ -55,25 +59,25 @@ public class AccountBalanceTask extends AsyncTask<String, Void, Money> {
         //if the view for which we are doing this job is dead, kill the job as well
         if (accountBalanceTextViewReference.get() == null) {
             cancel(true);
-            return Money.getZeroInstance();
+            return null;
         }
 
-        Money balance = Money.getZeroInstance();
         try {
-            balance = accountsDbAdapter.getAccountBalance(accountUID, -1, -1);
-        } catch (Exception ex) {
-            Timber.e(ex, "Error computing account balance");
+            Account account = accountsDbAdapter.getSimpleRecord(accountUID);
+            Money balance = accountsDbAdapter.getAccountBalance(account);
+            AccountType accountType = account.getAccountType();
+            return (accountType.hasDebitNormalBalance != accountType.hasDebitDisplayBalance) ? balance.unaryMinus() : balance;
+        } catch (Exception e) {
+            Timber.e(e, "Error computing account balance");
         }
-        return balance;
+        return null;
     }
 
     @Override
-    protected void onPostExecute(Money balance) {
-        if (accountBalanceTextViewReference.get() != null && balance != null) {
-            final TextView balanceTextView = accountBalanceTextViewReference.get();
-            if (balanceTextView != null) {
-                displayBalance(balanceTextView, balance, colorBalanceZero);
-            }
+    protected void onPostExecute(@Nullable Money balance) {
+        final TextView balanceTextView = accountBalanceTextViewReference.get();
+        if (balanceTextView != null) {
+            displayBalance(balanceTextView, balance, colorBalanceZero);
         }
     }
 }

@@ -17,6 +17,7 @@ package org.gnucash.android.export
 
 import androidx.annotation.StringRes
 import org.gnucash.android.R
+import java.util.Locale
 
 /**
  * Enumeration of the different export formats supported by the application
@@ -31,6 +32,9 @@ enum class ExportFormat(
      */
     @JvmField
     val extension: String,
+    /** The MIME type. */
+    @JvmField
+    val mimeType: String = "*/*",
     /**
      * Full name of the export format acronym
      */
@@ -39,11 +43,11 @@ enum class ExportFormat(
     @JvmField
     @StringRes val labelId: Int
 ) {
-    QIF("QIF", ".qif", "Quicken Interchange Format", R.string.file_format_qif),
-    OFX("OFX", ".ofx", "Open Financial eXchange", R.string.file_format_ofx),
-    XML("XML", ".gnca", "GnuCash XML", R.string.file_format_xml),
-    CSVA("CSVA", ".csv", "GnuCash accounts CSV", R.string.file_format_csv),
-    CSVT("CSVT", ".csv", "GnuCash transactions CSV", R.string.file_format_csv);
+    QIF("QIF", ".qif", "application/qif", "Quicken Interchange Format", R.string.file_format_qif),
+    OFX("OFX", ".ofx", "application/x-ofx", "Open Financial eXchange", R.string.file_format_ofx),
+    XML("XML", ".xac", "application/x-gnucash", "GnuCash XML", R.string.file_format_xml),
+    CSVA("CSVA", ".csv", "text/csv", "GnuCash accounts CSV", R.string.file_format_csv),
+    CSVT("CSVT", ".csv", "text/csv", "GnuCash transactions CSV", R.string.file_format_csv);
 
     override fun toString(): String {
         return description
@@ -53,8 +57,9 @@ enum class ExportFormat(
         private val values = values()
 
         @JvmStatic
-        fun of(key: String): ExportFormat {
-            return values.firstOrNull { it.value == key } ?: XML
+        fun of(key: String?): ExportFormat {
+            val value = key?.uppercase(Locale.ROOT) ?: return XML
+            return values.firstOrNull { it.value == value } ?: XML
         }
     }
 }

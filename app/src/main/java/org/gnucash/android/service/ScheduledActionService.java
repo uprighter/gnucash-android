@@ -19,6 +19,8 @@ package org.gnucash.android.service;
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.sqlite.SQLiteDatabase;
+import android.net.Uri;
+import android.text.TextUtils;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.VisibleForTesting;
@@ -28,12 +30,12 @@ import androidx.work.WorkRequest;
 
 import org.gnucash.android.app.GnuCashApplication;
 import org.gnucash.android.db.DatabaseHelper;
+import org.gnucash.android.db.DatabaseHolder;
 import org.gnucash.android.db.DatabaseSchema;
 import org.gnucash.android.db.adapter.BooksDbAdapter;
 import org.gnucash.android.db.adapter.DatabaseAdapter;
 import org.gnucash.android.db.adapter.RecurrenceDbAdapter;
 import org.gnucash.android.db.adapter.ScheduledActionDbAdapter;
-import org.gnucash.android.db.adapter.SplitsDbAdapter;
 import org.gnucash.android.db.adapter.TransactionsDbAdapter;
 import org.gnucash.android.export.ExportAsyncTask;
 import org.gnucash.android.export.ExportParams;
@@ -100,7 +102,7 @@ public class ScheduledActionService {
     private void processScheduledBooks(@NonNull Context context) {
         BooksDbAdapter booksDbAdapter = BooksDbAdapter.getInstance();
         List<Book> books = booksDbAdapter.getAllRecords();
-        for (Book book : books) { //// TODO: 20.04.2017 Retrieve only the book UIDs with new method
+        for (Book book : books) {
             processScheduledBook(context, book);
         }
     }
@@ -108,14 +110,14 @@ public class ScheduledActionService {
     private void processScheduledBook(@NonNull Context context, @NonNull Book book) {
         final String activeBookUID = GnuCashApplication.getActiveBookUID();
         DatabaseHelper dbHelper = new DatabaseHelper(context, book.getUID());
-        SQLiteDatabase db = dbHelper.getWritableDatabase();
-        RecurrenceDbAdapter recurrenceDbAdapter = new RecurrenceDbAdapter(db);
-        ScheduledActionDbAdapter scheduledActionDbAdapter = new ScheduledActionDbAdapter(db, recurrenceDbAdapter);
+        DatabaseHolder dbHolder = dbHelper.getHolder();
+        RecurrenceDbAdapter recurrenceDbAdapter = new RecurrenceDbAdapter(dbHolder);
+        ScheduledActionDbAdapter scheduledActionDbAdapter = new ScheduledActionDbAdapter(recurrenceDbAdapter);
 
         List<ScheduledAction> scheduledActions = scheduledActionDbAdapter.getAllEnabledScheduledActions();
         Timber.i("Processing %d total scheduled actions for Book: %s",
             scheduledActions.size(), book.getDisplayName());
-        processScheduledActions(context, scheduledActions, db);
+        processScheduledActions(dbHolder, scheduledActions);
 
         //close all databases except the currently active database
         if (!book.getUID().equals(activeBookUID)) {
@@ -126,37 +128,26 @@ public class ScheduledActionService {
     /**
      * Process scheduled actions and execute any pending actions
      *
-     * @param context          The application context.
+     * @param dbHolder         Database holder
      * @param scheduledActions List of scheduled actions
      */
     //made public static for testing. Do not call these methods directly
     @VisibleForTesting
-    static void processScheduledActions(@NonNull Context context, List<ScheduledAction> scheduledActions, SQLiteDatabase db) {
+    static void processScheduledActions(@NonNull DatabaseHolder dbHolder, List<ScheduledAction> scheduledActions) {
         for (ScheduledAction scheduledAction : scheduledActions) {
-            processScheduledAction(context, scheduledAction, db);
+            processScheduledAction(dbHolder, scheduledAction);
         }
     }
 
     /**
      * Process scheduled action and execute any pending actions
      *
+     * @param dbHolder        Database holder
      * @param scheduledAction The scheduled action.
      */
     //made public static for testing. Do not call these methods directly
     @VisibleForTesting
-    static void processScheduledAction(@NonNull ScheduledAction scheduledAction, SQLiteDatabase db) {
-        processScheduledAction(GnuCashApplication.getAppContext(), scheduledAction, db);
-    }
-
-    /**
-     * Process scheduled action and execute any pending actions
-     *
-     * @param context         The application context.
-     * @param scheduledAction The scheduled action.
-     */
-    //made public static for testing. Do not call these methods directly
-    @VisibleForTesting
-    static void processScheduledAction(@NonNull Context context, @NonNull ScheduledAction scheduledAction, SQLiteDatabase db) {
+    static void processScheduledAction(@NonNull DatabaseHolder dbHolder, @NonNull ScheduledAction scheduledAction) {
         long now = System.currentTimeMillis();
         int totalPlannedExecutions = scheduledAction.getTotalPlannedExecutionCount();
         int executionCount = scheduledAction.getExecutionCount();
@@ -170,26 +161,26 @@ public class ScheduledActionService {
             return;
         }
 
-        executeScheduledEvent(context, scheduledAction, db);
+        executeScheduledEvent(dbHolder, scheduledAction);
     }
 
     /**
      * Executes a scheduled event according to the specified parameters
      *
-     * @param context         The application context.
+     * @param dbHolder        Database holder
      * @param scheduledAction ScheduledEvent to be executed
      */
-    private static void executeScheduledEvent(@NonNull Context context, ScheduledAction scheduledAction, SQLiteDatabase db) {
+    private static void executeScheduledEvent(@NonNull DatabaseHolder dbHolder, @NonNull ScheduledAction scheduledAction) {
         Timber.i("Executing scheduled action: %s", scheduledAction.toString());
         int executionCount = 0;
 
         switch (scheduledAction.getActionType()) {
             case TRANSACTION:
-                executionCount += executeTransactions(context, scheduledAction, db);
+                executionCount += executeTransactions(dbHolder, scheduledAction);
                 break;
 
             case BACKUP:
-                executionCount += executeBackup(context, scheduledAction, GnuCashApplication.getActiveBookUID());
+                executionCount += executeBackup(dbHolder, scheduledAction);
                 break;
         }
 
@@ -205,6 +196,7 @@ public class ScheduledActionService {
                 scheduledAction.getLastRunTime());
             contentValues.put(DatabaseSchema.ScheduledActionEntry.COLUMN_EXECUTION_COUNT,
                 scheduledAction.getExecutionCount());
+            SQLiteDatabase db = dbHolder.db;
             db.update(DatabaseSchema.ScheduledActionEntry.TABLE_NAME, contentValues,
                 DatabaseSchema.ScheduledActionEntry.COLUMN_UID + "=?", new String[]{scheduledAction.getUID()});
         }
@@ -214,31 +206,28 @@ public class ScheduledActionService {
      * Executes scheduled backups for a given scheduled action.
      * The backup will be executed only once, even if multiple schedules were missed
      *
-     * @param context         The application context.
+     * @param dbHolder Databas holder
      * @param scheduledAction Scheduled action referencing the backup
-     * @param bookUID         The book UID.
      * @return Number of times backup is executed. This should either be 1 or 0
      */
-    private static int executeBackup(@NonNull Context context, ScheduledAction scheduledAction, String bookUID) {
+    private static int executeBackup(@NonNull DatabaseHolder dbHolder, @NonNull ScheduledAction scheduledAction) {
         if (!shouldExecuteScheduledBackup(scheduledAction))
             return 0;
 
-        ExportParams params = ExportParams.parseCsv(scheduledAction.getTag());
+        Context context = dbHolder.context;
+        String bookUID = scheduledAction.getActionUID();
+        ExportParams params = ExportParams.parseTag(scheduledAction.getTag());
         // HACK: the tag isn't updated with the new date, so set the correct by hand
         params.setExportStartTime(new Timestamp(scheduledAction.getLastRunTime()));
-        Integer result = null;
+        Uri result = null;
         try {
             //wait for async task to finish before we proceed (we are holding a wake lock)
             result = new ExportAsyncTask(context, bookUID).execute(params).get();
         } catch (InterruptedException | ExecutionException e) {
             Timber.e(e);
         }
-        if (result == null || result < 0) {
-            Timber.w("Backup/export did not occur. There was a problem.");
-            return 0;
-        }
-        if (result == 0) {
-            Timber.i("Backup/export did not occur." +
+        if (result == null) {
+            Timber.w("Backup/export did not occur." +
                 " There might have been no new transactions to export");
             return 0;
         }
@@ -253,14 +242,18 @@ public class ScheduledActionService {
      */
     @SuppressWarnings("RedundantIfStatement")
     private static boolean shouldExecuteScheduledBackup(ScheduledAction scheduledAction) {
+        if (scheduledAction.getActionType() != ScheduledAction.ActionType.BACKUP) {
+            return false;
+        }
         long now = System.currentTimeMillis();
         long endTime = scheduledAction.getEndTime();
 
-        if (endTime > 0 && endTime < now)
+        if (endTime > 0 && endTime < now) {
             return false;
-
-        if (scheduledAction.computeNextTimeBasedScheduledExecutionTime() > now)
+        }
+        if (scheduledAction.computeNextTimeBasedScheduledExecutionTime() > now) {
             return false;
+        }
 
         return true;
     }
@@ -270,22 +263,25 @@ public class ScheduledActionService {
      * <p>If a schedule was missed, all the intervening transactions will be generated, even if
      * the end time of the transaction was already reached</p>
      *
+     * @param dbHolder        Database holder
      * @param scheduledAction Scheduled action which references the transaction
-     * @param db              SQLiteDatabase where the transactions are to be executed
      * @return Number of transactions created as a result of this action
      */
-    private static int executeTransactions(@NonNull Context context, ScheduledAction scheduledAction, SQLiteDatabase db) {
+    private static int executeTransactions(@NonNull DatabaseHolder dbHolder, @NonNull ScheduledAction scheduledAction) {
         int executionCount = 0;
         String actionUID = scheduledAction.getActionUID();
-        TransactionsDbAdapter transactionsDbAdapter = new TransactionsDbAdapter(db, new SplitsDbAdapter(db));
+        if (TextUtils.isEmpty(actionUID)) {
+            Timber.w("Scheduled transaction without action");
+            return executionCount;
+        }
+        TransactionsDbAdapter transactionsDbAdapter = new TransactionsDbAdapter(dbHolder);
         Transaction trxnTemplate;
         try {
             trxnTemplate = transactionsDbAdapter.getRecord(actionUID);
         } catch (IllegalArgumentException ex) { //if the record could not be found, abort
-            Timber.e(ex, "Scheduled transaction with UID " + actionUID + " could not be found in the db with path " + db.getPath());
+            Timber.e(ex, "Scheduled transaction with action " + actionUID + " could not be found in the db with path " + dbHolder.db.getPath());
             return executionCount;
         }
-
 
         long now = System.currentTimeMillis();
         //if there is an end time in the past, we execute all schedules up to the end time.

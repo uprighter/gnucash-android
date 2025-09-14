@@ -16,14 +16,12 @@
 
 package org.gnucash.android.ui.homescreen;
 
-import android.app.Activity;
 import android.app.PendingIntent;
 import android.appwidget.AppWidgetManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.database.Cursor;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.View;
@@ -33,11 +31,14 @@ import android.widget.CompoundButton;
 import android.widget.RemoteViews;
 
 import androidx.core.content.ContextCompat;
-import androidx.preference.PreferenceManager;
 
 import org.gnucash.android.R;
+import org.gnucash.android.app.GnuCashActivity;
+import org.gnucash.android.app.GnuCashApplication;
 import org.gnucash.android.databinding.WidgetConfigurationBinding;
 import org.gnucash.android.db.BookDbHelper;
+import org.gnucash.android.db.DatabaseHelper;
+import org.gnucash.android.db.DatabaseHolder;
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.db.adapter.BooksDbAdapter;
 import org.gnucash.android.model.Account;
@@ -45,16 +46,14 @@ import org.gnucash.android.model.Book;
 import org.gnucash.android.model.Money;
 import org.gnucash.android.receivers.TransactionAppWidgetProvider;
 import org.gnucash.android.ui.account.AccountsActivity;
+import org.gnucash.android.ui.adapter.QualifiedAccountNameAdapter;
 import org.gnucash.android.ui.common.FormActivity;
 import org.gnucash.android.ui.common.UxArgument;
 import org.gnucash.android.ui.passcode.PasscodeHelper;
-import org.gnucash.android.ui.settings.PreferenceActivity;
 import org.gnucash.android.ui.transaction.TransactionsActivity;
-import org.gnucash.android.util.QualifiedAccountNameCursorAdapter;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 import timber.log.Timber;
 
@@ -64,26 +63,25 @@ import timber.log.Timber;
  *
  * @author Ngewi Fet <ngewif@gmail.com>
  */
-public class WidgetConfigurationActivity extends Activity {
+public class WidgetConfigurationActivity extends GnuCashActivity {
 
     private static final String PREFS_PREFIX = "widget:";
     private static final int FLAGS_UPDATE = PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE;
 
-    private AccountsDbAdapter mAccountsDbAdapter;
     private int mAppWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID;
     private String selectedBookUID = null;
     private String selectedAccountUID = null;
     private boolean isHideBalance = false;
     private final List<Book> books = new ArrayList<>();
-    private QualifiedAccountNameCursorAdapter accountsAdapter;
+    private QualifiedAccountNameAdapter accountNameAdapter;
 
-    private WidgetConfigurationBinding mBinding;
+    private WidgetConfigurationBinding binding;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        mBinding = WidgetConfigurationBinding.inflate(getLayoutInflater());
-        setContentView(mBinding.getRoot());
+        binding = WidgetConfigurationBinding.inflate(getLayoutInflater());
+        setContentView(binding.getRoot());
 
         Context context = this;
         BooksDbAdapter booksDbAdapter = BooksDbAdapter.getInstance();
@@ -93,15 +91,13 @@ public class WidgetConfigurationActivity extends Activity {
 
         ArrayAdapter<Book> booksAdapter = new ArrayAdapter<>(context, android.R.layout.simple_spinner_item, allBooks);
         booksAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        mBinding.inputBooksSpinner.setAdapter(booksAdapter);
+        binding.inputBooksSpinner.setAdapter(booksAdapter);
 
-        mAccountsDbAdapter = AccountsDbAdapter.getInstance();
-
-        accountsAdapter = new QualifiedAccountNameCursorAdapter(context, null);
-        mBinding.inputAccountsSpinner.setAdapter(accountsAdapter);
+        accountNameAdapter = new QualifiedAccountNameAdapter(context, this);
+        binding.inputAccountsSpinner.setAdapter(accountNameAdapter);
 
         boolean passcodeEnabled = PasscodeHelper.isPasscodeEnabled(this);
-        mBinding.inputHideAccountBalance.setChecked(passcodeEnabled);
+        binding.inputHideAccountBalance.setChecked(passcodeEnabled);
 
         bindListeners();
         handleIntent(getIntent());
@@ -111,20 +107,15 @@ public class WidgetConfigurationActivity extends Activity {
      * Sets click listeners for the buttons in the dialog
      */
     private void bindListeners() {
-        mBinding.inputBooksSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+        binding.inputBooksSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (view == null) return;
+                Context context = view.getContext();
                 Book book = books.get(position);
-                String bookUID = book.getUID();
-                selectedBookUID = bookUID;
-
-                mAccountsDbAdapter = new AccountsDbAdapter(BookDbHelper.getDatabase(bookUID));
-
-                Cursor cursor = mAccountsDbAdapter.fetchAllRecordsOrderedByFullName();
-                accountsAdapter.swapCursor(cursor);
-
-                int accountIndex = accountsAdapter.getItemPosition(selectedAccountUID);
-                mBinding.inputAccountsSpinner.setSelection(accountIndex);
+                DatabaseHolder holder = new DatabaseHelper(context, book.getUID()).getHolder();
+                accountNameAdapter.swapAdapter(new AccountsDbAdapter(holder));
+                selectedBookUID = book.getUID();
             }
 
             @Override
@@ -133,10 +124,11 @@ public class WidgetConfigurationActivity extends Activity {
             }
         });
 
-        mBinding.inputAccountsSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+        binding.inputAccountsSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                selectedAccountUID = mAccountsDbAdapter.getUID(id);
+                if (view == null) return;
+                selectedAccountUID = accountNameAdapter.getUID(position);
             }
 
             @Override
@@ -144,14 +136,14 @@ public class WidgetConfigurationActivity extends Activity {
             }
         });
 
-        mBinding.inputHideAccountBalance.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+        binding.inputHideAccountBalance.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                 isHideBalance = isChecked;
             }
         });
 
-        mBinding.defaultButtons.btnSave.setOnClickListener(unusedView -> {
+        binding.defaultButtons.btnSave.setOnClickListener(unusedView -> {
             int appWidgetId = mAppWidgetId;
             if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
                 finish();
@@ -172,7 +164,7 @@ public class WidgetConfigurationActivity extends Activity {
             finish();
         });
 
-        mBinding.defaultButtons.btnCancel.setOnClickListener(unusedView -> {
+        binding.defaultButtons.btnCancel.setOnClickListener(unusedView -> {
             setResult(RESULT_CANCELED);
             finish();
         });
@@ -213,9 +205,13 @@ public class WidgetConfigurationActivity extends Activity {
                 break;
             }
         }
-        mBinding.inputBooksSpinner.setSelection(bookIndex);
 
-        mBinding.inputHideAccountBalance.setChecked(hideAccountBalance);
+        int accountIndex = accountNameAdapter.getPosition(accountUID);
+
+        binding.inputBooksSpinner.setSelection(bookIndex);
+        binding.inputAccountsSpinner.setSelection(accountIndex);
+
+        binding.inputHideAccountBalance.setChecked(hideAccountBalance);
     }
 
     /**
@@ -271,13 +267,14 @@ public class WidgetConfigurationActivity extends Activity {
             return;
         }
 
-        AccountsDbAdapter accountsDbAdapter = new AccountsDbAdapter(BookDbHelper.getDatabase(bookUID));
+        DatabaseHolder holder = new DatabaseHolder(context, BookDbHelper.getDatabase(bookUID), bookUID);
+        AccountsDbAdapter accountsDbAdapter = new AccountsDbAdapter(holder);
 
         Account account = null;
         try {
             account = accountsDbAdapter.getSimpleRecord(accountUID);
         } catch (IllegalArgumentException e) {
-            Timber.e(e, "Account not found, resetting widget %s", appWidgetId);
+            Timber.e(e, "Account not found, resetting widget");
         }
         if (account == null) {
             accountsDbAdapter.closeQuietly();
@@ -292,7 +289,8 @@ public class WidgetConfigurationActivity extends Activity {
             views.setOnClickPendingIntent(R.id.btn_new_transaction, pendingIntent);
             appWidgetManager.updateAppWidget(appWidgetId, views);
 
-            PreferenceActivity.getActiveBookSharedPreferences().edit()
+            GnuCashApplication.getBookPreferences(context)
+                .edit()
                 .remove(UxArgument.SELECTED_ACCOUNT_UID + appWidgetId)
                 .apply();
             return;
@@ -303,9 +301,9 @@ public class WidgetConfigurationActivity extends Activity {
         if (hideAccountBalance) {
             views.setViewVisibility(R.id.transactions_summary, View.GONE);
         } else {
-            Money accountBalance = accountsDbAdapter.getAccountBalance(accountUID, -1, System.currentTimeMillis());
+            Money accountBalance = accountsDbAdapter.getCurrentAccountBalance(account);
             views.setTextViewText(R.id.transactions_summary,
-                accountBalance.formattedString(Locale.getDefault()));
+                accountBalance.formattedString());
             int color = accountBalance.isNegative() ? R.color.debit_red : R.color.credit_green;
             views.setTextColor(R.id.transactions_summary, ContextCompat.getColor(context, color));
         }

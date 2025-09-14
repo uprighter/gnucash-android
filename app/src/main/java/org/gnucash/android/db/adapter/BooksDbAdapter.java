@@ -16,12 +16,14 @@
 
 package org.gnucash.android.db.adapter;
 
+import static java.lang.Math.max;
+
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteStatement;
 import android.net.Uri;
+import android.provider.BaseColumns;
 import android.text.TextUtils;
 
 import androidx.annotation.NonNull;
@@ -31,9 +33,9 @@ import androidx.annotation.VisibleForTesting;
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
 import org.gnucash.android.db.DatabaseHelper;
+import org.gnucash.android.db.DatabaseHolder;
 import org.gnucash.android.db.DatabaseSchema.BookEntry;
 import org.gnucash.android.model.Book;
-import org.gnucash.android.ui.settings.PreferenceActivity;
 import org.gnucash.android.util.TimestampHelper;
 
 import java.util.ArrayList;
@@ -49,16 +51,16 @@ public class BooksDbAdapter extends DatabaseAdapter<Book> {
     /**
      * Opens the database adapter with an existing database
      *
-     * @param db SQLiteDatabase object
+     * @param holder Database holder
      */
-    public BooksDbAdapter(SQLiteDatabase db) {
-        super(db, BookEntry.TABLE_NAME, new String[]{
-                BookEntry.COLUMN_DISPLAY_NAME,
-                BookEntry.COLUMN_ROOT_GUID,
-                BookEntry.COLUMN_TEMPLATE_GUID,
-                BookEntry.COLUMN_SOURCE_URI,
-                BookEntry.COLUMN_ACTIVE,
-                BookEntry.COLUMN_LAST_SYNC
+    public BooksDbAdapter(@NonNull DatabaseHolder holder) {
+        super(holder, BookEntry.TABLE_NAME, new String[]{
+            BookEntry.COLUMN_DISPLAY_NAME,
+            BookEntry.COLUMN_ROOT_GUID,
+            BookEntry.COLUMN_TEMPLATE_GUID,
+            BookEntry.COLUMN_SOURCE_URI,
+            BookEntry.COLUMN_ACTIVE,
+            BookEntry.COLUMN_LAST_SYNC
         });
     }
 
@@ -92,20 +94,20 @@ public class BooksDbAdapter extends DatabaseAdapter<Book> {
     }
 
     @Override
-    protected @NonNull SQLiteStatement setBindings(@NonNull SQLiteStatement stmt, @NonNull final Book book) {
-        stmt.clearBindings();
-        String displayName = TextUtils.isEmpty(book.getDisplayName()) ? generateDefaultBookName() : book.getDisplayName();
-        stmt.bindString(1, displayName);
+    protected @NonNull SQLiteStatement bind(@NonNull SQLiteStatement stmt, @NonNull final Book book) {
+        if (TextUtils.isEmpty(book.getDisplayName())) {
+            book.setDisplayName(generateDefaultBookName());
+        }
+        bindBaseModel(stmt, book);
+        stmt.bindString(1, book.getDisplayName());
         stmt.bindString(2, book.getRootAccountUID());
         stmt.bindString(3, book.getRootTemplateUID());
         if (book.getSourceUri() != null) {
             stmt.bindString(4, book.getSourceUri().toString());
-        } else {
-            stmt.bindNull(4);
         }
-        stmt.bindLong(5, book.isActive() ? 1L : 0L);
+        stmt.bindLong(5, book.isActive() ? 1 : 0);
         stmt.bindString(6, TimestampHelper.getUtcStringFromTimestamp(book.getLastSync()));
-        stmt.bindString(7, book.getUID());
+
         return stmt;
     }
 
@@ -117,13 +119,12 @@ public class BooksDbAdapter extends DatabaseAdapter<Book> {
      * @return <code>true</code> if deletion was successful, <code>false</code> otherwise
      * @see #deleteRecord(String)
      */
-    public boolean deleteBook(@NonNull String bookUID) {
-        Context context = GnuCashApplication.getAppContext();
+    public boolean deleteBook(@NonNull Context context, @NonNull String bookUID) {
         boolean result = context.deleteDatabase(bookUID);
         if (result) //delete the db entry only if the file deletion was successful
             result &= deleteRecord(bookUID);
 
-        PreferenceActivity.getBookSharedPreferences(bookUID).edit().clear().apply();
+        GnuCashApplication.getBookPreferences(context, bookUID).edit().clear().apply();
 
         return result;
     }
@@ -167,23 +168,23 @@ public class BooksDbAdapter extends DatabaseAdapter<Book> {
      * @return GUID of the active book
      * @throws NoActiveBookFoundException
      */
-    public @NonNull String getActiveBookUID() {
+    public @NonNull String getActiveBookUID() throws NoActiveBookFoundException {
         try (Cursor cursor = mDb.query(mTableName,
-                new String[]{BookEntry.COLUMN_UID},
-                BookEntry.COLUMN_ACTIVE + "= 1",
-                null,
-                null,
-                null,
-                null,
-            null)) {
+            new String[]{BookEntry.COLUMN_UID},
+            BookEntry.COLUMN_ACTIVE + " = 1",
+            null,
+            null,
+            null,
+            null,
+            "1")) {
             if (cursor.moveToFirst()) {
-                return cursor.getString(cursor.getColumnIndexOrThrow(BookEntry.COLUMN_UID));
+                return cursor.getString(0);
             }
             NoActiveBookFoundException e = new NoActiveBookFoundException(
                 "There is no active book in the app.\n"
                     + "This should NEVER happen - fix your bugs!\n"
                     + getNoActiveBookFoundExceptionInfo());
-            Timber.e(e);
+            // Timber.e(e);
             throw e;
         }
     }
@@ -192,9 +193,9 @@ public class BooksDbAdapter extends DatabaseAdapter<Book> {
         StringBuilder info = new StringBuilder("UID, created, source\n");
         for (Book book : getAllRecords()) {
             info.append(String.format("%s, %s, %s\n",
-                    book.getUID(),
-                    book.getCreatedTimestamp(),
-                    book.getSourceUri()));
+                book.getUID(),
+                book.getCreatedTimestamp(),
+                book.getSourceUri()));
         }
         return info.toString();
     }
@@ -211,6 +212,7 @@ public class BooksDbAdapter extends DatabaseAdapter<Book> {
 
     /**
      * Tries to fix the books database.
+     *
      * @return the active book UID.
      */
     @Nullable
@@ -245,13 +247,12 @@ public class BooksDbAdapter extends DatabaseAdapter<Book> {
      * Returns the root account UID from the database with name dbName.
      */
     private String getRootAccountUID(String dbName) {
-        Context context = GnuCashApplication.getAppContext();
+        Context context = holder.context;
         DatabaseHelper databaseHelper = new DatabaseHelper(context, dbName);
-        SQLiteDatabase db = databaseHelper.getReadableDatabase();
-        AccountsDbAdapter accountsDbAdapter = new AccountsDbAdapter(db,
-                new TransactionsDbAdapter(db, new SplitsDbAdapter(db)));
-        String uid = accountsDbAdapter.getOrCreateGnuCashRootAccountUID();
-        db.close();
+        DatabaseHolder holder = databaseHelper.getHolder();
+        AccountsDbAdapter accountsDbAdapter = new AccountsDbAdapter(holder);
+        String uid = accountsDbAdapter.getOrCreateRootAccountUID();
+        databaseHelper.close();
         return uid;
     }
 
@@ -295,7 +296,7 @@ public class BooksDbAdapter extends DatabaseAdapter<Book> {
     public @NonNull List<String> getAllBookUIDs() {
         List<String> bookUIDs = new ArrayList<>();
         try (Cursor cursor = mDb.query(true, mTableName, new String[]{BookEntry.COLUMN_UID},
-                null, null, null, null, null, null)) {
+            null, null, null, null, null, null)) {
             while (cursor.moveToNext()) {
                 bookUIDs.add(cursor.getString(cursor.getColumnIndexOrThrow(BookEntry.COLUMN_UID)));
             }
@@ -312,11 +313,11 @@ public class BooksDbAdapter extends DatabaseAdapter<Book> {
      */
     public @NonNull String getActiveBookDisplayName() {
         Cursor cursor = mDb.query(mTableName,
-                new String[]{BookEntry.COLUMN_DISPLAY_NAME}, BookEntry.COLUMN_ACTIVE + " = 1",
-                null, null, null, null);
+            new String[]{BookEntry.COLUMN_DISPLAY_NAME}, BookEntry.COLUMN_ACTIVE + " = 1",
+            null, null, null, null);
         try {
             if (cursor.moveToFirst()) {
-                return cursor.getString(cursor.getColumnIndexOrThrow(BookEntry.COLUMN_DISPLAY_NAME));
+                return cursor.getString(0);
             }
         } finally {
             cursor.close();
@@ -330,7 +331,9 @@ public class BooksDbAdapter extends DatabaseAdapter<Book> {
      * @return String with default name
      */
     public @NonNull String generateDefaultBookName() {
-        long bookCount = getRecordsCount() + 1;
+        String sqlMax = "SELECT MAX(" + BaseColumns._ID +") FROM " + mTableName;
+        SQLiteStatement statementMax = mDb.compileStatement(sqlMax);
+        long bookCount = max(statementMax.simpleQueryForLong(), 1);
 
         String sql = "SELECT COUNT(*) FROM " + mTableName + " WHERE " + BookEntry.COLUMN_DISPLAY_NAME + " = ?";
         SQLiteStatement statement = mDb.compileStatement(sql);
@@ -350,6 +353,4 @@ public class BooksDbAdapter extends DatabaseAdapter<Book> {
             bookCount++;
         }
     }
-
-
 }

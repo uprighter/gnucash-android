@@ -19,7 +19,6 @@ package org.gnucash.android.db.adapter;
 import static org.gnucash.android.db.DatabaseSchema.RecurrenceEntry;
 
 import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteStatement;
 import android.text.TextUtils;
 
@@ -27,6 +26,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import org.gnucash.android.app.GnuCashApplication;
+import org.gnucash.android.db.DatabaseHolder;
 import org.gnucash.android.model.PeriodType;
 import org.gnucash.android.model.Recurrence;
 import org.gnucash.android.util.TimestampHelper;
@@ -43,15 +43,15 @@ public class RecurrenceDbAdapter extends DatabaseAdapter<Recurrence> {
     /**
      * Opens the database adapter with an existing database
      *
-     * @param db SQLiteDatabase object
+     * @param holder Database holder
      */
-    public RecurrenceDbAdapter(SQLiteDatabase db) {
-        super(db, RecurrenceEntry.TABLE_NAME, new String[]{
-                RecurrenceEntry.COLUMN_MULTIPLIER,
-                RecurrenceEntry.COLUMN_PERIOD_TYPE,
-                RecurrenceEntry.COLUMN_BYDAY,
-                RecurrenceEntry.COLUMN_PERIOD_START,
-                RecurrenceEntry.COLUMN_PERIOD_END
+    public RecurrenceDbAdapter(@NonNull DatabaseHolder holder) {
+        super(holder, RecurrenceEntry.TABLE_NAME, new String[]{
+            RecurrenceEntry.COLUMN_MULTIPLIER,
+            RecurrenceEntry.COLUMN_PERIOD_TYPE,
+            RecurrenceEntry.COLUMN_BYDAY,
+            RecurrenceEntry.COLUMN_PERIOD_START,
+            RecurrenceEntry.COLUMN_PERIOD_END
         });
     }
 
@@ -67,13 +67,13 @@ public class RecurrenceDbAdapter extends DatabaseAdapter<Recurrence> {
         String periodEnd = cursor.getString(cursor.getColumnIndexOrThrow(RecurrenceEntry.COLUMN_PERIOD_END));
         String byDays = cursor.getString(cursor.getColumnIndexOrThrow(RecurrenceEntry.COLUMN_BYDAY));
 
-        PeriodType periodType = PeriodType.of(type);
+        PeriodType periodType = PeriodType.valueOf(type);
         Recurrence recurrence = new Recurrence(periodType);
         populateBaseModelAttributes(cursor, recurrence);
         recurrence.setMultiplier(multiplier);
         recurrence.setPeriodStart(TimestampHelper.getTimestampFromUtcString(periodStart).getTime());
         if (periodEnd != null) {
-            recurrence.setPeriodEnd(TimestampHelper.getTimestampFromUtcString(periodEnd));
+            recurrence.setPeriodEnd(TimestampHelper.getTimestampFromUtcString(periodEnd).getTime());
         }
         recurrence.setByDays(stringToByDays(byDays));
 
@@ -81,24 +81,18 @@ public class RecurrenceDbAdapter extends DatabaseAdapter<Recurrence> {
     }
 
     @Override
-    protected @NonNull SQLiteStatement setBindings(@NonNull SQLiteStatement stmt, @NonNull final Recurrence recurrence) {
-        stmt.clearBindings();
+    protected @NonNull SQLiteStatement bind(@NonNull SQLiteStatement stmt, @NonNull final Recurrence recurrence) {
+        bindBaseModel(stmt, recurrence);
         stmt.bindLong(1, recurrence.getMultiplier());
         stmt.bindString(2, recurrence.getPeriodType().name());
         if (!recurrence.getByDays().isEmpty()) {
             stmt.bindString(3, byDaysToString(recurrence.getByDays()));
-        } else {
-            stmt.bindNull(3);
         }
         //recurrence should always have a start date
         stmt.bindString(4, TimestampHelper.getUtcStringFromTimestamp(recurrence.getPeriodStart()));
-
         if (recurrence.getPeriodEnd() != null) {
             stmt.bindString(5, TimestampHelper.getUtcStringFromTimestamp(recurrence.getPeriodEnd()));
-        } else {
-            stmt.bindNull(5);
         }
-        stmt.bindString(6, recurrence.getUID());
 
         return stmt;
     }

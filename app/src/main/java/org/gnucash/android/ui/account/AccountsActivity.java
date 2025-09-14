@@ -17,30 +17,27 @@
 
 package org.gnucash.android.ui.account;
 
+import static org.gnucash.android.util.DocumentExtKt.chooseContent;
+
+import android.annotation.SuppressLint;
 import android.app.Activity;
-import android.app.AlertDialog;
-import android.content.ActivityNotFoundException;
+import android.app.SearchManager;
 import android.content.ContentResolver;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.SharedPreferences.Editor;
-import android.content.pm.PackageInfo;
-import android.content.pm.PackageManager.NameNotFoundException;
-import android.content.res.Resources;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.Menu;
-import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
-import android.widget.Toast;
 
+import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.SearchView;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
 import androidx.preference.PreferenceManager;
@@ -55,19 +52,18 @@ import org.gnucash.android.app.GnuCashApplication;
 import org.gnucash.android.databinding.ActivityAccountsBinding;
 import org.gnucash.android.db.DatabaseSchema;
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
+import org.gnucash.android.db.adapter.CommoditiesDbAdapter;
 import org.gnucash.android.importer.ImportAsyncTask;
+import org.gnucash.android.importer.ImportBookCallback;
 import org.gnucash.android.service.ScheduledActionService;
 import org.gnucash.android.ui.common.BaseDrawerActivity;
 import org.gnucash.android.ui.common.FormActivity;
 import org.gnucash.android.ui.common.Refreshable;
 import org.gnucash.android.ui.common.UxArgument;
 import org.gnucash.android.ui.transaction.TransactionsActivity;
-import org.gnucash.android.ui.util.TaskDelegate;
 import org.gnucash.android.ui.util.widget.FragmentStateAdapter;
 import org.gnucash.android.ui.wizard.FirstRunWizardActivity;
 import org.gnucash.android.util.BackupManager;
-
-import timber.log.Timber;
 
 /**
  * Manages actions related to accounts, displaying, exporting and creating new accounts
@@ -76,17 +72,16 @@ import timber.log.Timber;
  * @author Ngewi Fet <ngewif@gmail.com>
  * @author Oleksandr Tyshkovets <olexandr.tyshkovets@gmail.com>
  */
-public class AccountsActivity extends BaseDrawerActivity implements OnAccountClickedListener, Refreshable {
+public class AccountsActivity extends BaseDrawerActivity implements
+    OnAccountClickedListener,
+    Refreshable,
+    SearchView.OnQueryTextListener,
+    SearchView.OnCloseListener {
 
     /**
      * Request code for GnuCash account structure file to import
      */
     public static final int REQUEST_PICK_ACCOUNTS_FILE = 0x1;
-
-    /**
-     * Request code for opening the account to edit
-     */
-    public static final int REQUEST_EDIT_ACCOUNT = 0x10;
 
     /**
      * Index for the recent accounts tab
@@ -121,8 +116,26 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
 
     private ActivityAccountsBinding mBinding;
 
+    /**
+     * Search view for searching accounts
+     */
+    private SearchView mSearchView;
+    /**
+     * Filter for which accounts should be displayed. Used by search interface
+     */
+    private String mCurrentFilter;
+    private boolean isShowHiddenAccounts = false;
+
+    @SuppressLint("NotifyDataSetChanged")
     @Override
     public void refresh() {
+        final int count = mPagerAdapter.getItemCount();
+        for (int i = 0; i < count; i++) {
+            Fragment fragment = mPagerAdapter.getFragment(i);
+            if (fragment instanceof Refreshable) {
+                ((Refreshable) fragment).refresh();
+            }
+        }
         mPagerAdapter.notifyDataSetChanged();
     }
 
@@ -190,31 +203,14 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
         init();
 
         TabLayout tabLayout = mBinding.tabLayout;
-        tabLayout.addTab(tabLayout.newTab());
-        tabLayout.addTab(tabLayout.newTab());
-        tabLayout.addTab(tabLayout.newTab());
+        for (int i = 0; i < AccountViewPagerAdapter.DEFAULT_NUM_PAGES; i++) {
+            tabLayout.addTab(tabLayout.newTab());
+        }
         tabLayout.setTabGravity(TabLayout.GRAVITY_FILL);
 
         //show the simple accounts list
         mPagerAdapter = new AccountViewPagerAdapter(this);
         mBinding.pager.setAdapter(mPagerAdapter);
-
-        tabLayout.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
-            @Override
-            public void onTabSelected(TabLayout.Tab tab) {
-                mBinding.pager.setCurrentItem(tab.getPosition());
-            }
-
-            @Override
-            public void onTabUnselected(TabLayout.Tab tab) {
-                //nothing to see here, move along
-            }
-
-            @Override
-            public void onTabReselected(TabLayout.Tab tab) {
-                //nothing to see here, move along
-            }
-        });
 
         TabLayoutMediator tabLayoutMediator = new TabLayoutMediator(tabLayout, mBinding.pager, new TabLayoutMediator.TabConfigurationStrategy() {
 
@@ -307,19 +303,12 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
 
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
         boolean firstRun = prefs.getBoolean(getString(R.string.key_first_run), true);
-
         if (firstRun) {
-            //default to using double entry and save the preference explicitly
-            prefs.edit().putBoolean(getString(R.string.key_use_double_entry), true).apply();
-
             startActivity(new Intent(context, FirstRunWizardActivity.class));
             finish();
             return;
         }
 
-        if (hasNewFeatures()) {
-            showWhatsNewDialog(context);
-        }
         ScheduledActionService.schedulePeriodic(context);
     }
 
@@ -328,53 +317,6 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
         super.onDestroy();
         SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(this);
         preferences.edit().putInt(LAST_OPEN_TAB_INDEX, mBinding.pager.getCurrentItem()).apply();
-    }
-
-    /**
-     * Checks if the minor version has been increased and displays the What's New dialog box.
-     * This is the minor version as per semantic versioning.
-     *
-     * @return <code>true</code> if the minor version has been increased, <code>false</code> otherwise.
-     */
-    private boolean hasNewFeatures() {
-        String minorVersion = getString(R.string.app_minor_version);
-        int currentMinor = Integer.parseInt(minorVersion);
-
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-        int previousMinor = prefs.getInt(getString(R.string.key_previous_minor_version), 0);
-        if (currentMinor > previousMinor) {
-            Editor editor = prefs.edit();
-            editor.putInt(getString(R.string.key_previous_minor_version), currentMinor);
-            editor.apply();
-            return true;
-        }
-        return false;
-    }
-
-    /**
-     * Show dialog with new features for this version
-     */
-    public static AlertDialog showWhatsNewDialog(Context context) {
-        Resources resources = context.getResources();
-        StringBuilder releaseTitle = new StringBuilder(resources.getString(R.string.title_whats_new));
-        PackageInfo packageInfo;
-        try {
-            packageInfo = context.getPackageManager().getPackageInfo(context.getPackageName(), 0);
-            releaseTitle.append(" - v").append(packageInfo.versionName);
-        } catch (NameNotFoundException e) {
-            Timber.e(e, "Error displaying 'Whats new' dialog");
-        }
-
-        return new AlertDialog.Builder(context)
-            .setTitle(releaseTitle.toString())
-            .setMessage(R.string.whats_new)
-            .setPositiveButton(R.string.label_dismiss, new DialogInterface.OnClickListener() {
-
-                @Override
-                public void onClick(DialogInterface dialog, int which) {
-                    dialog.dismiss();
-                }
-            }).show();
     }
 
     /**
@@ -387,10 +329,26 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
     }
 
     @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        MenuInflater inflater = getMenuInflater();
-        inflater.inflate(R.menu.global_actions, menu);
+    public boolean onCreateOptionsMenu(@NonNull Menu menu) {
+        super.onCreateOptionsMenu(menu);
+        getMenuInflater().inflate(R.menu.account_actions, menu);
+        // Associate searchable configuration with the SearchView
+        SearchView searchView = mSearchView = (SearchView) menu.findItem(R.id.menu_search).getActionView();
+        if (searchView != null) {
+            Activity activity = this;
+            SearchManager searchManager = (SearchManager) activity.getSystemService(Context.SEARCH_SERVICE);
+            searchView.setSearchableInfo(searchManager.getSearchableInfo(activity.getComponentName()));
+            searchView.setOnQueryTextListener(this);
+            searchView.setOnCloseListener(this);
+        }
         return true;
+    }
+
+    @Override
+    public boolean onPrepareOptionsMenu(Menu menu) {
+        MenuItem itemHidden = menu.findItem(R.id.menu_hidden);
+        showHiddenAccounts(itemHidden, isShowHiddenAccounts);
+        return super.onPrepareOptionsMenu(menu);
     }
 
     @Override
@@ -399,8 +357,12 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
             case android.R.id.home:
                 return super.onOptionsItemSelected(item);
 
+            case R.id.menu_hidden:
+                toggleHidden(item);
+                return true;
+
             default:
-                return false;
+                return super.onOptionsItemSelected(item);
         }
     }
 
@@ -408,64 +370,76 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
      * Creates default accounts with the specified currency code.
      * If the currency parameter is null, then locale currency will be used if available
      *
-     * @param currencyCode Currency code to assign to the imported accounts
      * @param activity     Activity for providing context and displaying dialogs
-     */
-    public static void createDefaultAccounts(@NonNull final String currencyCode, @NonNull final Activity activity) {
-        createDefaultAccounts(currencyCode, activity, null);
-    }
-
-    /**
-     * Creates default accounts with the specified currency code.
-     * If the currency parameter is null, then locale currency will be used if available
-     *
      * @param currencyCode Currency code to assign to the imported accounts
-     * @param activity     Activity for providing context and displaying dialogs
-     * @param callback     The callback to call when the book has been imported.
      */
-    public static void createDefaultAccounts(@NonNull final String currencyCode, @NonNull final Activity activity, @Nullable final TaskDelegate callback) {
-        TaskDelegate delegate = callback;
-        if (!TextUtils.isEmpty(currencyCode)) {
-            delegate = new TaskDelegate() {
-                @Override
-                public void onTaskComplete() {
-                    AccountsDbAdapter.getInstance().updateAllAccounts(DatabaseSchema.AccountEntry.COLUMN_CURRENCY, currencyCode);
-                    GnuCashApplication.setDefaultCurrencyCode(activity, currencyCode);
-                    if (callback != null) {
-                        callback.onTaskComplete();
-                    }
-                }
-            };
-        }
-
+    public static void createDefaultAccounts(@NonNull final Activity activity, @NonNull final String currencyCode) {
         Uri uri = new Uri.Builder()
             .scheme(ContentResolver.SCHEME_ANDROID_RESOURCE)
             .authority(BuildConfig.APPLICATION_ID)
             .path(String.valueOf(R.raw.default_accounts))
             .build();
+        createDefaultAccounts(activity, currencyCode, uri, null);
+    }
+
+    /**
+     * Creates default accounts with the specified currency code.
+     * If the currency parameter is null, then locale currency will be used if available
+     *
+     * @param activity     Activity for providing context and displaying dialogs
+     * @param currencyCode Currency code to assign to the imported accounts
+     */
+    public static void createDefaultAccounts(@NonNull final Activity activity, @NonNull final String currencyCode, @NonNull String assetId, @Nullable final ImportBookCallback callback) {
+        Uri uri = new Uri.Builder()
+            .scheme(ContentResolver.SCHEME_FILE)
+            .encodedAuthority("/android_asset")
+            .path(assetId)
+            .build();
+        createDefaultAccounts(activity, currencyCode, uri, callback);
+    }
+
+    /**
+     * Creates default accounts with the specified currency code.
+     * If the currency parameter is null, then locale currency will be used if available
+     *
+     * @param activity     Activity for providing context and displaying dialogs
+     * @param currencyCode Currency code to assign to the imported accounts
+     * @param callback     The callback to call when the book has been imported.
+     */
+    public static void createDefaultAccounts(
+        @NonNull final Activity activity,
+        @Nullable final String currencyCode,
+        @NonNull final Uri uri,
+        @Nullable final ImportBookCallback callback
+    ) {
+        ImportBookCallback delegate = new ImportBookCallback() {
+            @Override
+            public void onBookImported(@Nullable String bookUID) {
+                if (!TextUtils.isEmpty(currencyCode)) {
+                    CommoditiesDbAdapter commoditiesDbAdapter = CommoditiesDbAdapter.getInstance();
+                    String currencyUID = commoditiesDbAdapter.getCommodityUID(currencyCode);
+                    AccountsDbAdapter.getInstance().updateAllAccounts(DatabaseSchema.AccountEntry.COLUMN_COMMODITY_UID, currencyUID);
+                    commoditiesDbAdapter.setDefaultCurrencyCode(currencyCode);
+                }
+                if (callback != null) {
+                    callback.onBookImported(bookUID);
+                }
+            }
+        };
+
         new ImportAsyncTask(activity, delegate).execute(uri);
     }
 
     /**
      * Starts Intent chooser for selecting a GnuCash accounts file to import.
-     * <p>The {@code activity} is responsible for the actual import of the file and can do so by calling {@link #importXmlFileFromIntent(Activity, Intent, TaskDelegate)}<br>
+     * <p>The {@code activity} is responsible for the actual import of the file and can do so by calling {@link #importXmlFileFromIntent(Activity, Intent, ImportBookCallback)}<br>
      * The calling class should respond to the request code {@link AccountsActivity#REQUEST_PICK_ACCOUNTS_FILE} in its {@link #onActivityResult(int, int, Intent)} method</p>
      *
      * @param activity Activity starting the request and will also handle the response
-     * @see #importXmlFileFromIntent(Activity, Intent, TaskDelegate)
+     * @see #importXmlFileFromIntent(Activity, Intent, ImportBookCallback)
      */
     public static void startXmlFileChooser(Activity activity) {
-        Intent pickIntent = new Intent(Intent.ACTION_GET_CONTENT)
-            .addCategory(Intent.CATEGORY_OPENABLE)
-            .setType("*/*");
-        Intent chooser = Intent.createChooser(pickIntent, "Select GnuCash account file"); //todo internationalize string
-
-        try {
-            activity.startActivityForResult(chooser, REQUEST_PICK_ACCOUNTS_FILE);
-        } catch (ActivityNotFoundException ex) {
-            Timber.e(ex, "No file manager for selecting files available");
-            Toast.makeText(activity, R.string.toast_install_file_manager, Toast.LENGTH_LONG).show();
-        }
+        chooseContent(activity, REQUEST_PICK_ACCOUNTS_FILE);
     }
 
     /**
@@ -476,17 +450,7 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
      * @see #startXmlFileChooser(Activity)
      */
     public static void startXmlFileChooser(Fragment fragment) {
-        Intent pickIntent = new Intent(Intent.ACTION_GET_CONTENT)
-            .addCategory(Intent.CATEGORY_OPENABLE)
-            .setType("*/*");
-        Intent chooser = Intent.createChooser(pickIntent, "Select GnuCash account file"); //todo internationalize string
-
-        try {
-            fragment.startActivityForResult(chooser, REQUEST_PICK_ACCOUNTS_FILE);
-        } catch (ActivityNotFoundException ex) {
-            Timber.e(ex, "No file manager for selecting files available");
-            Toast.makeText(fragment.getActivity(), R.string.toast_install_file_manager, Toast.LENGTH_LONG).show();
-        }
+        chooseContent(fragment, REQUEST_PICK_ACCOUNTS_FILE);
     }
 
     /**
@@ -497,8 +461,9 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
      * @param data         Intent data containing the XML uri
      * @param onFinishTask Task to be executed when import is complete
      */
-    public static void importXmlFileFromIntent(Activity context, Intent data, TaskDelegate onFinishTask) {
-        new ImportAsyncTask(context, onFinishTask, true).execute(data.getData());
+    public static void importXmlFileFromIntent(@NonNull Activity context, @NonNull Intent data, @Nullable ImportBookCallback onFinishTask) {
+        boolean backup = GnuCashApplication.shouldBackupForImport(context);
+        new ImportAsyncTask(context, onFinishTask, backup).execute(data.getData());
     }
 
     /**
@@ -526,9 +491,10 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
 
     @Override
     public void accountSelected(String accountUID) {
-        Intent intent = new Intent(this, TransactionsActivity.class);
-        intent.setAction(Intent.ACTION_VIEW);
-        intent.putExtra(UxArgument.SELECTED_ACCOUNT_UID, accountUID);
+        Intent intent = new Intent(this, TransactionsActivity.class)
+            .setAction(Intent.ACTION_VIEW)
+            .putExtra(UxArgument.SELECTED_ACCOUNT_UID, accountUID)
+            .putExtra(UxArgument.SHOW_HIDDEN, isShowHiddenAccounts);
 
         startActivity(intent);
     }
@@ -546,4 +512,62 @@ public class AccountsActivity extends BaseDrawerActivity implements OnAccountCli
             .apply();
     }
 
+    @Override
+    public boolean onClose() {
+        if (!TextUtils.isEmpty(mSearchView.getQuery())) {
+            mSearchView.setQuery(null, true);
+        }
+        return true;
+    }
+
+    @Override
+    public boolean onQueryTextChange(String newText) {
+        String newFilter = !TextUtils.isEmpty(newText) ? newText : null;
+        String oldFilter = mCurrentFilter;
+        if (oldFilter == null && newFilter == null) {
+            return true;
+        }
+        if (oldFilter != null && oldFilter.equals(newFilter)) {
+            return true;
+        }
+        setSearchFilter(newFilter);
+        return true;
+    }
+
+    @Override
+    public boolean onQueryTextSubmit(String query) {
+        //nothing to see here, move along
+        return true;
+    }
+
+    private void setSearchFilter(String filter) {
+        mCurrentFilter = filter;
+        // apply to each page
+        final int count = mPagerAdapter.getItemCount();
+        for (int i = 0; i < count; i++) {
+            AccountsListFragment fragment = (AccountsListFragment) mPagerAdapter.getFragment(i);
+            if (fragment != null) {
+                fragment.onQueryTextChange(filter);
+            }
+        }
+    }
+
+    private void toggleHidden(@NonNull MenuItem item) {
+        showHiddenAccounts(item, !item.isChecked());
+    }
+
+    private void showHiddenAccounts(@NonNull MenuItem item, boolean isVisible) {
+        item.setChecked(isVisible);
+        @DrawableRes int visibilityIcon = isVisible ? R.drawable.ic_visibility_off : R.drawable.ic_visibility;
+        item.setIcon(visibilityIcon);
+        isShowHiddenAccounts = isVisible;
+        // apply to each page
+        final int count = mPagerAdapter.getItemCount();
+        for (int i = 0; i < count; i++) {
+            AccountsListFragment fragment = (AccountsListFragment) mPagerAdapter.getFragment(i);
+            if (fragment != null) {
+                fragment.setShowHiddenAccounts(isShowHiddenAccounts);
+            }
+        }
+    }
 }

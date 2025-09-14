@@ -28,9 +28,9 @@ public final class UxArgument {
     public static final String SELECTED_TRANSACTION_UID = "selected_transaction_uid";
 
     /**
-     * Key for passing list of IDs selected transactions as an argument in a bundle or intent
+     * Key for passing list of UIDs selected transactions as an argument in a bundle or intent
      */
-    public static final String SELECTED_TRANSACTION_IDS = "selected_transactions";
+    public static final String SELECTED_TRANSACTION_UIDS = "selected_transactions";
 
     /**
      * Key for the origin account as argument when moving accounts
@@ -63,11 +63,6 @@ public final class UxArgument {
     public static final String PARENT_ACCOUNT_UID = "parent_account_uid";
 
     /**
-     * Key for passing the transaction UID to the transactions editor
-     */
-    public static final String TRANSACTION_UID = "transaction_uid";
-
-    /**
      * Key for passing the scheduled action UID to the transactions editor
      */
     public static final String SCHEDULED_ACTION_UID = "scheduled_action_uid";
@@ -96,6 +91,11 @@ public final class UxArgument {
      * GUID of a book which is relevant for a specific action
      */
     public static final String BOOK_UID = "book_uid";
+
+    /**
+     * Show hidden items?
+     */
+    public static final String SHOW_HIDDEN = "show_hidden";
 
     //prevent initialization of instances of this class
     private UxArgument() {
