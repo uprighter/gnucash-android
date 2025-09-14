@@ -15,9 +15,12 @@
  */
 package org.gnucash.android.importer;
 
-import android.database.sqlite.SQLiteDatabase;
+import androidx.annotation.NonNull;
+
+import androidx.annotation.Nullable;
 
 import org.gnucash.android.app.GnuCashApplication;
+import org.gnucash.android.db.DatabaseHolder;
 import org.gnucash.android.db.adapter.CommoditiesDbAdapter;
 import org.gnucash.android.db.adapter.DatabaseAdapter;
 import org.gnucash.android.model.Commodity;
@@ -27,6 +30,8 @@ import org.xml.sax.helpers.DefaultHandler;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 /**
  * XML stream handler for parsing currencies to add to the database
@@ -40,25 +45,37 @@ public class CommoditiesXmlHandler extends DefaultHandler {
     public static final String ATTR_EXCHANGE_CODE = "exchange-code";
     public static final String ATTR_SMALLEST_FRACTION = "smallest-fraction";
     public static final String ATTR_LOCAL_SYMBOL = "local-symbol";
+    public static final String SOURCE_CURRENCY = "currency";
     /**
      * List of commodities parsed from the XML file.
      * They will be all added to db at once at the end of the document
      */
-    private final List<Commodity> mCommodities = new ArrayList<>();
+    private final Map<String, Commodity> commodities = new TreeMap<>();
 
     private final CommoditiesDbAdapter mCommoditiesDbAdapter;
 
-    public CommoditiesXmlHandler(SQLiteDatabase db) {
-        if (db == null) {
+    public CommoditiesXmlHandler(@NonNull DatabaseHolder holder) {
+        if (holder.db == null) {
             mCommoditiesDbAdapter = GnuCashApplication.getCommoditiesDbAdapter();
         } else {
-            mCommoditiesDbAdapter = new CommoditiesDbAdapter(db, false);
+            mCommoditiesDbAdapter = new CommoditiesDbAdapter(holder, false);
         }
     }
 
     @Override
-    public void startElement(String uri, String localName, String qName, Attributes attributes) throws SAXException {
-        if (qName.equals(TAG_CURRENCY)) {
+    public void startDocument() throws SAXException {
+        super.startDocument();
+        List<Commodity> commoditiesDb = mCommoditiesDbAdapter.getAllRecords();
+        commodities.clear();
+        for (Commodity commodity : commoditiesDb) {
+            String key = commodity.getNamespace() + "::" + commodity.getMnemonic();;
+            commodities.put(key, commodity);
+        }
+    }
+
+    @Override
+    public void startElement(String uri, String localName, String qualifiedName, Attributes attributes) throws SAXException {
+        if (qualifiedName.equals(TAG_CURRENCY)) {
             String isoCode = attributes.getValue(ATTR_ISO_CODE);
             String fullname = attributes.getValue(ATTR_FULL_NAME);
             String namespace = attributes.getValue(ATTR_NAMESPACE);
@@ -70,18 +87,28 @@ public class CommoditiesXmlHandler extends DefaultHandler {
             String smallestFraction = attributes.getValue(ATTR_SMALLEST_FRACTION);
             String localSymbol = attributes.getValue(ATTR_LOCAL_SYMBOL);
 
-            Commodity commodity = new Commodity(fullname, isoCode, Integer.parseInt(smallestFraction));
-            commodity.setNamespace(namespace);
+            if (Commodity.COMMODITY_ISO4217.equals(namespace)) {
+                namespace = Commodity.COMMODITY_CURRENCY;
+            }
+            String key = namespace + "::" + isoCode;
+            Commodity commodity = commodities.get(key);
+            if (commodity == null) {
+                commodity = new Commodity(fullname, isoCode, namespace, Integer.parseInt(smallestFraction));
+                commodity.setNamespace(namespace);
+                commodities.put(key, commodity);
+            } else {
+                commodity.setFullname(fullname);
+                commodity.setSmallestFraction(Integer.parseInt(smallestFraction));
+            }
             commodity.setCusip(cusip);
             commodity.setLocalSymbol(localSymbol);
-
-            mCommodities.add(commodity);
+            commodity.setQuoteSource(SOURCE_CURRENCY);
+            mCommoditiesDbAdapter.addRecord(commodity, DatabaseAdapter.UpdateMethod.replace);
         }
     }
 
     @Override
-    public void endDocument() throws SAXException {
-        mCommoditiesDbAdapter.bulkAddRecords(mCommodities, DatabaseAdapter.UpdateMethod.insert);
+    public void endDocument() {
         mCommoditiesDbAdapter.initCommon();
     }
 }

@@ -35,7 +35,6 @@ import android.widget.Button;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
 import androidx.viewpager2.widget.ViewPager2;
@@ -48,6 +47,7 @@ import com.tech.freak.wizardpager.ui.PageFragmentCallbacks;
 import com.tech.freak.wizardpager.ui.StepPagerStrip;
 
 import org.gnucash.android.R;
+import org.gnucash.android.app.GnuCashActivity;
 import org.gnucash.android.app.GnuCashApplication;
 import org.gnucash.android.databinding.ActivityFirstRunWizardBinding;
 import org.gnucash.android.db.adapter.BooksDbAdapter;
@@ -65,7 +65,7 @@ import timber.log.Timber;
 /**
  * Activity for managing the wizard displayed upon first run of the application
  */
-public class FirstRunWizardActivity extends AppCompatActivity implements
+public class FirstRunWizardActivity extends GnuCashActivity implements
     PageFragmentCallbacks, ReviewFragment.Callbacks, ModelCallbacks {
 
     private static final String STATE_MODEL = "model";
@@ -173,8 +173,19 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
      * Create accounts depending on the user preference (import or default set) and finish this activity
      * <p>This method also removes the first run flag from the application</p>
      */
-    private void createAccountsAndFinish(@NonNull String accountOption, String currencyCode) {
-        if (accountOption.equals(mWizardModel.optionAccountDefault)) {
+    private void createAccountsAndFinish(@NonNull String accountOption, @Nullable String currencyCode) {
+        if (accountOption.equals(mWizardModel.optionAccountImport)) {
+            startXmlFileChooser(this);
+        } else if (accountOption.equals(mWizardModel.optionAccountUser)) {
+            //user prefers to handle account creation themselves
+            AccountsActivity.start(this);
+            finish();
+        } else {
+            String accountAssetId = mWizardModel.getAccountsByLabel(accountOption);
+            if (TextUtils.isEmpty(accountAssetId)) {
+                return;
+            }
+
             final Activity activity = FirstRunWizardActivity.this;
             //save the UID of the active book, and then delete it after successful import
             final BooksDbAdapter booksDbAdapter = BooksDbAdapter.getInstance();
@@ -185,12 +196,7 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
                     maybeDeleteOldBook(activity, bookOldUID, bookUID);
                 }
             } : null;
-            createDefaultAccounts(activity, currencyCode, callbackAfterImport);
-            finish();
-        } else if (accountOption.equals(mWizardModel.optionAccountImport)) {
-            startXmlFileChooser(this);
-        } else { //user prefers to handle account creation themselves
-            AccountsActivity.start(this);
+            createDefaultAccounts(activity, currencyCode, accountAssetId, callbackAfterImport);
             finish();
         }
 
@@ -325,7 +331,7 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
         }
 
         String currencyLabel = null;
-        String accountOption = mWizardModel.optionAccountUser;
+        String accountLabel = mWizardModel.optionAccountUser;
         String feedbackOption = "";
         for (ReviewItem reviewItem : reviewItems) {
             String title = reviewItem.getTitle();
@@ -334,13 +340,15 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
             } else if (title.equals(mWizardModel.titleOtherCurrency)) {
                 currencyLabel = reviewItem.getDisplayValue();
             } else if (title.equals(mWizardModel.titleAccount)) {
-                accountOption = reviewItem.getDisplayValue();
+                accountLabel = reviewItem.getDisplayValue();
+            } else if (title.equals(mWizardModel.optionAccountDefault)) {
+                accountLabel = reviewItem.getDisplayValue();
             } else if (title.equals(mWizardModel.titleFeedback)) {
                 feedbackOption = reviewItem.getDisplayValue();
             }
         }
 
-        if (TextUtils.isEmpty(currencyLabel) || TextUtils.isEmpty(accountOption)) {
+        if (TextUtils.isEmpty(currencyLabel) || TextUtils.isEmpty(accountLabel)) {
             return;
         }
         String currencyCode = mWizardModel.getCurrencyByLabel(currencyLabel);
@@ -349,13 +357,13 @@ public class FirstRunWizardActivity extends AppCompatActivity implements
         }
 
         Context context = FirstRunWizardActivity.this;
-        GnuCashApplication.setDefaultCurrencyCode(context, currencyCode);
+        GnuCashApplication.setDefaultCurrencyCode(currencyCode);
         PreferenceManager.getDefaultSharedPreferences(context)
             .edit()
             .putBoolean(getString(R.string.key_enable_crashlytics), feedbackOption.equals(mWizardModel.optionFeedbackSend))
             .apply();
 
-        createAccountsAndFinish(accountOption, currencyCode);
+        createAccountsAndFinish(accountLabel, currencyCode);
     }
 
     private void importFileAndFinish(Intent data) {

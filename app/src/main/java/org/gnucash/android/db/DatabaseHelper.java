@@ -16,6 +16,7 @@
 
 package org.gnucash.android.db;
 
+import static android.database.DatabaseUtils.appendEscapedSQLString;
 import static org.gnucash.android.db.DatabaseSchema.AccountEntry;
 import static org.gnucash.android.db.DatabaseSchema.BudgetAmountEntry;
 import static org.gnucash.android.db.DatabaseSchema.BudgetEntry;
@@ -28,6 +29,7 @@ import static org.gnucash.android.db.DatabaseSchema.SplitEntry;
 import static org.gnucash.android.db.DatabaseSchema.TransactionEntry;
 
 import android.content.Context;
+import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteException;
 import android.database.sqlite.SQLiteOpenHelper;
@@ -59,7 +61,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         + AccountEntry.COLUMN_UID + " varchar(255) not null UNIQUE, "
         + AccountEntry.COLUMN_NAME + " varchar(255) not null, "
         + AccountEntry.COLUMN_TYPE + " varchar(255) not null, "
-        + AccountEntry.COLUMN_CURRENCY + " varchar(255) not null, "
+        + AccountEntry.COLUMN_CURRENCY + " varchar(255), "
         + AccountEntry.COLUMN_COMMODITY_UID + " varchar(255) not null, "
         + AccountEntry.COLUMN_DESCRIPTION + " varchar(255), "
         + AccountEntry.COLUMN_COLOR_CODE + " varchar(255), "
@@ -69,10 +71,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         + AccountEntry.COLUMN_PLACEHOLDER + " tinyint default 0, "
         + AccountEntry.COLUMN_PARENT_ACCOUNT_UID + " varchar(255), "
         + AccountEntry.COLUMN_DEFAULT_TRANSFER_ACCOUNT_UID + " varchar(255), "
+        + AccountEntry.COLUMN_NOTES + " text, "
         + AccountEntry.COLUMN_BALANCE + " varchar(255), "
         + AccountEntry.COLUMN_CLEARED_BALANCE + " varchar(255), "
         + AccountEntry.COLUMN_NOCLOSING_BALANCE + " varchar(255), "
         + AccountEntry.COLUMN_RECONCILED_BALANCE + " varchar(255), "
+        + AccountEntry.COLUMN_TEMPLATE + " tinyint default 0, "
         + AccountEntry.COLUMN_CREATED_AT + " TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, "
         + AccountEntry.COLUMN_MODIFIED_AT + " TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, "
         + "FOREIGN KEY (" + AccountEntry.COLUMN_COMMODITY_UID + ") REFERENCES " + CommodityEntry.TABLE_NAME + " (" + CommodityEntry.COLUMN_UID + ") "
@@ -90,7 +94,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         + TransactionEntry.COLUMN_TIMESTAMP + " integer not null, "
         + TransactionEntry.COLUMN_EXPORTED + " tinyint default 0, "
         + TransactionEntry.COLUMN_TEMPLATE + " tinyint default 0, "
-        + TransactionEntry.COLUMN_CURRENCY + " varchar(255) not null, "
+        + TransactionEntry.COLUMN_CURRENCY + " varchar(255), "
         + TransactionEntry.COLUMN_COMMODITY_UID + " varchar(255) not null, "
         + TransactionEntry.COLUMN_SCHEDX_ACTION_UID + " varchar(255), "
         + TransactionEntry.COLUMN_CREATED_AT + " TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, "
@@ -116,6 +120,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         + SplitEntry.COLUMN_TRANSACTION_UID + " varchar(255) not null, "
         + SplitEntry.COLUMN_RECONCILE_STATE + " varchar(1) not null default 'n', "
         + SplitEntry.COLUMN_RECONCILE_DATE + " timestamp not null default current_timestamp, "
+        + SplitEntry.COLUMN_SCHEDX_ACTION_ACCOUNT_UID + " varchar(255), "
         + SplitEntry.COLUMN_CREATED_AT + " TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, "
         + SplitEntry.COLUMN_MODIFIED_AT + " TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, "
         + "FOREIGN KEY (" + SplitEntry.COLUMN_ACCOUNT_UID + ") REFERENCES " + AccountEntry.TABLE_NAME + " (" + AccountEntry.COLUMN_UID + ") ON DELETE CASCADE, "
@@ -157,6 +162,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         + CommodityEntry.COLUMN_LOCAL_SYMBOL + " varchar(255) not null default '', "
         + CommodityEntry.COLUMN_CUSIP + " varchar(255), "
         + CommodityEntry.COLUMN_SMALLEST_FRACTION + " integer not null, "
+        + CommodityEntry.COLUMN_QUOTE_FLAG + " tinyint not null default 0, "
         + CommodityEntry.COLUMN_QUOTE_SOURCE + " varchar(255), "
         + CommodityEntry.COLUMN_QUOTE_TZ + " varchar(100), "
         + CommodityEntry.COLUMN_CREATED_AT + " TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, "
@@ -228,6 +234,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         + RecurrenceEntry.COLUMN_MODIFIED_AT + " TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP); "
         + createUpdatedAtTrigger(RecurrenceEntry.TABLE_NAME);
 
+    @NonNull
+    private final Context context;
 
     /**
      * Constructor
@@ -235,9 +243,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
      * @param context      Application context
      * @param databaseName Name of the database
      */
-    public DatabaseHelper(Context context, String databaseName) {
+    public DatabaseHelper(@NonNull Context context, String databaseName) {
         super(context, databaseName, null, DatabaseSchema.DATABASE_VERSION);
-
+        this.context = context;
     }
 
     /**
@@ -258,7 +266,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
     @Override
     public void onCreate(SQLiteDatabase db) {
-        createDatabaseTables(db);
+        DatabaseHolder holder = new DatabaseHolder(context, db);
+        createDatabaseTables(holder);
     }
 
     @Override
@@ -268,18 +277,18 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     }
 
     @Override
-    public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        MigrationHelper.migrate(db, oldVersion, newVersion);
+    public void onUpgrade(@NonNull SQLiteDatabase db, int oldVersion, int newVersion) {
+        MigrationHelper.migrate(context, db, oldVersion, newVersion);
     }
-
 
     /**
      * Creates the tables in the database and import default commodities into the database
      *
-     * @param db Database instance
+     * @param holder Database holder
      */
-    private void createDatabaseTables(SQLiteDatabase db) {
+    private void createDatabaseTables(@NonNull DatabaseHolder holder) {
         Timber.i("Creating database tables");
+        SQLiteDatabase db = holder.db;
         db.execSQL(ACCOUNTS_TABLE_CREATE);
         db.execSQL(TRANSACTIONS_TABLE_CREATE);
         db.execSQL(SPLITS_TABLE_CREATE);
@@ -329,7 +338,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         createResetBalancesTriggers(db);
 
         try {
-            MigrationHelper.importCommodities(db);
+            MigrationHelper.importCommodities(holder);
         } catch (SAXException | ParserConfigurationException | IOException e) {
             String msg = "Error loading currencies into the database";
             Timber.e(e, msg);
@@ -340,22 +349,26 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     /**
      * Escape the given argument for use in a {@code LIKE} statement.
      *
-     * @hide
+     * @param value the value to escape.
      */
-    public static String escapeForLike(@NonNull String arg) {
-        // Shamelessly borrowed from android.database.DatabaseUtils
-        final StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < arg.length(); i++) {
-            final char c = arg.charAt(i);
-            switch (c) {
-                case '%':
-                case '_':
-                    sb.append('\\');
-                    break;
+    public static String sqlEscapeLike(String value) {
+        StringBuilder escaper = new StringBuilder();
+        appendEscapedSQLString(escaper, value);
+        boolean escape = false;
+        int length = escaper.length();
+        for (int i = length - 1; i > 0; i--) {
+            char c = escaper.charAt(i);
+            if ((c == '%') || (c == '_')) {
+                escape = true;
+                escaper.insert(i, '_');
             }
-            sb.append(c);
         }
-        return sb.toString();
+        escaper.insert(1, '%');
+        escaper.insert(escaper.length() - 1, '%');
+        if (escape) {
+            escaper.append(" ESCAPE '_'");
+        }
+        return escaper.toString();
     }
 
     static void createResetBalancesTriggers(SQLiteDatabase db) {
@@ -396,11 +409,36 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         String sqlWhenUpdateAccount = "CREATE TRIGGER reset_balances_update_" + AccountEntry.TABLE_NAME
             + " AFTER UPDATE OF "
             + AccountEntry.COLUMN_COMMODITY_UID + ", "
-            + AccountEntry.COLUMN_CURRENCY + ", "
             + AccountEntry.COLUMN_PARENT_ACCOUNT_UID + ", "
             + AccountEntry.COLUMN_TYPE
             + " ON " + AccountEntry.TABLE_NAME
             + " BEGIN " + sqlReset + "; END;";
         db.execSQL(sqlWhenUpdateAccount);
+    }
+
+    public DatabaseHolder getHolder() {
+        return new DatabaseHolder(context, getWritableDatabase(), getDatabaseName());
+    }
+
+    public DatabaseHolder getReadableHolder() {
+        return new DatabaseHolder(context, getReadableDatabase(), getDatabaseName());
+    }
+
+    public static boolean hasTableColumn(@NonNull SQLiteDatabase db, @NonNull String tableName, @NonNull String columnName) {
+        Cursor cursor = db.rawQuery("PRAGMA table_info(" + tableName + ")", null);
+        try {
+            if (cursor.moveToFirst()) {
+                final int indexName = cursor.getColumnIndexOrThrow("name");
+                do {
+                    String name = cursor.getString(indexName);
+                    if (columnName.equals(name)) {
+                        return true;
+                    }
+                } while (cursor.moveToNext());
+            }
+        } finally {
+            cursor.close();
+        }
+        return false;
     }
 }

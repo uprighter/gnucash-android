@@ -23,7 +23,6 @@ internal class ScheduledTransactionsViewHolder(
     override fun bind(scheduledAction: ScheduledAction) {
         super.bind(scheduledAction)
         val context = itemView.context
-        primaryTextView.text = scheduledAction.toString()
 
         val transactionUID = scheduledAction.actionUID!!
         val transaction = try {
@@ -43,50 +42,56 @@ internal class ScheduledTransactionsViewHolder(
 
         var text = ""
         val slitsSize = splits.size
+        val first = splits.firstOrNull()
         if (slitsSize == 2) {
-            val first = splits[0]
             for (split in splits) {
-                if ((first !== split) && first.isPairOf(split)) {
-                    text = first.value!!.formattedString()
+                if ((first != null) && (first !== split) && first.isPairOf(split)) {
+                    text = first.value.formattedString()
                     break
                 }
             }
-        } else {
+        }
+        if (text.isEmpty()) {
             text = context.getString(R.string.label_split_count, slitsSize)
         }
         amountTextView.text = text
 
+        val accountUID =
+            if (slitsSize > 0) first!!.scheduledActionAccountUID ?: first.accountUID else null
         itemView.setOnClickListener {
-            val accountUID = if (slitsSize > 0) splits[0].accountUID else null
             if (accountUID != null) {
-                editTransaction(scheduledAction, accountUID)
+                editTransaction(scheduledAction, accountUID, transactionUID)
             }
         }
     }
 
-    private fun editTransaction(scheduledAction: ScheduledAction, accountUID: String) {
+    private fun editTransaction(
+        scheduledAction: ScheduledAction,
+        accountUID: String,
+        transactionUID: String
+    ) {
         val context = itemView.context
         val intent = Intent(context, FormActivity::class.java)
             .setAction(Intent.ACTION_INSERT_OR_EDIT)
             .putExtra(UxArgument.FORM_TYPE, FormActivity.FormType.TRANSACTION.name)
             .putExtra(UxArgument.SCHEDULED_ACTION_UID, scheduledAction.uid)
             .putExtra(UxArgument.SELECTED_ACCOUNT_UID, accountUID)
-            .putExtra(UxArgument.SELECTED_TRANSACTION_UID, scheduledAction.actionUID)
+            .putExtra(UxArgument.SELECTED_TRANSACTION_UID, transactionUID)
         context.startActivity(intent)
     }
 
     @SuppressLint("NotifyDataSetChanged")
     override fun deleteSchedule(scheduledAction: ScheduledAction) {
         Timber.i("Removing scheduled transaction")
-        val transactionUID = scheduledAction.actionUID!!
-        scheduledActionDbAdapter.deleteRecord(scheduledAction.uid);
+        val transactionUID = scheduledAction.actionUID ?: return
+        scheduledActionDbAdapter.deleteRecord(scheduledAction)
         if (transactionsDbAdapter.deleteRecord(transactionUID)) {
             val context = itemView.context
             Toast.makeText(
                 context,
                 R.string.toast_recurring_transaction_deleted,
                 Toast.LENGTH_LONG
-            ).show();
+            ).show()
         }
     }
 }

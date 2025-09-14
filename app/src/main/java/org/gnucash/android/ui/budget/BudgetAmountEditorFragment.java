@@ -62,7 +62,7 @@ import java.util.List;
 public class BudgetAmountEditorFragment extends MenuFragment {
 
     private QualifiedAccountNameAdapter accountNameAdapter;
-    private List<View> mBudgetAmountViews = new ArrayList<>();
+    private final List<View> mBudgetAmountViews = new ArrayList<>();
     private AccountsDbAdapter mAccountsDbAdapter;
 
     private FragmentBudgetAmountEditorBinding mBinding;
@@ -78,9 +78,7 @@ public class BudgetAmountEditorFragment extends MenuFragment {
     public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
         mBinding = FragmentBudgetAmountEditorBinding.inflate(inflater, container, false);
-        View view = mBinding.getRoot();
-        setupAccountSpinnerAdapter();
-        return view;
+        return mBinding.getRoot();
     }
 
     @Override
@@ -96,6 +94,8 @@ public class BudgetAmountEditorFragment extends MenuFragment {
         ActionBar actionBar = ((AppCompatActivity) requireActivity()).getSupportActionBar();
         assert actionBar != null;
         actionBar.setTitle("Edit Budget Amounts");
+
+        setupAccountSpinnerAdapter();
 
         ArrayList<BudgetAmount> budgetAmounts = getArguments().getParcelableArrayList(UxArgument.BUDGET_AMOUNT_LIST);
         if (budgetAmounts != null) {
@@ -147,7 +147,7 @@ public class BudgetAmountEditorFragment extends MenuFragment {
             //at least one account should be loaded (don't create budget with empty account tree
             if (viewHolder.budgetAccountSpinner.getCount() == 0) {
                 Toast.makeText(getActivity(), "You need an account hierarchy to create a budget!",
-                        Toast.LENGTH_SHORT).show();
+                    Toast.LENGTH_SHORT).show();
                 return false;
             }
         }
@@ -198,7 +198,7 @@ public class BudgetAmountEditorFragment extends MenuFragment {
      * Loads the accounts in the spinner
      */
     private void setupAccountSpinnerAdapter() {
-        accountNameAdapter = new QualifiedAccountNameAdapter(requireContext(), mAccountsDbAdapter);
+        accountNameAdapter = new QualifiedAccountNameAdapter(requireContext(), mAccountsDbAdapter, getViewLifecycleOwner());
     }
 
     /**
@@ -215,6 +215,7 @@ public class BudgetAmountEditorFragment extends MenuFragment {
                 continue;
             int accountPosition = viewHolder.budgetAccountSpinner.getSelectedItemPosition();
             Account account = accountNameAdapter.getAccount(accountPosition);
+            if (account == null) continue;
             Money amount = new Money(amountValue, account.getCommodity());
             BudgetAmount budgetAmount = new BudgetAmount(amount, account.getUID());
             budgetAmounts.add(budgetAmount);
@@ -260,6 +261,7 @@ public class BudgetAmountEditorFragment extends MenuFragment {
             budgetAccountSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 @Override
                 public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                    if (view == null) return;
                     Account account = accountNameAdapter.getAccount(position);
                     Commodity commodity = account.getCommodity();
                     currencySymbolTextView.setText(commodity.getSymbol());
@@ -281,7 +283,7 @@ public class BudgetAmountEditorFragment extends MenuFragment {
         }
 
         public void bindViews(BudgetAmount budgetAmount) {
-            amountEditText.setValue(budgetAmount.getAmount().asBigDecimal());
+            amountEditText.setValue(budgetAmount.getAmount().toBigDecimal());
             budgetAccountSpinner.setSelection(accountNameAdapter.getPosition(budgetAmount.getAccountUID()));
         }
     }

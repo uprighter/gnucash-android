@@ -34,7 +34,6 @@ import androidx.core.content.ContextCompat;
 
 import org.gnucash.android.R;
 import org.gnucash.android.model.AccountType;
-import org.gnucash.android.model.Transaction;
 import org.gnucash.android.model.TransactionType;
 
 import java.math.BigDecimal;
@@ -48,7 +47,7 @@ import java.util.List;
  * @author Ngewi Fet <ngewif@gmail.com>
  */
 public class TransactionTypeSwitch extends SwitchCompat {
-    private AccountType mAccountType;
+    private AccountType mAccountType = AccountType.ROOT;
     private String textCredit;
     private String textDebit;
 
@@ -59,17 +58,32 @@ public class TransactionTypeSwitch extends SwitchCompat {
 
     public TransactionTypeSwitch(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
-        setAccountType(AccountType.BANK);
+        init();
     }
 
     public TransactionTypeSwitch(Context context, AttributeSet attrs) {
         super(context, attrs);
-        setAccountType(AccountType.BANK);
+        init();
     }
 
     public TransactionTypeSwitch(Context context) {
         super(context);
+        init();
+    }
+
+    private void init() {
         setAccountType(AccountType.BANK);
+
+        // Force red/green colors.
+        final boolean isChecked = isChecked();
+        post(new Runnable() {
+            @Override
+            public void run() {
+                setChecked(!isChecked);
+                setChecked(isChecked);
+
+            }
+        });
     }
 
     public void setAccountType(AccountType accountType) {
@@ -204,8 +218,13 @@ public class TransactionTypeSwitch extends SwitchCompat {
      *
      * @param transactionType {@link org.gnucash.android.model.TransactionType} of the split
      */
-    public void setChecked(TransactionType transactionType) {
-        setChecked(Transaction.shouldDecreaseBalance(mAccountType, transactionType));
+    public void setChecked(final TransactionType transactionType) {
+        post(new Runnable() {
+            @Override
+            public void run() {
+                setChecked(shouldDecreaseBalance(mAccountType, transactionType));
+            }
+        });
     }
 
     /**
@@ -223,6 +242,15 @@ public class TransactionTypeSwitch extends SwitchCompat {
         } else {
             return mAccountType.hasDebitNormalBalance ? TransactionType.DEBIT : TransactionType.CREDIT;
         }
+    }
+
+    /**
+     * Is the transaction type represents a decrease for the account balance for the `accountType`?
+     *
+     * @return true if the amount represents a decrease in the account balance, false otherwise
+     */
+    private boolean shouldDecreaseBalance(AccountType accountType, TransactionType transactionType) {
+        return (accountType.hasDebitNormalBalance) ? transactionType == TransactionType.CREDIT : transactionType == TransactionType.DEBIT;
     }
 
     private class OnTypeChangedListener implements OnCheckedChangeListener {
@@ -260,7 +288,6 @@ public class TransactionTypeSwitch extends SwitchCompat {
                     || (!isChecked && amount.signum() < 0)) { //credit but amount is -ve
                     mAmountEditText.setValue(amount.negate());
                 }
-
             }
 
             for (OnCheckedChangeListener listener : mOnCheckedChangeListeners) {

@@ -21,11 +21,10 @@ import static org.gnucash.android.util.BackupManager.getBackupFolder;
 
 import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.content.pm.ResolveInfo;
 import android.database.SQLException;
-import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
+import android.os.CancellationSignal;
 import android.os.Environment;
 import android.preference.PreferenceManager;
 import android.text.TextUtils;
@@ -49,6 +48,7 @@ import org.gnucash.android.BuildConfig;
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
 import org.gnucash.android.db.DatabaseHelper;
+import org.gnucash.android.db.DatabaseHolder;
 import org.gnucash.android.db.DatabaseSchema;
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.db.adapter.BooksDbAdapter;
@@ -60,7 +60,9 @@ import org.gnucash.android.db.adapter.RecurrenceDbAdapter;
 import org.gnucash.android.db.adapter.ScheduledActionDbAdapter;
 import org.gnucash.android.db.adapter.SplitsDbAdapter;
 import org.gnucash.android.db.adapter.TransactionsDbAdapter;
+import org.gnucash.android.gnc.GncProgressListener;
 import org.gnucash.android.model.Transaction;
+import org.gnucash.android.ui.settings.OwnCloudPreferences;
 import org.gnucash.android.util.BackupManager;
 import org.gnucash.android.util.DateExtKt;
 import org.gnucash.android.util.FileUtils;
@@ -131,32 +133,38 @@ public abstract class Exporter {
     /**
      * Database being currently exported
      */
-    protected final SQLiteDatabase mDb;
+    protected final DatabaseHolder holder;
 
     /**
      * GUID of the book being exported
      */
     @NonNull
     private final String mBookUID;
+    @Nullable
+    protected final GncProgressListener listener;
+    @NonNull
+    protected final CancellationSignal cancellationSignal = new CancellationSignal();
 
     protected Exporter(@NonNull Context context,
                        @NonNull ExportParams params,
-                       @NonNull String bookUID) {
+                       @NonNull String bookUID,
+                       @Nullable GncProgressListener listener
+    ) {
         super();
         mContext = context;
         mExportParams = params;
         mBookUID = bookUID;
+        this.listener = listener;
         mBooksDbADapter = BooksDbAdapter.getInstance();
 
         DatabaseHelper dbHelper = new DatabaseHelper(context, bookUID);
-        SQLiteDatabase db = dbHelper.getReadableDatabase();
-        mDb = db;
-        mCommoditiesDbAdapter = new CommoditiesDbAdapter(db);
+        holder = dbHelper.getReadableHolder();
+        mCommoditiesDbAdapter = new CommoditiesDbAdapter(holder);
         mPricesDbAdapter = new PricesDbAdapter(mCommoditiesDbAdapter);
-        mSplitsDbAdapter = new SplitsDbAdapter(mPricesDbAdapter);
+        mSplitsDbAdapter = new SplitsDbAdapter(mCommoditiesDbAdapter);
         mTransactionsDbAdapter = new TransactionsDbAdapter(mSplitsDbAdapter);
-        mAccountsDbAdapter = new AccountsDbAdapter(mTransactionsDbAdapter);
-        RecurrenceDbAdapter recurrenceDbAdapter = new RecurrenceDbAdapter(db);
+        mAccountsDbAdapter = new AccountsDbAdapter(mTransactionsDbAdapter, mPricesDbAdapter);
+        RecurrenceDbAdapter recurrenceDbAdapter = new RecurrenceDbAdapter(holder);
         mBudgetsDbAdapter = new BudgetsDbAdapter(recurrenceDbAdapter);
         mScheduledActionDbAdapter = new ScheduledActionDbAdapter(recurrenceDbAdapter);
 
@@ -249,7 +257,7 @@ public abstract class Exporter {
      * @throws ExporterException if an error occurs during export
      */
     @Nullable
-    public Uri generateExport() throws ExporterException {
+    public Uri export() throws ExporterException {
         Timber.i("generate export");
         final ExportParams exportParams = mExportParams;
         final Uri result;
@@ -293,7 +301,7 @@ public abstract class Exporter {
     protected File writeToFile(@NonNull ExportParams exportParams) throws ExporterException, IOException {
         File cacheFile = getExportCacheFile(exportParams);
         try (Writer writer = createWriter(cacheFile)) {
-            writeExport(exportParams, writer);
+            writeExport(writer, exportParams);
         } catch (ExporterException ee) {
             throw ee;
         } catch (Exception e) {
@@ -302,7 +310,7 @@ public abstract class Exporter {
         return cacheFile;
     }
 
-    protected abstract void writeExport(@NonNull ExportParams exportParams, @NonNull Writer writer) throws ExporterException, IOException;
+    protected abstract void writeExport(@NonNull Writer writer, @NonNull ExportParams exportParams) throws ExporterException, IOException;
 
     /**
      * Recursively delete all files in a directory
@@ -370,7 +378,7 @@ public abstract class Exporter {
         mScheduledActionDbAdapter.close();
         mSplitsDbAdapter.close();
         mTransactionsDbAdapter.close();
-        mDb.close();
+        holder.close();
     }
 
     protected Writer createWriter(@NonNull File file) throws IOException {
@@ -469,18 +477,18 @@ public abstract class Exporter {
     private Uri moveExportToOwnCloud(ExportParams exportParams, File exportedFile) throws Exporter.ExporterException {
         Timber.i("Copying exported file to ownCloud");
         final Context context = mContext;
-        SharedPreferences preferences = context.getSharedPreferences(context.getString(R.string.owncloud_pref), Context.MODE_PRIVATE);
+        final OwnCloudPreferences preferences = new OwnCloudPreferences(context);
 
-        boolean ocSync = preferences.getBoolean(context.getString(R.string.owncloud_sync), false);
+        boolean ocSync = preferences.isSync();
 
         if (!ocSync) {
             throw new Exporter.ExporterException(exportParams, "ownCloud not enabled.");
         }
 
-        String ocServer = preferences.getString(context.getString(R.string.key_owncloud_server), null);
-        String ocUsername = preferences.getString(context.getString(R.string.key_owncloud_username), null);
-        String ocPassword = preferences.getString(context.getString(R.string.key_owncloud_password), null);
-        String ocDir = preferences.getString(context.getString(R.string.key_owncloud_dir), null);
+        String ocServer = preferences.getServer();
+        String ocUsername = preferences.getUsername();
+        String ocPassword = preferences.getPassword();
+        String ocDir = preferences.getDir();
 
         Uri serverUri = Uri.parse(ocServer);
         OwnCloudClient client = OwnCloudClientFactory.createOwnCloudClient(serverUri, context, true);
@@ -602,6 +610,10 @@ public abstract class Exporter {
         if (preserveOpeningBalances && !openingBalances.isEmpty()) {
             transactionsDbAdapter.bulkAddRecords(openingBalances, DatabaseAdapter.UpdateMethod.insert);
         }
+    }
+
+    public void cancel() {
+        cancellationSignal.cancel();
     }
 
     public static class ExporterException extends RuntimeException {

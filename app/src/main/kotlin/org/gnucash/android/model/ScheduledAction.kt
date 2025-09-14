@@ -17,8 +17,6 @@ package org.gnucash.android.model
 
 import android.content.Context
 import androidx.annotation.StringRes
-import java.sql.Timestamp
-import java.util.Calendar
 import org.gnucash.android.R
 import org.gnucash.android.app.GnuCashApplication
 import org.gnucash.android.util.dayOfWeek
@@ -26,6 +24,9 @@ import org.gnucash.android.util.lastDayOfMonth
 import org.gnucash.android.util.lastDayOfWeek
 import org.joda.time.LocalDateTime
 import org.joda.time.format.DateTimeFormat
+import java.sql.Timestamp
+import java.util.Calendar
+import java.util.Locale
 
 /**
  * Represents a scheduled event which is stored in the database and run at regular period
@@ -37,7 +38,7 @@ class ScheduledAction    //all actions are enabled by default
     /**
      * Type of event being scheduled
      */
-    var actionType: ActionType
+    var actionType: ActionType = ActionType.TRANSACTION
 ) : BaseModel() {
 
     private var _startDate: Long = 0
@@ -59,10 +60,21 @@ class ScheduledAction    //all actions are enabled by default
     /**
      * Types of events which can be scheduled
      */
-    enum class ActionType(@JvmField @StringRes val labelId: Int) {
-        TRANSACTION(R.string.action_transaction),
+    enum class ActionType(@JvmField val value: String, @JvmField @StringRes val labelId: Int) {
+        TRANSACTION("TRANSACTION", R.string.action_transaction),
+
         // TODO rename `BACKUP` to `EXPORT`
-        BACKUP(R.string.action_backup)
+        BACKUP("BACKUP", R.string.action_backup);
+
+        companion object {
+            private val _values = values()
+
+            @JvmStatic
+            fun of(value: String): ActionType {
+                val valueLower = value.uppercase(Locale.ROOT)
+                return _values.firstOrNull { it.value == valueLower } ?: TRANSACTION
+            }
+        }
     }
 
     /**
@@ -258,9 +270,9 @@ class ScheduledAction    //all actions are enabled by default
      */
     var startTime: Long
         get() = _startDate
-        set(startDate) {
-            _startDate = startDate
-            recurrence?.periodStart = startDate
+        set(value) {
+            _startDate = value
+            recurrence?.periodStart = value
         }
 
     /**
@@ -268,9 +280,9 @@ class ScheduledAction    //all actions are enabled by default
      */
     var endTime: Long
         get() = _endDate
-        set(endDate) {
-            _endDate = endDate
-            recurrence?.setPeriodEnd(Timestamp(_endDate))
+        set(value) {
+            _endDate = value
+            recurrence?.periodEnd = value
         }
 
     /**
@@ -333,10 +345,10 @@ class ScheduledAction    //all actions are enabled by default
         /**
          * Set the template account GUID
          *
-         * @param templateAccountUID String GUID of template account
+         * @param value String GUID of template account
          */
-        set(templateAccountUID) {
-            _templateAccountUID = templateAccountUID
+        set(value) {
+            _templateAccountUID = value
         }
 
     /**
@@ -410,7 +422,7 @@ class ScheduledAction    //all actions are enabled by default
             _startDate = recurrence.periodStart
         }
         if (_endDate > 0) {
-            recurrence.setPeriodEnd(Timestamp(_endDate))
+            recurrence.periodEnd = _endDate
         } else {
             val periodEnd = recurrence.periodEnd
             if (periodEnd != null) {

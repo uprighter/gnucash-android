@@ -16,8 +16,6 @@
 
 package org.gnucash.android.ui.budget;
 
-import static org.gnucash.android.math.MathExtKt.isZero;
-
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
@@ -71,7 +69,7 @@ import timber.log.Timber;
  * Budget list fragment
  */
 public class BudgetListFragment extends Fragment implements Refreshable,
-        LoaderManager.LoaderCallbacks<Cursor> {
+    LoaderManager.LoaderCallbacks<Cursor> {
 
     private static final int REQUEST_EDIT_BUDGET = 0xB;
     private static final int REQUEST_OPEN_ACCOUNT = 0xC;
@@ -284,9 +282,12 @@ public class BudgetListFragment extends Fragment implements Refreshable,
 
                 BigDecimal spentAmountValue = BigDecimal.ZERO;
                 for (BudgetAmount budgetAmount : budget.getCompactedBudgetAmounts()) {
-                    Money balance = accountsDbAdapter.getAccountBalance(budgetAmount.getAccountUID(),
-                        budget.getStartOfCurrentPeriod(), budget.getEndOfCurrentPeriod());
-                    spentAmountValue = spentAmountValue.add(balance.asBigDecimal());
+                    Money balance = accountsDbAdapter.getAccountBalance(
+                        budgetAmount.getAccountUID(),
+                        budget.getStartOfCurrentPeriod(),
+                        budget.getEndOfCurrentPeriod()
+                    );
+                    spentAmountValue = spentAmountValue.add(balance.toBigDecimal());
                 }
 
                 Money budgetTotal = budget.getAmountSum();
@@ -295,8 +296,8 @@ public class BudgetListFragment extends Fragment implements Refreshable,
                     + budgetTotal.formattedString();
                 budgetAmount.setText(usedAmount);
 
-                double budgetProgress = budgetTotal.isAmountZero() ? 0.0 : spentAmountValue.divide(budgetTotal.asBigDecimal(),
-                        commodity.getSmallestFractionDigits(), RoundingMode.HALF_EVEN)
+                double budgetProgress = budgetTotal.isAmountZero() ? 0.0 : spentAmountValue.divide(budgetTotal.toBigDecimal(),
+                        commodity.getSmallestFractionDigits(), RoundingMode.HALF_UP)
                     .doubleValue();
                 budgetIndicator.setProgress((int) (budgetProgress * 100));
 

@@ -1,5 +1,6 @@
 import org.jetbrains.kotlin.gradle.plugin.extraProperties
 import org.jetbrains.kotlin.konan.exec.Command
+import java.util.Locale
 
 plugins {
     id("com.android.application")
@@ -13,7 +14,7 @@ plugins {
 }
 
 val versionMajor = 2
-val versionMinor = 5
+val versionMinor = 6
 val versionPatch = 0
 val versionBuild = 0
 
@@ -26,13 +27,13 @@ fun gitSha(): String {
 
 android {
     namespace = "org.gnucash.android"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "org.gnucash.pocket"
         minSdk = 21
-        targetSdk = 34
-        versionCode = versionMajor * 10000 + versionMinor * 1000 + versionPatch * 100 + versionBuild
+        targetSdk = 36
+        versionCode = (((((versionMajor * 100) + versionMinor) * 1000) + versionPatch) * 1000) + versionBuild
         versionName = "${versionMajor}.${versionMinor}.${versionPatch}"
         resValue("string", "app_name", "GnuCash")
         resValue("string", "app_playstore_url", "market://details?id=${applicationId}")
@@ -156,24 +157,26 @@ android {
 
 dependencies {
     // Jetpack
-    implementation("androidx.appcompat:appcompat:1.7.0")
+    implementation("androidx.appcompat:appcompat:1.7.1")
     implementation("com.google.android.material:material:1.12.0")
+    implementation("androidx.activity:activity-ktx:1.10.1")
     implementation("androidx.cardview:cardview:1.0.0")
+    implementation("androidx.core:core-ktx:1.16.0")
     implementation("androidx.preference:preference-ktx:1.2.1")
     implementation("androidx.recyclerview:recyclerview:1.4.0")
-    implementation("androidx.work:work-runtime-ktx:2.10.0")
+    implementation("androidx.work:work-runtime-ktx:2.10.2")
 
     implementation("net.objecthunter:exp4j:0.4.7")
     implementation("com.ezylang:EvalEx:3.2.0")
     implementation("androidx.drawerlayout:drawerlayout:1.2.0")
 
     // Logging
-    implementation("com.google.firebase:firebase-crashlytics:19.4.1")
+    implementation("com.google.firebase:firebase-crashlytics:19.4.4")
     implementation("com.jakewharton.timber:timber:5.0.1")
 
     implementation("com.github.nextcloud:android-library:1.0.31")
     implementation("com.squareup:android-times-square:1.6.5")
-    implementation("com.github.PhilJay:MPAndroidChart:2.2.4")
+    implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
 
     implementation("joda-time:joda-time:2.13.0")
     implementation("org.apache.jackrabbit:jackrabbit-webdav:2.13.3")
@@ -181,18 +184,16 @@ dependencies {
     implementation("com.github.techfreak:wizardpager:1.0.3")
     implementation("com.dropbox.core:dropbox-android-sdk:7.0.0")
     implementation("com.kobakei:ratethisapp:0.0.7")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
     // Export
     implementation("com.opencsv:opencsv:5.9") {
         exclude(group = "commons-logging", module = "commons-logging")
     }
 
-    // Debug
-    debugImplementation("com.facebook.stetho:stetho:1.5.0")
-
-    testImplementation("org.robolectric:robolectric:4.13")
+    testImplementation("org.robolectric:robolectric:4.14.1")
     testImplementation("junit:junit:4.13.2")
-    testImplementation("org.assertj:assertj-core:3.26.3")
+    testImplementation("org.assertj:assertj-core:3.27.3")
 
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
@@ -205,7 +206,7 @@ dependencies {
     androidTestImplementation("androidx.test.espresso:espresso-intents:$androidEspressoVersion")
     androidTestImplementation("androidx.test.espresso:espresso-contrib:$androidEspressoVersion")
 
-    androidTestImplementation("org.assertj:assertj-core:3.26.3")
+    androidTestImplementation("org.assertj:assertj-core:3.27.3")
 
     androidTestImplementation("com.squareup.spoon:spoon-client:1.7.1")
 }
@@ -219,7 +220,7 @@ afterEvaluate {
 
     // Disable Google Services plugin for some flavors.
     android.productFlavors.forEach { flavor ->
-        val flavorName = flavor.name.capitalize()
+        val flavorName = flavor.name.capitalize(Locale.ROOT)
         tasks.matching { task ->
             task.name.contains("GoogleServices") && task.name.contains(flavorName)
         }.forEach { task ->

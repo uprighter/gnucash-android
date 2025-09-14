@@ -24,10 +24,10 @@ import android.widget.TextView;
 
 import androidx.annotation.ColorInt;
 import androidx.annotation.Nullable;
-import androidx.annotation.Nullable;
 
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.model.Account;
+import org.gnucash.android.model.AccountType;
 import org.gnucash.android.model.Money;
 
 import java.lang.ref.WeakReference;
@@ -56,7 +56,6 @@ public class AccountBalanceTask extends AsyncTask<String, Void, Money> {
     @Override
     protected Money doInBackground(String... params) {
         String accountUID = params[0];
-        Account account = accountsDbAdapter.getSimpleRecord(accountUID);
         //if the view for which we are doing this job is dead, kill the job as well
         if (accountBalanceTextViewReference.get() == null) {
             cancel(true);
@@ -64,9 +63,12 @@ public class AccountBalanceTask extends AsyncTask<String, Void, Money> {
         }
 
         try {
-            return accountsDbAdapter.getCurrentAccountBalance(accountUID);
-        } catch (Exception ex) {
-            Timber.e(ex, "Error computing account balance");
+            Account account = accountsDbAdapter.getSimpleRecord(accountUID);
+            Money balance = accountsDbAdapter.getAccountBalance(account);
+            AccountType accountType = account.getAccountType();
+            return (accountType.hasDebitNormalBalance != accountType.hasDebitDisplayBalance) ? balance.unaryMinus() : balance;
+        } catch (Exception e) {
+            Timber.e(e, "Error computing account balance");
         }
         return null;
     }

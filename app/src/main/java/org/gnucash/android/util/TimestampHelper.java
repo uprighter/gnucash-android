@@ -37,9 +37,9 @@ public final class TimestampHelper {
      * We are using Joda Time classes because they are thread-safe.
      */
     private static final DateTimeFormatter UTC_DATE_FORMAT =
-            DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss").withZoneUTC();
+        DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss").withZoneUTC();
     private static final DateTimeFormatter UTC_DATE_WITH_MILLISECONDS_FORMAT =
-            DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss.SSS").withZoneUTC();
+        DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss.SSS").withZoneUTC();
 
     /**
      * Get a {@link String} representing the {@link Timestamp}
@@ -92,12 +92,11 @@ public final class TimestampHelper {
                 // In case of parsing of string without milliseconds.
                 millis = UTC_DATE_FORMAT.parseMillis(utcString);
                 return new Timestamp(millis);
-
             } catch (IllegalArgumentException secondException) {
                 // If we are here:
                 // - The utcString has an invalid format OR
                 // - We are missing some relevant pattern.
-                throw new IllegalArgumentException("Unknown utcString = '" + utcString + "'.", secondException);
+                throw new IllegalArgumentException("Unknown UTC format '" + utcString + "'", secondException);
             }
         }
     }

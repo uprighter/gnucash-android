@@ -17,6 +17,7 @@
 package org.gnucash.android.db.adapter;
 
 import android.content.ContentValues;
+import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.database.DatabaseUtils;
 import android.database.SQLException;
@@ -27,6 +28,8 @@ import android.text.TextUtils;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import org.gnucash.android.db.BookDbHelper;
+import org.gnucash.android.db.DatabaseHolder;
 import org.gnucash.android.db.DatabaseSchema;
 import org.gnucash.android.db.DatabaseSchema.AccountEntry;
 import org.gnucash.android.db.DatabaseSchema.CommonColumns;
@@ -38,6 +41,7 @@ import org.gnucash.android.util.TimestampHelper;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -56,17 +60,18 @@ public abstract class DatabaseAdapter<Model extends BaseModel> implements Closea
     /**
      * SQLite database
      */
+    protected final DatabaseHolder holder;
     protected final SQLiteDatabase mDb;
 
     protected final String mTableName;
 
     protected final String[] mColumns;
 
-    protected volatile SQLiteStatement mReplaceStatement;
+    private volatile SQLiteStatement mReplaceStatement;
 
-    protected volatile SQLiteStatement mUpdateStatement;
+    private volatile SQLiteStatement mUpdateStatement;
 
-    protected volatile SQLiteStatement mInsertStatement;
+    private volatile SQLiteStatement mInsertStatement;
 
     protected final Map<String, Model> cache = new ConcurrentHashMap<>();
     protected final boolean isCached;
@@ -78,22 +83,24 @@ public abstract class DatabaseAdapter<Model extends BaseModel> implements Closea
     /**
      * Opens the database adapter with an existing database
      *
-     * @param db SQLiteDatabase object
+     * @param holder Database holder
      */
-    public DatabaseAdapter(@NonNull SQLiteDatabase db, @NonNull String tableName, @NonNull String[] columns) {
-        this(db, tableName, columns, false);
+    public DatabaseAdapter(@NonNull DatabaseHolder holder, @NonNull String tableName, @NonNull String[] columns) {
+        this(holder, tableName, columns, false);
     }
 
     /**
      * Opens the database adapter with an existing database
      *
-     * @param db SQLiteDatabase object
+     * @param holder Database holder
      */
-    public DatabaseAdapter(SQLiteDatabase db, @NonNull String tableName, @NonNull String[] columns, boolean isCached) {
+    public DatabaseAdapter(@NonNull DatabaseHolder holder, @NonNull String tableName, @NonNull String[] columns, boolean isCached) {
+        this.holder = holder;
         this.mTableName = tableName;
-        this.mDb = db;
         this.mColumns = columns;
         this.isCached = isCached;
+        SQLiteDatabase db = holder.db;
+        this.mDb = db;
         if (!db.isOpen()) {
             throw new IllegalArgumentException("Database not open.");
         }
@@ -120,99 +127,72 @@ public abstract class DatabaseAdapter<Model extends BaseModel> implements Closea
         //todo: would it be useful to add the split reconciled_state and reconciled_date to this view?
         mDb.execSQL("CREATE TEMP VIEW IF NOT EXISTS trans_split_acct AS SELECT "
             + TransactionEntry.TABLE_NAME + "." + CommonColumns.COLUMN_MODIFIED_AT + " AS "
-            + TransactionEntry.TABLE_NAME + "_" + CommonColumns.COLUMN_MODIFIED_AT + " , "
+            + TransactionEntry.TABLE_NAME + "_" + CommonColumns.COLUMN_MODIFIED_AT + ", "
             + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_UID + " AS "
-            + TransactionEntry.TABLE_NAME + "_" + TransactionEntry.COLUMN_UID + " , "
+            + TransactionEntry.TABLE_NAME + "_" + TransactionEntry.COLUMN_UID + ", "
             + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_DESCRIPTION + " AS "
-            + TransactionEntry.TABLE_NAME + "_" + TransactionEntry.COLUMN_DESCRIPTION + " , "
+            + TransactionEntry.TABLE_NAME + "_" + TransactionEntry.COLUMN_DESCRIPTION + ", "
             + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_NOTES + " AS "
-            + TransactionEntry.TABLE_NAME + "_" + TransactionEntry.COLUMN_NOTES + " , "
-            + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_CURRENCY + " AS "
-            + TransactionEntry.TABLE_NAME + "_" + TransactionEntry.COLUMN_CURRENCY + " , "
+            + TransactionEntry.TABLE_NAME + "_" + TransactionEntry.COLUMN_NOTES + ", "
             + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_TIMESTAMP + " AS "
-            + TransactionEntry.TABLE_NAME + "_" + TransactionEntry.COLUMN_TIMESTAMP + " , "
+            + TransactionEntry.TABLE_NAME + "_" + TransactionEntry.COLUMN_TIMESTAMP + ", "
             + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_EXPORTED + " AS "
-            + TransactionEntry.TABLE_NAME + "_" + TransactionEntry.COLUMN_EXPORTED + " , "
+            + TransactionEntry.TABLE_NAME + "_" + TransactionEntry.COLUMN_EXPORTED + ", "
             + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_TEMPLATE + " AS "
-            + TransactionEntry.TABLE_NAME + "_" + TransactionEntry.COLUMN_TEMPLATE + " , "
+            + TransactionEntry.TABLE_NAME + "_" + TransactionEntry.COLUMN_TEMPLATE + ", "
+            + SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_ID + " AS "
+            + SplitEntry.TABLE_NAME + "_" + SplitEntry.COLUMN_ID + ", "
             + SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_UID + " AS "
-            + SplitEntry.TABLE_NAME + "_" + SplitEntry.COLUMN_UID + " , "
+            + SplitEntry.TABLE_NAME + "_" + SplitEntry.COLUMN_UID + ", "
             + SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_TYPE + " AS "
-            + SplitEntry.TABLE_NAME + "_" + SplitEntry.COLUMN_TYPE + " , "
+            + SplitEntry.TABLE_NAME + "_" + SplitEntry.COLUMN_TYPE + ", "
             + SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_VALUE_NUM + " AS "
-            + SplitEntry.TABLE_NAME + "_" + SplitEntry.COLUMN_VALUE_NUM + " , "
+            + SplitEntry.TABLE_NAME + "_" + SplitEntry.COLUMN_VALUE_NUM + ", "
             + SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_VALUE_DENOM + " AS "
-            + SplitEntry.TABLE_NAME + "_" + SplitEntry.COLUMN_VALUE_DENOM + " , "
+            + SplitEntry.TABLE_NAME + "_" + SplitEntry.COLUMN_VALUE_DENOM + ", "
             + SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_QUANTITY_NUM + " AS "
-            + SplitEntry.TABLE_NAME + "_" + SplitEntry.COLUMN_QUANTITY_NUM + " , "
+            + SplitEntry.TABLE_NAME + "_" + SplitEntry.COLUMN_QUANTITY_NUM + ", "
             + SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_QUANTITY_DENOM + " AS "
-            + SplitEntry.TABLE_NAME + "_" + SplitEntry.COLUMN_QUANTITY_DENOM + " , "
+            + SplitEntry.TABLE_NAME + "_" + SplitEntry.COLUMN_QUANTITY_DENOM + ", "
             + SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_MEMO + " AS "
-            + SplitEntry.TABLE_NAME + "_" + SplitEntry.COLUMN_MEMO + " , "
+            + SplitEntry.TABLE_NAME + "_" + SplitEntry.COLUMN_MEMO + ", "
             + AccountEntry.TABLE_NAME + "." + AccountEntry.COLUMN_UID + " AS "
-            + AccountEntry.TABLE_NAME + "_" + AccountEntry.COLUMN_UID + " , "
+            + AccountEntry.TABLE_NAME + "_" + AccountEntry.COLUMN_UID + ", "
             + AccountEntry.TABLE_NAME + "." + AccountEntry.COLUMN_NAME + " AS "
-            + AccountEntry.TABLE_NAME + "_" + AccountEntry.COLUMN_NAME + " , "
+            + AccountEntry.TABLE_NAME + "_" + AccountEntry.COLUMN_NAME + ", "
             + AccountEntry.TABLE_NAME + "." + AccountEntry.COLUMN_COMMODITY_UID + " AS "
-            + AccountEntry.TABLE_NAME + "_" + AccountEntry.COLUMN_COMMODITY_UID + " , "
-            + AccountEntry.TABLE_NAME + "." + AccountEntry.COLUMN_CURRENCY + " AS "
-            + AccountEntry.TABLE_NAME + "_" + AccountEntry.COLUMN_CURRENCY + " , "
+            + AccountEntry.TABLE_NAME + "_" + AccountEntry.COLUMN_COMMODITY_UID + ", "
             + AccountEntry.TABLE_NAME + "." + AccountEntry.COLUMN_PARENT_ACCOUNT_UID + " AS "
-            + AccountEntry.TABLE_NAME + "_" + AccountEntry.COLUMN_PARENT_ACCOUNT_UID + " , "
+            + AccountEntry.TABLE_NAME + "_" + AccountEntry.COLUMN_PARENT_ACCOUNT_UID + ", "
             + AccountEntry.TABLE_NAME + "." + AccountEntry.COLUMN_PLACEHOLDER + " AS "
-            + AccountEntry.TABLE_NAME + "_" + AccountEntry.COLUMN_PLACEHOLDER + " , "
+            + AccountEntry.TABLE_NAME + "_" + AccountEntry.COLUMN_PLACEHOLDER + ", "
             + AccountEntry.TABLE_NAME + "." + AccountEntry.COLUMN_COLOR_CODE + " AS "
-            + AccountEntry.TABLE_NAME + "_" + AccountEntry.COLUMN_COLOR_CODE + " , "
+            + AccountEntry.TABLE_NAME + "_" + AccountEntry.COLUMN_COLOR_CODE + ", "
             + AccountEntry.TABLE_NAME + "." + AccountEntry.COLUMN_FAVORITE + " AS "
-            + AccountEntry.TABLE_NAME + "_" + AccountEntry.COLUMN_FAVORITE + " , "
+            + AccountEntry.TABLE_NAME + "_" + AccountEntry.COLUMN_FAVORITE + ", "
             + AccountEntry.TABLE_NAME + "." + AccountEntry.COLUMN_FULL_NAME + " AS "
-            + AccountEntry.TABLE_NAME + "_" + AccountEntry.COLUMN_FULL_NAME + " , "
+            + AccountEntry.TABLE_NAME + "_" + AccountEntry.COLUMN_FULL_NAME + ", "
             + AccountEntry.TABLE_NAME + "." + AccountEntry.COLUMN_TYPE + " AS "
-            + AccountEntry.TABLE_NAME + "_" + AccountEntry.COLUMN_TYPE + " , "
+            + AccountEntry.TABLE_NAME + "_" + AccountEntry.COLUMN_TYPE + ", "
             + AccountEntry.TABLE_NAME + "." + AccountEntry.COLUMN_DEFAULT_TRANSFER_ACCOUNT_UID + " AS "
             + AccountEntry.TABLE_NAME + "_" + AccountEntry.COLUMN_DEFAULT_TRANSFER_ACCOUNT_UID
-            + " FROM " + TransactionEntry.TABLE_NAME + " , " + SplitEntry.TABLE_NAME + " ON "
+            + " FROM " + TransactionEntry.TABLE_NAME + ", " + SplitEntry.TABLE_NAME + " ON "
             + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_UID + "=" + SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_TRANSACTION_UID
-            + " , " + AccountEntry.TABLE_NAME + " ON "
+            + ", " + AccountEntry.TABLE_NAME + " ON "
             + SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_ACCOUNT_UID + "=" + AccountEntry.TABLE_NAME + "." + AccountEntry.COLUMN_UID
         );
 
-        // SELECT transactions_uid AS trans_acct_t_uid ,
-        //      SUBSTR (
-        //          MIN (
-        //              ( CASE WHEN IFNULL ( splits_memo , '' ) == '' THEN 'a' ELSE 'b' END ) || accounts_uid
-        //          ) ,
-        //          2
-        //      ) AS trans_acct_a_uid ,
-        //   TOTAL ( CASE WHEN splits_type = 'DEBIT' THEN splits_value_num
-        //                ELSE - splits_value_num END ) * 1.0 / splits_value_denom AS trans_acct_balance ,
-        //   COUNT ( DISTINCT accounts_currency_code ) AS trans_currency_count ,
-        //   COUNT (*) AS trans_split_count
-        //   FROM trans_split_acct GROUP BY transactions_uid
-        //
-        // This temporary view would pick one Account_UID for each
-        // Transaction, which can be used to order all transactions. If possible, account_uid of a split whose
-        // memo is null is select.
-        //
-        // Transaction balance is also picked out by this view
-        //
-        // a split without split memo is chosen if possible, in the following manner:
-        //   if the splits memo is null or empty string, attach an 'a' in front of the split account uid,
-        //   if not, attach a 'b' to the split account uid
-        //   pick the minimal value of the modified account uid (one of the ones begins with 'a', if exists)
-        //   use substr to get account uid
-
         mDb.execSQL("CREATE TEMP VIEW IF NOT EXISTS trans_extra_info AS SELECT " + TransactionEntry.TABLE_NAME + "_" + TransactionEntry.COLUMN_UID +
-            " AS trans_acct_t_uid , SUBSTR ( MIN ( ( CASE WHEN IFNULL ( " + SplitEntry.TABLE_NAME + "_" +
-            SplitEntry.COLUMN_MEMO + " , '' ) == '' THEN 'a' ELSE 'b' END ) || " +
+            " AS trans_acct_t_uid, SUBSTR ( MIN ( ( CASE WHEN IFNULL ( " + SplitEntry.TABLE_NAME + "_" +
+            SplitEntry.COLUMN_MEMO + ", '' ) == '' THEN 'a' ELSE 'b' END ) || " +
             AccountEntry.TABLE_NAME + "_" + AccountEntry.COLUMN_UID +
-            " ) , 2 ) AS trans_acct_a_uid , TOTAL ( CASE WHEN " + SplitEntry.TABLE_NAME + "_" +
+            " ), 2 ) AS trans_acct_a_uid, TOTAL ( CASE WHEN " + SplitEntry.TABLE_NAME + "_" +
             SplitEntry.COLUMN_TYPE + " = 'DEBIT' THEN " + SplitEntry.TABLE_NAME + "_" +
             SplitEntry.COLUMN_VALUE_NUM + " ELSE - " + SplitEntry.TABLE_NAME + "_" +
             SplitEntry.COLUMN_VALUE_NUM + " END ) * 1.0 / " + SplitEntry.TABLE_NAME + "_" +
-            SplitEntry.COLUMN_VALUE_DENOM + " AS trans_acct_balance , COUNT ( DISTINCT " +
-            AccountEntry.TABLE_NAME + "_" + AccountEntry.COLUMN_CURRENCY +
-            " ) AS trans_currency_count , COUNT (*) AS trans_split_count FROM trans_split_acct " +
+            SplitEntry.COLUMN_VALUE_DENOM + " AS trans_acct_balance, COUNT ( DISTINCT " +
+            AccountEntry.TABLE_NAME + "_" + AccountEntry.COLUMN_COMMODITY_UID +
+            " ) AS trans_currency_count, COUNT (*) AS trans_split_count FROM trans_split_acct " +
             " GROUP BY " + TransactionEntry.TABLE_NAME + "_" + TransactionEntry.COLUMN_UID
         );
     }
@@ -245,7 +225,7 @@ public abstract class DatabaseAdapter<Model extends BaseModel> implements Closea
      * @param updateMethod Method to use for adding the record
      */
     public void addRecord(@NonNull final Model model, UpdateMethod updateMethod) throws SQLException {
-        Timber.d("Adding %s record to database: ", model.getClass().getSimpleName());
+        Timber.d("Adding record to database: %s %s", model.getClass().getSimpleName(), model.getUID());
         final SQLiteStatement statement;
         switch (updateMethod) {
             case insert:
@@ -273,18 +253,18 @@ public abstract class DatabaseAdapter<Model extends BaseModel> implements Closea
     /**
      * Persist the model object to the database as records using the {@code updateMethod}
      *
-     * @param modelList    List of records
+     * @param models       List of records
      * @param updateMethod Method to use when persisting them
      * @return Number of rows affected in the database
      */
-    private long doAddModels(@NonNull final List<Model> modelList, UpdateMethod updateMethod) throws SQLException {
+    private long doAddModels(@NonNull final List<Model> models, UpdateMethod updateMethod) throws SQLException {
         long nRow = 0;
         final SQLiteStatement statement;
         switch (updateMethod) {
             case update:
                 statement = getUpdateStatement();
                 synchronized (statement) {
-                    for (Model model : modelList) {
+                    for (Model model : models) {
                         bind(statement, model).execute();
                         nRow++;
                     }
@@ -293,8 +273,8 @@ public abstract class DatabaseAdapter<Model extends BaseModel> implements Closea
             case insert:
                 statement = getInsertStatement();
                 synchronized (statement) {
-                    for (Model model : modelList) {
-                        bind(statement, model).execute();
+                    for (Model model : models) {
+                        model.id = bind(statement, model).executeInsert();
                         nRow++;
                     }
                 }
@@ -302,8 +282,8 @@ public abstract class DatabaseAdapter<Model extends BaseModel> implements Closea
             default:
                 statement = getReplaceStatement();
                 synchronized (statement) {
-                    for (Model model : modelList) {
-                        bind(statement, model).execute();
+                    for (Model model : models) {
+                        model.id = bind(statement, model).executeInsert();
                         nRow++;
                     }
                 }
@@ -336,6 +316,9 @@ public abstract class DatabaseAdapter<Model extends BaseModel> implements Closea
             beginTransaction();
             nRow = doAddModels(modelList, updateMethod);
             setTransactionSuccessful();
+            if (isCached) {
+                cache.clear();
+            }
         } finally {
             endTransaction();
         }
@@ -460,15 +443,8 @@ public abstract class DatabaseAdapter<Model extends BaseModel> implements Closea
         stmt.bindString(1 + mColumns.length, model.getUID());
     }
 
-    /**
-     * Returns a model instance populated with data from the record with GUID {@code uid}
-     * <p>Sub-classes which require special handling should override this method</p>
-     *
-     * @param uid GUID of the record
-     * @return BaseModel instance of the record
-     * @throws IllegalArgumentException if the record UID does not exist in thd database
-     */
-    public Model getRecord(@NonNull String uid) {
+    @Nullable
+    public Model getRecordOrNull(String uid) {
         if (isCached) {
             Model model = cache.get(uid);
             if (model != null) return model;
@@ -478,14 +454,32 @@ public abstract class DatabaseAdapter<Model extends BaseModel> implements Closea
         try {
             if (cursor.moveToFirst()) {
                 Model model = buildModelInstance(cursor);
-                if (isCached) cache.put(uid, model);
+                if (isCached) {
+                    cache.put(uid, model);
+                }
                 return model;
-            } else {
-                throw new IllegalArgumentException("Record with " + uid + " does not exist");
             }
         } finally {
             cursor.close();
         }
+        return null;
+    }
+
+    /**
+     * Returns a model instance populated with data from the record with GUID {@code uid}
+     * <p>Sub-classes which require special handling should override this method</p>
+     *
+     * @param uid GUID of the record
+     * @return BaseModel instance of the record
+     * @throws IllegalArgumentException if the record UID does not exist in thd database
+     */
+    @NonNull
+    public Model getRecord(@NonNull String uid) throws IllegalArgumentException {
+        Model model = getRecordOrNull(uid);
+        if (model == null) {
+            throw new IllegalArgumentException("Record for " + mTableName + " not found in " + mTableName);
+        }
+        return model;
     }
 
     /**
@@ -495,7 +489,8 @@ public abstract class DatabaseAdapter<Model extends BaseModel> implements Closea
      * @param id Database record ID
      * @return Subclass of {@link BaseModel} containing record info
      */
-    public Model getRecord(long id) {
+    @NonNull
+    public Model getRecord(long id) throws IllegalArgumentException {
         return getRecord(getUID(id));
     }
 
@@ -506,7 +501,23 @@ public abstract class DatabaseAdapter<Model extends BaseModel> implements Closea
      */
     @NonNull
     public List<Model> getAllRecords() {
-        return getRecords(fetchAllRecords());
+        return getAllRecords(null, null);
+    }
+
+    @NonNull
+    public List<Model> getAllRecords(@Nullable String where, @Nullable String[] whereArgs) {
+        List<Model> modelRecords = new ArrayList<>();
+        Cursor cursor = fetchAllRecords(where, whereArgs, null);
+        try {
+            if (cursor.moveToFirst()) {
+                do {
+                    modelRecords.add(buildModelInstance(cursor));
+                } while (cursor.moveToNext());
+            }
+        } finally {
+            cursor.close();
+        }
+        return modelRecords;
     }
 
     @NonNull
@@ -576,8 +587,9 @@ public abstract class DatabaseAdapter<Model extends BaseModel> implements Closea
         if (TextUtils.isEmpty(uid)) {
             throw new IllegalArgumentException("UID required");
         }
-        return mDb.query(mTableName, null, CommonColumns.COLUMN_UID + "=?",
-            new String[]{uid}, null, null, null);
+        String where = CommonColumns.COLUMN_UID + "=?";
+        String[] whereArgs = new String[]{uid};
+        return mDb.query(mTableName, null, where, whereArgs, null, null, null);
     }
 
     /**
@@ -598,6 +610,7 @@ public abstract class DatabaseAdapter<Model extends BaseModel> implements Closea
      * @return Cursor to records matching conditions
      */
     public Cursor fetchAllRecords(String where, String[] whereArgs, String orderBy) {
+        Timber.v("Fetching all accounts from db where " + where + "/" + Arrays.toString(whereArgs) + " order by " + orderBy);
         return mDb.query(mTableName, null, where, whereArgs, null, null, orderBy);
     }
 
@@ -644,7 +657,7 @@ public abstract class DatabaseAdapter<Model extends BaseModel> implements Closea
             if (cursor.moveToFirst()) {
                 result = cursor.getLong(0);
             } else {
-                throw new IllegalArgumentException(mTableName + " with GUID " + uid + " does not exist in the db");
+                throw new IllegalArgumentException("Record not found in " + mTableName);
             }
         } finally {
             cursor.close();
@@ -676,7 +689,7 @@ public abstract class DatabaseAdapter<Model extends BaseModel> implements Closea
             if (cursor.moveToFirst()) {
                 return cursor.getString(0);
             } else {
-                throw new IllegalArgumentException(mTableName + " Record ID " + id + " does not exist in the db");
+                throw new IllegalArgumentException("Record not found in " + mTableName);
             }
         } finally {
             cursor.close();
@@ -770,7 +783,21 @@ public abstract class DatabaseAdapter<Model extends BaseModel> implements Closea
      */
     public boolean deleteRecord(@NonNull String uid) throws SQLException {
         if (isCached) cache.remove(uid);
-        return deleteRecord(getID(uid));
+        try {
+            return deleteRecord(getID(uid));
+        } catch (IllegalArgumentException e) {
+            Timber.e(e);
+            return false;
+        }
+    }
+
+    public boolean deleteRecord(@NonNull Model model) throws SQLException {
+        if (deleteRecord(model.id)) {
+            if (isCached) cache.remove(model.getUID());
+            model.id = 0L;
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -822,11 +849,10 @@ public abstract class DatabaseAdapter<Model extends BaseModel> implements Closea
             new String[]{recordUID}, null, null, null);
 
         try {
-            if (cursor.moveToFirst())
-                return cursor.getString(cursor.getColumnIndexOrThrow(columnName));
-            else {
-                throw new IllegalArgumentException(String.format("Record with GUID %s does not exist in the db", recordUID));
+            if (cursor.moveToFirst()) {
+                return cursor.getString(0);
             }
+            throw new IllegalArgumentException("Record not found in " + tableName + " with column '" + columnName + "'");
         } finally {
             cursor.close();
         }
@@ -838,7 +864,18 @@ public abstract class DatabaseAdapter<Model extends BaseModel> implements Closea
      * @return Total number of records in the database
      */
     public long getRecordsCount() {
-        return DatabaseUtils.queryNumEntries(mDb, mTableName);
+        return getRecordsCount(null, null);
+    }
+
+    /**
+     * Returns the number of transactions in the database which fulfill the conditions
+     *
+     * @param where     SQL WHERE clause without the "WHERE" itself
+     * @param whereArgs Arguments to substitute question marks for
+     * @return Number of records in the databases
+     */
+    public long getRecordsCount(@Nullable String where, @Nullable String[] whereArgs) {
+        return DatabaseUtils.queryNumEntries(mDb, mTableName, where, whereArgs);
     }
 
     /**
@@ -909,5 +946,14 @@ public abstract class DatabaseAdapter<Model extends BaseModel> implements Closea
 
     public String getUID(Model model) {
         return model.getUID();
+    }
+
+    /**
+     * Return the {@link SharedPreferences} for a specific book
+     *
+     * @return Shared preferences
+     */
+    public SharedPreferences getBookPreferences() {
+        return BookDbHelper.getBookPreferences(holder);
     }
 }

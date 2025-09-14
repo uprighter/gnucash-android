@@ -16,7 +16,6 @@
 
 package org.gnucash.android.ui.budget;
 
-import static org.gnucash.android.math.MathExtKt.isZero;
 import static org.gnucash.android.math.MathExtKt.times;
 
 import android.app.Activity;
@@ -191,8 +190,8 @@ public class BudgetDetailFragment extends MenuFragment implements Refreshable {
 
 
     public class BudgetAmountAdapter extends RecyclerView.Adapter<BudgetAmountAdapter.BudgetAmountViewHolder> {
-        private List<BudgetAmount> mBudgetAmounts;
-        private Budget mBudget;
+        private final List<BudgetAmount> mBudgetAmounts;
+        private final Budget mBudget;
 
         public BudgetAmountAdapter() {
             mBudget = mBudgetsDbAdapter.getRecord(mBudgetUID);
@@ -223,7 +222,6 @@ public class BudgetDetailFragment extends MenuFragment implements Refreshable {
             AccountsDbAdapter accountsDbAdapter = AccountsDbAdapter.getInstance();
 
             List<BarEntry> barEntries = new ArrayList<>();
-            List<String> xVals = new ArrayList<>();
 
             //todo: refactor getNumberOfPeriods into budget
             int budgetPeriods = (int) mBudget.getNumberOfPeriods();
@@ -231,25 +229,25 @@ public class BudgetDetailFragment extends MenuFragment implements Refreshable {
             int periods = mBudget.getRecurrence().getNumberOfPeriods(budgetPeriods); //// FIXME: 15.08.2016 why do we need number of periods
 
             for (int periodNum = 1; periodNum <= periods; periodNum++) {
-                BigDecimal amount = accountsDbAdapter.getAccountBalance(budgetAmount.getAccountUID(),
-                                mBudget.getStartOfPeriod(periodNum), mBudget.getEndOfPeriod(periodNum))
-                        .asBigDecimal();
+                BigDecimal amount = accountsDbAdapter.getAccountBalance(
+                        budgetAmount.getAccountUID(),
+                        mBudget.getStartOfPeriod(periodNum),
+                        mBudget.getEndOfPeriod(periodNum)
+                    ).toBigDecimal();
 
                 if (amount.equals(BigDecimal.ZERO))
                     continue;
 
-                barEntries.add(new BarEntry(amount.floatValue(), periodNum));
-                xVals.add(mBudget.getRecurrence().getTextOfCurrentPeriod(periodNum));
+                barEntries.add(new BarEntry(periodNum, amount.floatValue()));
             }
 
             String label = accountsDbAdapter.getAccountName(budgetAmount.getAccountUID());
             BarDataSet barDataSet = new BarDataSet(barEntries, label);
 
-            BarData barData = new BarData(xVals, barDataSet);
-            LimitLine limitLine = new LimitLine(budgetAmount.getAmount().asBigDecimal().floatValue());
+            BarData barData = new BarData(barDataSet);
+            LimitLine limitLine = new LimitLine(budgetAmount.getAmount().toFloat());
             limitLine.setLineWidth(2f);
             limitLine.setLineColor(Color.RED);
-
 
             barChart.setData(barData);
             barChart.getAxisLeft().addLimitLine(limitLine);
@@ -299,7 +297,7 @@ public class BudgetDetailFragment extends MenuFragment implements Refreshable {
 
                 double budgetProgress = 0;
                 if (!projectedAmount.isAmountZero()) {
-                    budgetProgress = spentAmount.asBigDecimal().divide(projectedAmount.asBigDecimal(),
+                    budgetProgress = spentAmount.toBigDecimal().divide(projectedAmount.toBigDecimal(),
                         spentAmount.getCommodity().getSmallestFractionDigits(),
                         RoundingMode.HALF_EVEN).doubleValue();
                 }

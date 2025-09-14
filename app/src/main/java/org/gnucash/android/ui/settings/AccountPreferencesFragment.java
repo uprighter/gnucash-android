@@ -30,11 +30,8 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.ActionBar;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.preference.ListPreference;
 import androidx.preference.Preference;
-import androidx.preference.PreferenceFragmentCompat;
 
 import com.google.android.material.snackbar.Snackbar;
 
@@ -62,23 +59,28 @@ import timber.log.Timber;
  * @author Ngewi Fet <ngewi.fet@gmail.com>
  * @author Oleksandr Tyshkovets <olexandr.tyshkovets@gmail.com>
  */
-public class AccountPreferencesFragment extends PreferenceFragmentCompat implements
-        Preference.OnPreferenceChangeListener, Preference.OnPreferenceClickListener {
+public class AccountPreferencesFragment extends GnuPreferenceFragment {
 
     private static final int REQUEST_EXPORT_FILE = 0xC5;
 
-    private final CommoditiesDbAdapter commoditiesDbAdapter = CommoditiesDbAdapter.getInstance();
+    private CommoditiesDbAdapter commoditiesDbAdapter = CommoditiesDbAdapter.getInstance();
     private final List<CharSequence> currencyEntries = new ArrayList<>();
     private final List<CharSequence> currencyEntryValues = new ArrayList<>();
 
     @Override
-    public void onCreatePreferences(Bundle bundle, String s) {
-        addPreferencesFromResource(R.xml.fragment_account_preferences);
+    protected int getTitleId() {
+        return R.string.title_account_preferences;
     }
 
     @Override
-    public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
+    public void onStart() {
+        super.onStart();
+        commoditiesDbAdapter = CommoditiesDbAdapter.getInstance();
+    }
+
+    public void onCreatePreferences(@Nullable Bundle savedInstanceState, @Nullable String rootKey) {
+        getPreferenceManager().setSharedPreferencesName(GnuCashApplication.getActiveBookUID());
+        addPreferencesFromResource(R.xml.fragment_account_preferences);
 
         currencyEntries.clear();
         currencyEntryValues.clear();
@@ -87,45 +89,52 @@ public class AccountPreferencesFragment extends PreferenceFragmentCompat impleme
             currencyEntries.add(commodity.formatListItem());
             currencyEntryValues.add(commodity.getCurrencyCode());
         }
-    }
-
-    @Override
-    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
-        ActionBar actionBar = ((AppCompatActivity) requireActivity()).getSupportActionBar();
-        assert actionBar != null;
-        actionBar.setTitle(R.string.title_account_preferences);
-    }
-
-    @Override
-    public void onResume() {
-        super.onResume();
-
         ListPreference listPreference = findPreference(getString(R.string.key_default_currency));
         String currencyCode = listPreference.getValue();
         if (TextUtils.isEmpty(currencyCode)) {
             currencyCode = GnuCashApplication.getDefaultCurrencyCode();
         }
-        Commodity commodity = commoditiesDbAdapter.getCommodity(currencyCode);
+        Commodity commodity = commoditiesDbAdapter.getCurrency(currencyCode);
         if (commodity == null) {
             commodity = Commodity.DEFAULT_COMMODITY;
         }
         String currencyName = commodity.formatListItem();
         listPreference.setSummary(currencyName);
-        listPreference.setOnPreferenceChangeListener(this);
+        listPreference.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+            @Override
+            public boolean onPreferenceChange(@NonNull Preference preference, Object newValue) {
+                String currencyCode = newValue.toString();
+                commoditiesDbAdapter.setDefaultCurrencyCode(currencyCode);
+                String summary = commoditiesDbAdapter.getCurrency(currencyCode).formatListItem();
+                preference.setSummary(summary);
+                return true;
+            }
+        });
         listPreference.setEntries(currencyEntries.toArray(new CharSequence[0]));
         listPreference.setEntryValues(currencyEntryValues.toArray(new CharSequence[0]));
 
         Preference preference = findPreference(getString(R.string.key_import_accounts));
-        preference.setOnPreferenceClickListener(this);
+        preference.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+            @Override
+            public boolean onPreferenceClick(@NonNull Preference preference) {
+                AccountsActivity.startXmlFileChooser(AccountPreferencesFragment.this);
+                return true;
+            }
+        });
 
         preference = findPreference(getString(R.string.key_export_accounts_csv));
-        preference.setOnPreferenceClickListener(this);
+        preference.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+            @Override
+            public boolean onPreferenceClick(@NonNull Preference preference) {
+                selectExportFile();
+                return true;
+            }
+        });
 
         preference = findPreference(getString(R.string.key_delete_all_accounts));
         preference.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
             @Override
-            public boolean onPreferenceClick(Preference preference) {
+            public boolean onPreferenceClick(@NonNull Preference preference) {
                 showDeleteAccountsDialog();
                 return true;
             }
@@ -134,47 +143,30 @@ public class AccountPreferencesFragment extends PreferenceFragmentCompat impleme
         preference = findPreference(getString(R.string.key_create_default_accounts));
         preference.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
             @Override
-            public boolean onPreferenceClick(Preference preference) {
+            public boolean onPreferenceClick(@NonNull Preference preference) {
                 final Activity activity = requireActivity();
                 new AlertDialog.Builder(activity)
-                        .setTitle(R.string.title_create_default_accounts)
-                        .setMessage(R.string.msg_confirm_create_default_accounts_setting)
-                        .setIcon(R.drawable.ic_warning)
-                        .setPositiveButton(R.string.btn_create_accounts, new DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(DialogInterface dialogInterface, int which) {
-                                AccountsActivity.createDefaultAccounts(activity, Commodity.DEFAULT_COMMODITY.getCurrencyCode());
-                            }
-                        })
-                        .setNegativeButton(R.string.btn_cancel, new DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(DialogInterface dialog, int which) {
-                                dialog.dismiss();
-                            }
-                        })
-                        .create()
-                        .show();
+                    .setTitle(R.string.title_create_default_accounts)
+                    .setMessage(R.string.msg_confirm_create_default_accounts_setting)
+                    .setIcon(R.drawable.ic_warning)
+                    .setPositiveButton(R.string.btn_create_accounts, new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialogInterface, int which) {
+                            String currencyCode = GnuCashApplication.getDefaultCurrencyCode();
+                            AccountsActivity.createDefaultAccounts(activity, currencyCode);
+                        }
+                    })
+                    .setNegativeButton(R.string.btn_cancel, new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            dialog.dismiss();
+                        }
+                    })
+                    .show();
 
                 return true;
             }
         });
-    }
-
-    @Override
-    public boolean onPreferenceClick(Preference preference) {
-        String key = preference.getKey();
-
-        if (key.equals(getString(R.string.key_import_accounts))) {
-            AccountsActivity.startXmlFileChooser(this);
-            return true;
-        }
-
-        if (key.equals(getString(R.string.key_export_accounts_csv))) {
-            selectExportFile();
-            return true;
-        }
-
-        return false;
     }
 
     /**
@@ -202,24 +194,12 @@ public class AccountPreferencesFragment extends PreferenceFragmentCompat impleme
         }
     }
 
-    @Override
-    public boolean onPreferenceChange(Preference preference, Object newValue) {
-        if (preference.getKey().equals(getString(R.string.key_default_currency))) {
-            String currencyCode = newValue.toString();
-            GnuCashApplication.setDefaultCurrencyCode(preference.getContext(), currencyCode);
-            String summary = commoditiesDbAdapter.getCommodity(currencyCode).formatListItem();
-            preference.setSummary(summary);
-            return true;
-        }
-        return false;
-    }
-
     /**
      * Show the dialog for deleting accounts
      */
     public void showDeleteAccountsDialog() {
         DeleteAllAccountsConfirmationDialog deleteConfirmationDialog = DeleteAllAccountsConfirmationDialog.newInstance();
-        deleteConfirmationDialog.show(getActivity().getSupportFragmentManager(), "account_settings");
+        deleteConfirmationDialog.show(getParentFragmentManager(), "dslete_accounts");
     }
 
     @Override
@@ -245,9 +225,10 @@ public class AccountPreferencesFragment extends PreferenceFragmentCompat impleme
                     } catch (InterruptedException | ExecutionException e) {
                         Timber.e(e);
                         Toast.makeText(activity, "An error occurred during the Accounts CSV export",
-                                Toast.LENGTH_LONG).show();
+                            Toast.LENGTH_LONG).show();
                     }
                 }
+                break;
 
             default:
                 super.onActivityResult(requestCode, resultCode, data);

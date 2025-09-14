@@ -1,6 +1,5 @@
 package org.gnucash.android.widget
 
-import org.assertj.core.api.Assertions
 import org.assertj.core.api.Assertions.assertThat
 import org.gnucash.android.R
 import org.gnucash.android.app.GnuCashApplication
@@ -14,7 +13,6 @@ class TransactionTypeSwitchTest : GnuCashTest() {
 
     @Test
     fun `credit and debit labels`() {
-        val context = GnuCashApplication.getAppContext()
         val labelBill = context.getString(R.string.label_bill)
         val labelBuy = context.getString(R.string.label_buy)
         val labelCharge = context.getString(R.string.label_charge)

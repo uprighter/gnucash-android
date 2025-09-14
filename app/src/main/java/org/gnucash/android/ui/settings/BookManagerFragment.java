@@ -16,6 +16,7 @@
 
 package org.gnucash.android.ui.settings;
 
+import static androidx.recyclerview.widget.RecyclerView.NO_POSITION;
 import static org.gnucash.android.util.DocumentExtKt.chooseDocument;
 import static org.gnucash.android.util.DocumentExtKt.openBook;
 
@@ -24,7 +25,6 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -34,6 +34,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.ListAdapter;
 import android.widget.ListView;
 import android.widget.TextView;
 
@@ -52,17 +53,19 @@ import androidx.fragment.app.ListFragment;
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
 import org.gnucash.android.db.DatabaseHelper;
+import org.gnucash.android.db.DatabaseHolder;
 import org.gnucash.android.db.DatabaseSchema.BookEntry;
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.db.adapter.BooksDbAdapter;
 import org.gnucash.android.db.adapter.TransactionsDbAdapter;
+import org.gnucash.android.importer.AccountsTemplate;
 import org.gnucash.android.ui.account.AccountsActivity;
+import org.gnucash.android.ui.adapter.AccountsTemplatesAdapter;
 import org.gnucash.android.ui.common.Refreshable;
 import org.gnucash.android.ui.settings.dialog.DeleteBookConfirmationDialog;
 import org.gnucash.android.util.BookUtils;
 import org.gnucash.android.util.PreferencesHelper;
 
-import java.io.IOException;
 import java.sql.Timestamp;
 
 import timber.log.Timber;
@@ -71,11 +74,12 @@ import timber.log.Timber;
  * Fragment for managing the books in the database
  */
 public class BookManagerFragment extends ListFragment implements
-        Refreshable, FragmentResultListener {
+    Refreshable, FragmentResultListener {
 
     private static final int REQUEST_OPEN_DOCUMENT = 0x20;
 
     private BooksAdapter booksAdapter;
+    private AccountsTemplatesAdapter accountsTemplatesAdapter;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -89,6 +93,13 @@ public class BookManagerFragment extends ListFragment implements
 
         booksAdapter = new BooksAdapter(requireContext());
         setListAdapter(booksAdapter);
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        booksAdapter = null;
+        accountsTemplatesAdapter = null;
     }
 
     @Override
@@ -122,7 +133,7 @@ public class BookManagerFragment extends ListFragment implements
                     Timber.w("Activity expected");
                     return false;
                 }
-                AccountsActivity.createDefaultAccounts(activity, GnuCashApplication.getDefaultCurrencyCode());
+                createBook(activity);
                 return true;
             }
 
@@ -166,6 +177,34 @@ public class BookManagerFragment extends ListFragment implements
             }
         }
         super.onActivityResult(requestCode, resultCode, data);
+    }
+
+    private void createBook(@NonNull final Activity activity) {
+        if (accountsTemplatesAdapter == null) {
+            accountsTemplatesAdapter = new AccountsTemplatesAdapter(activity);
+        }
+        final ListAdapter adapter = accountsTemplatesAdapter;
+
+        new AlertDialog.Builder(activity)
+            .setTitle(R.string.title_create_default_accounts)
+            .setCancelable(true)
+            .setSingleChoiceItems(adapter, NO_POSITION, new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    AccountsTemplate.Header item = (AccountsTemplate.Header) adapter.getItem(which);
+                    String fileId = item.assetId;
+                    dialog.dismiss();
+                    String currencyCode = GnuCashApplication.getDefaultCurrencyCode();
+                    AccountsActivity.createDefaultAccounts(activity, currencyCode, fileId, null);
+                }
+            })
+            .setNegativeButton(R.string.alert_dialog_cancel, new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    dialog.dismiss();
+                }
+            })
+            .show();
     }
 
     private class BooksAdapter extends SimpleCursorAdapter {
@@ -212,8 +251,8 @@ public class BookManagerFragment extends ListFragment implements
 
         private void setUpMenu(View view, final Context context, Cursor cursor, final String bookUID) {
             final String bookName = cursor.getString(
-                    cursor.getColumnIndexOrThrow(BookEntry.COLUMN_DISPLAY_NAME));
-            ImageView optionsMenu = (ImageView) view.findViewById(R.id.options_menu);
+                cursor.getColumnIndexOrThrow(BookEntry.COLUMN_DISPLAY_NAME));
+            ImageView optionsMenu = view.findViewById(R.id.options_menu);
             optionsMenu.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
@@ -227,9 +266,6 @@ public class BookManagerFragment extends ListFragment implements
                             switch (item.getItemId()) {
                                 case R.id.menu_rename:
                                     return handleMenuRenameBook(bookName, bookUID);
-                                case R.id.menu_sync:
-                                    //TODO implement sync
-                                    return false;
                                 case R.id.menu_delete:
                                     return handleMenuDeleteBook(bookUID);
                                 default:
@@ -263,39 +299,38 @@ public class BookManagerFragment extends ListFragment implements
          * @return {@code true}
          */
         private boolean handleMenuRenameBook(String bookName, final String bookUID) {
-            AlertDialog.Builder dialogBuilder = new AlertDialog.Builder(getActivity());
-            dialogBuilder.setTitle(R.string.title_rename_book)
-                    .setView(R.layout.dialog_rename_book)
-                    .setPositiveButton(R.string.btn_rename, new DialogInterface.OnClickListener() {
-                        @Override
-                        public void onClick(DialogInterface dialog, int which) {
-                            EditText bookTitle = (EditText) ((AlertDialog) dialog).findViewById(R.id.input_book_title);
-                            BooksDbAdapter.getInstance()
-                                    .updateRecord(bookUID,
-                                            BookEntry.COLUMN_DISPLAY_NAME,
-                                            bookTitle.getText().toString().trim());
-                            refresh();
-                        }
-                    })
-                    .setNegativeButton(R.string.btn_cancel, new DialogInterface.OnClickListener() {
-                        @Override
-                        public void onClick(DialogInterface dialog, int which) {
-                            dialog.dismiss();
-                        }
-                    });
-            AlertDialog dialog = dialogBuilder.create();
-            dialog.show();
+            AlertDialog dialog = new AlertDialog.Builder(getActivity())
+                .setTitle(R.string.title_rename_book)
+                .setView(R.layout.dialog_rename_book)
+                .setPositiveButton(R.string.btn_rename, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        EditText bookTitle = ((AlertDialog) dialog).findViewById(R.id.input_book_title);
+                        BooksDbAdapter.getInstance()
+                            .updateRecord(bookUID,
+                                BookEntry.COLUMN_DISPLAY_NAME,
+                                bookTitle.getText().toString().trim());
+                        refresh();
+                    }
+                })
+                .setNegativeButton(R.string.btn_cancel, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.dismiss();
+                    }
+                })
+                .show();
             ((TextView) dialog.findViewById(R.id.input_book_title)).setText(bookName);
             return true;
         }
 
         private void setLastExportedText(View view, String bookUID) {
             Context context = view.getContext();
-            TextView labelLastSync = (TextView) view.findViewById(R.id.label_last_sync);
+            TextView labelLastSync = view.findViewById(R.id.label_last_sync);
             labelLastSync.setText(R.string.label_last_export_time);
 
             Timestamp lastSyncTime = PreferencesHelper.getLastExportTime(context, bookUID);
-            TextView lastSyncText = (TextView) view.findViewById(R.id.last_sync_time);
+            TextView lastSyncText = view.findViewById(R.id.last_sync_time);
             if (lastSyncTime.equals(new Timestamp(0)))
                 lastSyncText.setText(R.string.last_export_time_never);
             else
@@ -305,8 +340,8 @@ public class BookManagerFragment extends ListFragment implements
         private void setStatisticsText(View view, String bookUID) {
             final Context context = view.getContext();
             DatabaseHelper dbHelper = new DatabaseHelper(context, bookUID);
-            SQLiteDatabase db = dbHelper.getReadableDatabase();
-            TransactionsDbAdapter trnAdapter = new TransactionsDbAdapter(db);
+            DatabaseHolder holder = dbHelper.getHolder();
+            TransactionsDbAdapter trnAdapter = new TransactionsDbAdapter(holder);
             int transactionCount = (int) trnAdapter.getRecordsCount();
             AccountsDbAdapter accountsDbAdapter = new AccountsDbAdapter(trnAdapter);
             int accountsCount = (int) accountsDbAdapter.getRecordsCount();
@@ -315,7 +350,7 @@ public class BookManagerFragment extends ListFragment implements
             String transactionStats = getResources().getQuantityString(R.plurals.book_transaction_stats, transactionCount, transactionCount);
             String accountStats = getResources().getQuantityString(R.plurals.book_account_stats, accountsCount, accountsCount);
             String stats = accountStats + ", " + transactionStats;
-            TextView statsText = (TextView) view.findViewById(R.id.secondary_text);
+            TextView statsText = view.findViewById(R.id.secondary_text);
             statsText.setText(stats);
         }
     }

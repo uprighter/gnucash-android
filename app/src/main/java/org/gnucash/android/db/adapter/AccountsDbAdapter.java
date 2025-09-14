@@ -18,10 +18,11 @@
 package org.gnucash.android.db.adapter;
 
 import static org.gnucash.android.db.DatabaseExtKt.getBigDecimal;
-import static org.gnucash.android.db.DatabaseHelper.escapeForLike;
+import static org.gnucash.android.db.DatabaseHelper.sqlEscapeLike;
 import static org.gnucash.android.db.DatabaseSchema.AccountEntry;
 import static org.gnucash.android.db.DatabaseSchema.BudgetAmountEntry;
 import static org.gnucash.android.db.DatabaseSchema.BudgetEntry;
+import static org.gnucash.android.db.DatabaseSchema.CommodityEntry;
 import static org.gnucash.android.db.DatabaseSchema.PriceEntry;
 import static org.gnucash.android.db.DatabaseSchema.RecurrenceEntry;
 import static org.gnucash.android.db.DatabaseSchema.ScheduledActionEntry;
@@ -33,7 +34,6 @@ import android.content.Context;
 import android.database.Cursor;
 import android.database.DatabaseUtils;
 import android.database.SQLException;
-import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteStatement;
 import android.text.TextUtils;
 
@@ -44,10 +44,12 @@ import androidx.core.content.ContextCompat;
 
 import org.gnucash.android.R;
 import org.gnucash.android.app.GnuCashApplication;
+import org.gnucash.android.db.DatabaseHolder;
 import org.gnucash.android.model.Account;
 import org.gnucash.android.model.AccountType;
 import org.gnucash.android.model.Commodity;
 import org.gnucash.android.model.Money;
+import org.gnucash.android.model.Price;
 import org.gnucash.android.model.Split;
 import org.gnucash.android.model.Transaction;
 import org.gnucash.android.model.TransactionType;
@@ -57,10 +59,13 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import timber.log.Timber;
 
@@ -85,6 +90,9 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
      */
     public static final String ROOT_ACCOUNT_FULL_NAME = " ";
     public static final String ROOT_ACCOUNT_NAME = "Root Account";
+    public static final String TEMPLATE_ACCOUNT_NAME = "Template Root";
+
+    public static final long ALWAYS = -1L;
 
     /**
      * Transactions database adapter for manipulating transactions associated with accounts
@@ -97,6 +105,8 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
      */
     @NonNull
     public final CommoditiesDbAdapter commoditiesDbAdapter;
+    @NonNull
+    final PricesDbAdapter pricesDbAdapter;
 
     @Nullable
     private String rootUID = null;
@@ -105,7 +115,14 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
      * Overloaded constructor. Creates an adapter for an already open database
      */
     public AccountsDbAdapter(@NonNull TransactionsDbAdapter transactionsDbAdapter) {
-        super(transactionsDbAdapter.mDb, AccountEntry.TABLE_NAME, new String[]{
+        this(transactionsDbAdapter, new PricesDbAdapter(transactionsDbAdapter.commoditiesDbAdapter));
+    }
+
+    /**
+     * Overloaded constructor. Creates an adapter for an already open database
+     */
+    public AccountsDbAdapter(@NonNull TransactionsDbAdapter transactionsDbAdapter, @NonNull PricesDbAdapter pricesDbAdapter) {
+        super(transactionsDbAdapter.holder, AccountEntry.TABLE_NAME, new String[]{
             AccountEntry.COLUMN_NAME,
             AccountEntry.COLUMN_DESCRIPTION,
             AccountEntry.COLUMN_TYPE,
@@ -118,10 +135,13 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
             AccountEntry.COLUMN_HIDDEN,
             AccountEntry.COLUMN_COMMODITY_UID,
             AccountEntry.COLUMN_PARENT_ACCOUNT_UID,
-            AccountEntry.COLUMN_DEFAULT_TRANSFER_ACCOUNT_UID
+            AccountEntry.COLUMN_DEFAULT_TRANSFER_ACCOUNT_UID,
+            AccountEntry.COLUMN_NOTES,
+            AccountEntry.COLUMN_TEMPLATE
         }, true);
         this.transactionsDbAdapter = transactionsDbAdapter;
         this.commoditiesDbAdapter = transactionsDbAdapter.commoditiesDbAdapter;
+        this.pricesDbAdapter = pricesDbAdapter;
     }
 
     /**
@@ -130,10 +150,10 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
      * constructor {@link #AccountsDbAdapter(TransactionsDbAdapter)}
      * should be used whenever possible
      *
-     * @param db Database to create an adapter for
+     * @param holder Database holder
      */
-    public AccountsDbAdapter(@NonNull SQLiteDatabase db) {
-        this(new TransactionsDbAdapter(db));
+    public AccountsDbAdapter(@NonNull DatabaseHolder holder) {
+        this(new TransactionsDbAdapter(holder));
     }
 
     /**
@@ -149,6 +169,7 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
     public void close() throws IOException {
         commoditiesDbAdapter.close();
         transactionsDbAdapter.close();
+        pricesDbAdapter.close();
         super.close();
     }
 
@@ -161,14 +182,14 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
     @Override
     public void addRecord(@NonNull Account account, UpdateMethod updateMethod) throws SQLException {
         Timber.d("Replace account to db");
-        if (account.getAccountType() == AccountType.ROOT) {
+        if (account.isRoot() && !account.isTemplate()) {
             rootUID = account.getUID();
         }
         //in-case the account already existed, we want to update the templates based on it as well
         super.addRecord(account, updateMethod);
         //now add transactions if there are any
         // NB! Beware of transactions that reference accounts not yet in the db,
-        if (account.getAccountType() != AccountType.ROOT) {
+        if (!account.isRoot()) {
             for (Transaction t : account.getTransactions()) {
                 t.setCommodity(account.getCommodity());
                 transactionsDbAdapter.addRecord(t, updateMethod);
@@ -214,9 +235,9 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
     @Override
     protected @NonNull SQLiteStatement bind(@NonNull SQLiteStatement stmt, @NonNull final Account account) throws SQLException {
         String parentAccountUID = account.getParentUID();
-        if (account.getAccountType() != AccountType.ROOT) {
+        if (!account.isRoot()) {
             if (TextUtils.isEmpty(parentAccountUID)) {
-                parentAccountUID = getOrCreateGnuCashRootAccountUID();
+                parentAccountUID = getOrCreateRootAccountUID();
                 account.setParentUID(parentAccountUID);
             }
             //update the fully qualified account name
@@ -243,6 +264,10 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
         if (account.getDefaultTransferAccountUID() != null) {
             stmt.bindString(13, account.getDefaultTransferAccountUID());
         }
+        if (account.getNote() != null) {
+            stmt.bindString(14, account.getNote());
+        }
+        stmt.bindLong(15, account.isTemplate() ? 1 : 0);
 
         return stmt;
     }
@@ -260,16 +285,16 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
         return mDb.update(
             TransactionEntry.TABLE_NAME,
             contentValues,
-            TransactionEntry.COLUMN_UID + " IN ( " +
-                "SELECT DISTINCT " + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_UID +
-                " FROM " + TransactionEntry.TABLE_NAME + " , " + SplitEntry.TABLE_NAME + " ON " +
-                TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_UID + " = " +
-                SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_TRANSACTION_UID + " , " +
-                AccountEntry.TABLE_NAME + " ON " + SplitEntry.TABLE_NAME + "." +
-                SplitEntry.COLUMN_ACCOUNT_UID + " = " + AccountEntry.TABLE_NAME + "." +
-                AccountEntry.COLUMN_UID + " WHERE " + AccountEntry.TABLE_NAME + "." +
-                AccountEntry.COLUMN_UID + " = ? "
-                + " ) ",
+            TransactionEntry.COLUMN_UID + " IN ("
+                + "SELECT DISTINCT " + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_UID
+                + " FROM " + TransactionEntry.TABLE_NAME + ", " + SplitEntry.TABLE_NAME + " ON "
+                + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_UID + " = "
+                + SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_TRANSACTION_UID + ", "
+                + AccountEntry.TABLE_NAME + " ON " + SplitEntry.TABLE_NAME + "."
+                + SplitEntry.COLUMN_ACCOUNT_UID + " = " + AccountEntry.TABLE_NAME + "."
+                + AccountEntry.COLUMN_UID + " WHERE " + AccountEntry.TABLE_NAME + "."
+                + AccountEntry.COLUMN_UID + " = ?"
+                + ")",
             new String[]{accountUID}
         );
     }
@@ -317,7 +342,7 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
         if (isCached) cache.clear();
         List<String> descendantAccountUIDs = getDescendantAccountUIDs(parentAccountUID, null, null);
         if (descendantAccountUIDs.isEmpty()) return;
-        List<Account> descendantAccounts = getSimpleAccountList(
+        List<Account> descendantAccounts = getSimpleAccounts(
             AccountEntry.COLUMN_UID + " IN ('" + TextUtils.join("','", descendantAccountUIDs) + "')",
             null,
             null
@@ -348,8 +373,7 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
             } else {
                 // indirect descendant
                 Account parentAccount = accountsByUID.get(account.getParentUID());
-                account.setFullName(parentAccount.getFullName() +
-                    ACCOUNT_NAME_SEPARATOR + account.getName());
+                account.setFullName(parentAccount.getFullName() + ACCOUNT_NAME_SEPARATOR + account.getName());
             }
             // update DB
             contentValues.put(AccountEntry.COLUMN_FULL_NAME, account.getFullName());
@@ -451,7 +475,7 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
         account.setAccountType(AccountType.valueOf(c.getString(c.getColumnIndexOrThrow(AccountEntry.COLUMN_TYPE))));
         String commodityUID = c.getString(c.getColumnIndexOrThrow(AccountEntry.COLUMN_COMMODITY_UID));
         account.setCommodity(commoditiesDbAdapter.getRecord(commodityUID));
-        account.setPlaceHolderFlag(c.getInt(c.getColumnIndexOrThrow(AccountEntry.COLUMN_PLACEHOLDER)) != 0);
+        account.setPlaceholder(c.getInt(c.getColumnIndexOrThrow(AccountEntry.COLUMN_PLACEHOLDER)) != 0);
         account.setDefaultTransferAccountUID(c.getString(c.getColumnIndexOrThrow(AccountEntry.COLUMN_DEFAULT_TRANSFER_ACCOUNT_UID)));
         String color = c.getString(c.getColumnIndexOrThrow(AccountEntry.COLUMN_COLOR_CODE));
         if (!TextUtils.isEmpty(color))
@@ -459,6 +483,15 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
         account.setFavorite(c.getInt(c.getColumnIndexOrThrow(AccountEntry.COLUMN_FAVORITE)) != 0);
         account.setFullName(c.getString(c.getColumnIndexOrThrow(AccountEntry.COLUMN_FULL_NAME)));
         account.setHidden(c.getInt(c.getColumnIndexOrThrow(AccountEntry.COLUMN_HIDDEN)) != 0);
+        if (account.isRoot()) {
+            account.setHidden(false);
+        }
+        account.setNote(c.getString(c.getColumnIndexOrThrow(AccountEntry.COLUMN_NOTES)));
+        account.setTemplate(c.getInt(c.getColumnIndexOrThrow(AccountEntry.COLUMN_TEMPLATE)) != 0);
+        if (account.isRoot()) {
+            account.setHidden(false);
+            account.setPlaceholder(false);
+        }
         return account;
     }
 
@@ -482,14 +515,12 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
             null, null, null, null);
         try {
             if (cursor.moveToFirst()) {
-                Timber.v("Found parent account UID, returning value");
-                return cursor.getString(cursor.getColumnIndexOrThrow(AccountEntry.COLUMN_PARENT_ACCOUNT_UID));
-            } else {
-                return null;
+                return cursor.getString(0);
             }
         } finally {
             cursor.close();
         }
+        return null;
     }
 
     /**
@@ -498,9 +529,15 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
      * @param accountUID UID of the account
      * @return String color code of account or null if none
      */
+    @ColorInt
     public int getAccountColor(String accountUID) {
-        Account account = getSimpleRecord(accountUID);
-        return (account != null) ? account.getColor() : Account.DEFAULT_COLOR;
+        try {
+            Account account = getSimpleRecord(accountUID);
+            return (account != null) ? account.getColor() : Account.DEFAULT_COLOR;
+        } catch (IllegalArgumentException e) {
+            Timber.e(e);
+            return Account.DEFAULT_COLOR;
+        }
     }
 
     /**
@@ -510,8 +547,7 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
      * @return {@link AccountType} of the account
      */
     public AccountType getAccountType(long accountId) {
-        String uid = getUID(accountId);
-        return getAccountType(uid);
+        return getAccountType(getUID(accountId));
     }
 
     /**
@@ -520,8 +556,8 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
      *
      * @return List of {@link Account}s in the database
      */
-    public List<Account> getSimpleAccountList() {
-        return getSimpleAccountList(null, null, AccountEntry.COLUMN_FULL_NAME + " ASC");
+    public List<Account> getSimpleAccounts() {
+        return getSimpleAccounts(null, null, null);
     }
 
     /**
@@ -530,7 +566,10 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
      *
      * @return List of {@link Account}s in the database
      */
-    public List<Account> getSimpleAccountList(@Nullable String where, @Nullable String[] whereArgs, @Nullable String orderBy) {
+    public List<Account> getSimpleAccounts(@Nullable String where, @Nullable String[] whereArgs, @Nullable String orderBy) {
+        if (orderBy == null) {
+            orderBy = AccountEntry.COLUMN_FULL_NAME + " ASC";
+        }
         List<Account> accounts = new ArrayList<>();
         Cursor cursor = fetchAccounts(where, whereArgs, orderBy);
         if (cursor == null) return accounts;
@@ -559,9 +598,9 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
      */
     public List<Account> getExportableAccounts(Timestamp lastExportTimeStamp) {
         Cursor cursor = mDb.query(
-            TransactionEntry.TABLE_NAME + " , " + SplitEntry.TABLE_NAME +
+            TransactionEntry.TABLE_NAME + ", " + SplitEntry.TABLE_NAME +
                 " ON " + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_UID + " = " +
-                SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_TRANSACTION_UID + " , " +
+                SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_TRANSACTION_UID + ", " +
                 AccountEntry.TABLE_NAME + " ON " + AccountEntry.TABLE_NAME + "." +
                 AccountEntry.COLUMN_UID + " = " + SplitEntry.TABLE_NAME + "." +
                 SplitEntry.COLUMN_ACCOUNT_UID,
@@ -583,17 +622,28 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
      * @return String unique ID of the account
      */
     public String getOrCreateImbalanceAccountUID(@NonNull Context context, @NonNull Commodity commodity) {
+        return getOrCreateImbalanceAccount(context, commodity).getUID();
+    }
+
+    /**
+     * Retrieves the unique ID of the imbalance account for a particular currency (creates the imbalance account
+     * on demand if necessary)
+     *
+     * @param commodity Commodity for the imbalance account
+     * @return The account
+     */
+    public Account getOrCreateImbalanceAccount(@NonNull Context context, @NonNull Commodity commodity) {
         String imbalanceAccountName = getImbalanceAccountName(context, commodity);
         String uid = findAccountUidByFullName(imbalanceAccountName);
-        if (uid == null) {
+        if (TextUtils.isEmpty(uid)) {
             Account account = new Account(imbalanceAccountName, commodity);
             account.setAccountType(AccountType.BANK);
-            account.setParentUID(getOrCreateGnuCashRootAccountUID());
-            account.setHidden(!GnuCashApplication.isDoubleEntryEnabled());
+            account.setParentUID(getOrCreateRootAccountUID());
+            account.setHidden(!GnuCashApplication.isDoubleEntryEnabled(context));
             addRecord(account, UpdateMethod.insert);
-            uid = account.getUID();
+            return account;
         }
-        return uid;
+        return getSimpleRecord(uid);
     }
 
     /**
@@ -621,10 +671,10 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
      */
     public String createAccountHierarchy(String fullName, AccountType accountType) {
         if (TextUtils.isEmpty(fullName)) {
-            throw new IllegalArgumentException("fullName cannot be empty");
+            throw new IllegalArgumentException("Full name required");
         }
         String[] tokens = fullName.trim().split(ACCOUNT_NAME_SEPARATOR);
-        String uid = getOrCreateGnuCashRootAccountUID();
+        String uid = getOrCreateRootAccountUID();
         String parentName = "";
         ArrayList<Account> accountsList = new ArrayList<>();
         Commodity commodity = commoditiesDbAdapter.getDefaultCommodity();
@@ -673,7 +723,9 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
     public String findAccountUidByFullName(String fullName) {
         if (isCached) {
             for (Account account : cache.values()) {
-                if (account.getFullName().equals(fullName)) return account.getFullName();
+                if (account.getFullName().equals(fullName)) {
+                    return account.getUID();
+                }
             }
         }
         Cursor c = mDb.query(AccountEntry.TABLE_NAME, new String[]{AccountEntry.COLUMN_UID},
@@ -681,7 +733,7 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
             null, null, null, "1");
         try {
             if (c.moveToNext()) {
-                return c.getString(c.getColumnIndexOrThrow(AccountEntry.COLUMN_UID));
+                return c.getString(0);
             } else {
                 return null;
             }
@@ -699,20 +751,10 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
     @Override
     public Cursor fetchAllRecords() {
         Timber.v("Fetching all accounts from db");
-        String selection = AccountEntry.COLUMN_HIDDEN + " = 0 AND " + AccountEntry.COLUMN_TYPE + " != ?";
-        return fetchAccounts(selection, new String[]{AccountType.ROOT.name()}, AccountEntry.COLUMN_NAME + " ASC");
-    }
-
-    /**
-     * Returns a cursor to all account records in the database ordered by full name.
-     * GnuCash ROOT accounts and hidden accounts will not be included in the result set.
-     *
-     * @return {@link Cursor} to all account records
-     */
-    public Cursor fetchAllRecordsOrderedByFullName() {
-        Timber.v("Fetching all accounts from db");
-        String selection = AccountEntry.COLUMN_HIDDEN + " = 0 AND " + AccountEntry.COLUMN_TYPE + " != ?";
-        return fetchAccounts(selection, new String[]{AccountType.ROOT.name()}, AccountEntry.COLUMN_FULL_NAME + " ASC");
+        String where = AccountEntry.COLUMN_HIDDEN + " = 0 AND " + AccountEntry.COLUMN_TYPE + " != ?";
+        String[] whereArgs = new String[]{AccountType.ROOT.name()};
+        String orderBy = AccountEntry.COLUMN_NAME + " ASC";
+        return fetchAccounts(where, whereArgs, orderBy);
     }
 
     /**
@@ -728,36 +770,7 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
         if (TextUtils.isEmpty(orderBy)) {
             orderBy = AccountEntry.COLUMN_NAME + " ASC";
         }
-        Timber.v("Fetching all accounts from db where " + where + "/" + Arrays.toString(whereArgs) + " order by " + orderBy);
-
-        return mDb.query(mTableName, null, where, whereArgs, null, null, orderBy);
-    }
-
-    /**
-     * Returns a Cursor set of accounts which fulfill <code>where</code>
-     * <p>This method returns the accounts list sorted by the full account name</p>
-     *
-     * @param where     SQL WHERE statement without the 'WHERE' itself
-     * @param whereArgs where args
-     * @return Cursor set of accounts which fulfill <code>where</code>
-     */
-    public Cursor fetchAccountsOrderedByFullName(String where, String[] whereArgs) {
-        Timber.v("Fetching all accounts from db where %s", where);
-        return fetchAccounts(where, whereArgs, AccountEntry.COLUMN_FULL_NAME + " ASC");
-    }
-
-    /**
-     * Returns a Cursor set of accounts which fulfill <code>where</code>
-     * <p>This method returns the favorite accounts first, sorted by name, and then the other accounts,
-     * sorted by name.</p>
-     *
-     * @param where     SQL WHERE statement without the 'WHERE' itself
-     * @param whereArgs where args
-     * @return Cursor set of accounts which fulfill <code>where</code>
-     */
-    public Cursor fetchAccountsOrderedByFavoriteAndFullName(String where, String[] whereArgs) {
-        Timber.v("Fetching all accounts from db where " + where + " order by Favorite then Name");
-        return fetchAccounts(where, whereArgs, AccountEntry.COLUMN_FAVORITE + " DESC, " + AccountEntry.COLUMN_FULL_NAME + " ASC");
+        return fetchAllRecords(where, whereArgs, orderBy);
     }
 
     /**
@@ -766,7 +779,16 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
      * @return Account Balance of an account including sub-accounts
      */
     public Money getAccountBalance(String accountUID) {
-        return computeBalance(accountUID, -1, -1, true);
+        return computeBalance(accountUID, ALWAYS, ALWAYS, true);
+    }
+
+    /**
+     * Returns the balance of an account while taking sub-accounts into consideration
+     *
+     * @return Account Balance of an account including sub-accounts
+     */
+    public Money getAccountBalance(Account account) {
+        return getAccountBalance(account, ALWAYS, ALWAYS);
     }
 
     /**
@@ -774,8 +796,8 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
      *
      * @return Account Balance of an account including sub-accounts
      */
-    public Money getCurrentAccountBalance(String accountUID) {
-        return getAccountBalance(accountUID, -1, System.currentTimeMillis());
+    public Money getCurrentAccountBalance(Account account) {
+        return getAccountBalance(account, ALWAYS, System.currentTimeMillis());
     }
 
     /**
@@ -793,6 +815,18 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
     /**
      * Returns the balance of an account within the specified time range while taking sub-accounts into consideration
      *
+     * @param account        the account
+     * @param startTimestamp the start timestamp of the time range
+     * @param endTimestamp   the end timestamp of the time range
+     * @return the balance of an account within the specified range including sub-accounts
+     */
+    public Money getAccountBalance(Account account, long startTimestamp, long endTimestamp) {
+        return getAccountBalance(account, startTimestamp, endTimestamp, true);
+    }
+
+    /**
+     * Returns the balance of an account within the specified time range while taking sub-accounts into consideration
+     *
      * @param accountUID         the account's UUID
      * @param startTimestamp     the start timestamp of the time range
      * @param endTimestamp       the end timestamp of the time range
@@ -804,43 +838,50 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
     }
 
     /**
+     * Returns the balance of an account within the specified time range while taking sub-accounts into consideration
+     *
+     * @param account            the account
+     * @param startTimestamp     the start timestamp of the time range
+     * @param endTimestamp       the end timestamp of the time range
+     * @param includeSubAccounts include the sub-accounts' balances?
+     * @return the balance of an account within the specified range including sub-accounts
+     */
+    @NonNull
+    public Money getAccountBalance(Account account, long startTimestamp, long endTimestamp, boolean includeSubAccounts) {
+        return computeBalance(account, startTimestamp, endTimestamp, includeSubAccounts);
+    }
+
+    /**
      * Compute the account balance for all accounts with the specified type within a specific duration
      *
      * @param accountType    Account Type for which to compute balance
+     * @param currency       the currency
      * @param startTimestamp Begin time for the duration in milliseconds
      * @param endTimestamp   End time for duration in milliseconds
      * @return Account balance
      */
-    public Money getAccountBalance(AccountType accountType, String currencyCode, long startTimestamp, long endTimestamp) {
-        String where = AccountEntry.COLUMN_TYPE + "= ?";
+    public Money getAccountsBalance(AccountType accountType, Commodity currency, long startTimestamp, long endTimestamp) {
+        String where = AccountEntry.COLUMN_TYPE + " = ?"
+            + " AND " + AccountEntry.COLUMN_TEMPLATE + " = 0";
         String[] whereArgs = new String[]{accountType.name()};
-        Cursor cursor = fetchAccounts(where, whereArgs, null);
-        final int columnIndexUID = cursor.getColumnIndexOrThrow(AccountEntry.COLUMN_UID);
-        List<String> accountUidList = new ArrayList<>();
-        while (cursor.moveToNext()) {
-            String accountUID = cursor.getString(columnIndexUID);
-            accountUidList.add(accountUID);
-        }
-        cursor.close();
-
-        Timber.d("all account list : %d", accountUidList.size());
-        SplitsDbAdapter splitsDbAdapter = transactionsDbAdapter.splitsDbAdapter;
-        return splitsDbAdapter.computeSplitBalance(accountUidList, currencyCode, startTimestamp, endTimestamp);
+        List<Account> accounts = getSimpleAccounts(where, whereArgs, null);
+        return getAccountsBalance(accounts, currency, startTimestamp, endTimestamp);
     }
 
     /**
      * Returns the account balance for all accounts types specified
      *
      * @param accountTypes List of account types
+     * @param currency     The currency
      * @param start        Begin timestamp for transactions
      * @param end          End timestamp of transactions
      * @return Money balance of the account types
      */
-    public Money getAccountBalance(List<AccountType> accountTypes, long start, long end) {
-        String currencyCode = GnuCashApplication.getDefaultCurrencyCode();
-        Money balance = Money.createZeroInstance(currencyCode);
+    public Money getBalancesByType(List<AccountType> accountTypes, Commodity currency, long start, long end) {
+        Money balance = Money.createZeroInstance(currency);
         for (AccountType accountType : accountTypes) {
-            balance = balance.plus(getAccountBalance(accountType, currencyCode, start, end));
+            Money accountsBalance = getAccountsBalance(accountType, currency, start, end);
+            balance = balance.plus(accountsBalance);
         }
         return balance;
     }
@@ -849,56 +890,76 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
      * Returns the current account balance for the accounts type.
      *
      * @param accountTypes The account type
+     * @param currency     The currency.
      * @return Money balance of the account type
      */
-    public Money getCurrentAccountsBalance(List<AccountType> accountTypes) {
-        return getAccountBalance(accountTypes, -1, System.currentTimeMillis());
+    public Money getCurrentAccountsBalance(List<AccountType> accountTypes, Commodity currency) {
+        return getBalancesByType(accountTypes, currency, ALWAYS, System.currentTimeMillis());
     }
 
-    private Money computeBalance(String accountUID, long startTimestamp, long endTimestamp, boolean includeSubAccounts) {
+    private Money computeBalance(@NonNull String accountUID, long startTimestamp, long endTimestamp, boolean includeSubAccounts) {
         Account account = getSimpleRecord(accountUID);
+        return computeBalance(account, startTimestamp, endTimestamp, includeSubAccounts);
+    }
 
-        // Is the value cached?
+    @NonNull
+    private Money computeBalance(@NonNull Account account, long startTimestamp, long endTimestamp, boolean includeSubAccounts) {
+        Timber.d("Computing account balance for [%s]", account);
+        String accountUID = account.getUID();
         String[] columns = new String[]{AccountEntry.COLUMN_BALANCE};
         String selection = AccountEntry.COLUMN_UID + "=?";
         String[] selectionArgs = new String[]{accountUID};
-        Cursor cursor = mDb.query(mTableName, columns, selection, selectionArgs, null, null, null);
-        try {
-            if (cursor.moveToFirst()) {
-                BigDecimal amount = getBigDecimal(cursor, 0);
-                if (amount != null) {
-                    return new Money(amount, account.getCommodity());
+
+        // Is the value cached?
+        boolean useCachedValue = (startTimestamp == ALWAYS) && (endTimestamp == ALWAYS);
+        if (useCachedValue) {
+            Cursor cursor = mDb.query(mTableName, columns, selection, selectionArgs, null, null, null);
+            try {
+                if (cursor.moveToFirst()) {
+                    BigDecimal amount = getBigDecimal(cursor, 0);
+                    if (amount != null) {
+                        return new Money(amount, account.getCommodity());
+                    }
                 }
+            } finally {
+                cursor.close();
             }
-        } finally {
-            cursor.close();
         }
 
-        Money balance = computeBalance(account, startTimestamp, endTimestamp, includeSubAccounts);
+        Money balance = computeSplitsBalance(account, startTimestamp, endTimestamp);
+
+        if (includeSubAccounts) {
+            Commodity commodity = account.getCommodity();
+            List<String> children = getChildren(accountUID);
+            Timber.d("compute account children : %d", children.size());
+            for (String childUID : children) {
+                Account child = getSimpleRecord(childUID);
+                final Commodity childCommodity = child.getCommodity();
+                Money childBalance = computeBalance(child, startTimestamp, endTimestamp, true);
+                if (childBalance.isAmountZero()) continue;
+                Price price = pricesDbAdapter.getPrice(childCommodity, commodity);
+                if (price == null) continue;
+                childBalance = childBalance.times(price);
+                balance = balance.plus(childBalance);
+            }
+        }
 
         // Cache for next read.
-        ContentValues values = new ContentValues();
-        values.put(AccountEntry.COLUMN_BALANCE, balance.toBigDecimal().toString());
-        mDb.update(mTableName, values, selection, selectionArgs);
+        if (useCachedValue) {
+            ContentValues values = new ContentValues();
+            values.put(AccountEntry.COLUMN_BALANCE, balance.toBigDecimal().toString());
+            mDb.update(mTableName, values, selection, selectionArgs);
+        }
 
         return balance;
     }
 
-    private Money computeBalance(Account account, long startTimestamp, long endTimestamp, boolean includeSubAccounts) {
-        Timber.d("Computing account balance for account %s", account);
-        String accountUID = account.getUID();
+    @NonNull
+    private Money computeSplitsBalance(Account account, long startTimestamp, long endTimestamp) {
         AccountType accountType = account.getAccountType();
-        String currencyCode = account.getCommodity().getCurrencyCode();
-
-        List<String> accountsList = includeSubAccounts ? getDescendantAccountUIDs(accountUID,
-            null, null) : new ArrayList<>();
-
-        accountsList.add(0, accountUID);
-        Timber.d("compute account list : %d", accountsList.size());
-
         SplitsDbAdapter splitsDbAdapter = transactionsDbAdapter.splitsDbAdapter;
-        Money balance = splitsDbAdapter.computeSplitBalance(accountsList, currencyCode, startTimestamp, endTimestamp);
-        return accountType.hasDebitDisplayBalance ? balance : balance.unaryMinus();
+        Money balance = splitsDbAdapter.computeSplitBalance(account, startTimestamp, endTimestamp);
+        return accountType.hasDebitNormalBalance ? balance : balance.unaryMinus();
     }
 
     /**
@@ -910,15 +971,62 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
      * @param endTimestamp   the end timestamp of the time range
      * @return Money balance of account list
      */
-    public Money getAccountsBalance(@NonNull List<String> accountUIDList, long startTimestamp, long endTimestamp) {
-        String currencyCode = GnuCashApplication.getDefaultCurrencyCode();
-        if (accountUIDList.isEmpty()) {
-            return Money.createZeroInstance(currencyCode);
+    public Money getAccountsBalanceByUID(@NonNull List<String> accountUIDList, long startTimestamp, long endTimestamp) {
+        List<Account> accounts = new ArrayList<>();
+        for (String accountUID : accountUIDList) {
+            accounts.add(getSimpleRecord(accountUID));
         }
+        return getAccountsBalance(accounts, startTimestamp, endTimestamp);
+    }
 
-        SplitsDbAdapter splitsDbAdapter = transactionsDbAdapter.splitsDbAdapter;
+    /**
+     * Returns the balance of account list within the specified time range. The default currency
+     * takes as base currency.
+     *
+     * @param accounts       list of accounts
+     * @param startTimestamp the start timestamp of the time range
+     * @param endTimestamp   the end timestamp of the time range
+     * @return Money balance of account list
+     */
+    public Money getAccountsBalance(@NonNull List<Account> accounts, long startTimestamp, long endTimestamp) {
+        String currencyCode = GnuCashApplication.getDefaultCurrencyCode();
+        Commodity commodity = commoditiesDbAdapter.getCurrency(currencyCode);
+        return getAccountsBalance(accounts, commodity, startTimestamp, endTimestamp);
+    }
 
-        return splitsDbAdapter.computeSplitBalance(accountUIDList, currencyCode, startTimestamp, endTimestamp);
+    /**
+     * Returns the balance of account list within the specified time range. The default currency
+     * takes as base currency.
+     *
+     * @param accounts       list of accounts
+     * @param currency       The target currency
+     * @param startTimestamp the start timestamp of the time range
+     * @param endTimestamp   the end timestamp of the time range
+     * @return Money balance of account list
+     */
+    public Money getAccountsBalance(@NonNull List<Account> accounts, Commodity currency, long startTimestamp, long endTimestamp) {
+        Money balance = Money.createZeroInstance(currency);
+        if ((startTimestamp == ALWAYS) && (endTimestamp == ALWAYS)) { // Use cached balances.
+            for (Account account : accounts) {
+                Money accountBalance = getAccountBalance(account, startTimestamp, endTimestamp, false);
+                if (accountBalance.isAmountZero()) continue;
+                Price price = pricesDbAdapter.getPrice(accountBalance.getCommodity(), currency);
+                if (price == null) continue;
+                accountBalance = accountBalance.times(price);
+                balance = balance.plus(accountBalance);
+            }
+        } else {
+            Map<String, Money> balances = getAccountsBalances(accounts, startTimestamp, endTimestamp);
+            for (Account account : accounts) {
+                Money accountBalance = balances.get(account.getUID());
+                if ((accountBalance == null) || accountBalance.isAmountZero()) continue;
+                Price price = pricesDbAdapter.getPrice(accountBalance.getCommodity(), currency);
+                if (price == null) continue;
+                accountBalance = accountBalance.times(price);
+                balance = balance.plus(accountBalance);
+            }
+        }
+        return balance;
     }
 
     /**
@@ -931,6 +1039,7 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
      * @param whereArgs  Condition args to filter accounts
      * @return The descendant accounts list.
      */
+    @NonNull
     public List<String> getDescendantAccountUIDs(String accountUID, String where, String[] whereArgs) {
         // holds accountUID with all descendant accounts.
         List<String> accounts = new ArrayList<>();
@@ -952,11 +1061,11 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
                 AccountEntry.COLUMN_FULL_NAME
             );
             accountsLevel.clear();
-            if (cursor != null) {
+            if (cursor != null && cursor.moveToFirst()) {
                 try {
-                    while (cursor.moveToNext()) {
+                    do {
                         accountsLevel.add(cursor.getString(columnIndexUID));
-                    }
+                    } while (cursor.moveToNext());
                 } finally {
                     cursor.close();
                 }
@@ -966,18 +1075,47 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
         return accounts;
     }
 
+    public List<String> getChildren(String accountUID) {
+        List<String> accounts = new ArrayList<>();
+        final String[] projection = new String[]{AccountEntry.COLUMN_UID};
+        final int columnIndexUID = 0;
+        String where = AccountEntry.COLUMN_PARENT_ACCOUNT_UID + "=?";
+        String[] whereArgs = new String[]{accountUID};
+        Cursor cursor = mDb.query(
+            mTableName,
+            projection,
+            where,
+            whereArgs,
+            null,
+            null,
+            AccountEntry.COLUMN_ID
+        );
+        try {
+            if (cursor.moveToFirst()) {
+                do {
+                    accounts.add(cursor.getString(columnIndexUID));
+                } while (cursor.moveToNext());
+            }
+        } finally {
+            cursor.close();
+        }
+        return accounts;
+    }
+
     /**
      * Returns a cursor to the dataset containing sub-accounts of the account with record ID <code>accountUID</code>
      *
-     * @param accountUID GUID of the parent account
+     * @param accountUID           GUID of the parent account
+     * @param isShowHiddenAccounts Show hidden accounts?
      * @return {@link Cursor} to the sub accounts data set
      */
-    public Cursor fetchSubAccounts(String accountUID) {
+    public Cursor fetchSubAccounts(String accountUID, boolean isShowHiddenAccounts) {
         Timber.v("Fetching sub accounts for account id %s", accountUID);
-        String selection = AccountEntry.COLUMN_HIDDEN + " = 0 AND "
-            + AccountEntry.COLUMN_PARENT_ACCOUNT_UID + " = ?";
-        final String[] selectionArgs =
-            new String[]{accountUID};
+        String selection = AccountEntry.COLUMN_PARENT_ACCOUNT_UID + " = ?";
+        if (!isShowHiddenAccounts) {
+            selection += " AND " + AccountEntry.COLUMN_HIDDEN + " = 0";
+        }
+        String[] selectionArgs = new String[]{accountUID};
         return fetchAccounts(selection, selectionArgs, null);
     }
 
@@ -986,17 +1124,19 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
      *
      * @return Cursor to the top level accounts
      */
-    public Cursor fetchTopLevelAccounts(@Nullable String filterName) {
+    public Cursor fetchTopLevelAccounts(@Nullable String filterName, boolean isShowHiddenAccounts) {
         //condition which selects accounts with no parent, whose UID is not ROOT and whose type is not ROOT
         final String[] selectionArgs;
-        String selection = AccountEntry.COLUMN_HIDDEN + " = 0 AND "
-            + AccountEntry.COLUMN_TYPE + " != ?";
+        String selection = AccountEntry.COLUMN_TYPE + " != ?";
+        if (!isShowHiddenAccounts) {
+            selection += " AND " + AccountEntry.COLUMN_HIDDEN + " = 0";
+        }
         if (TextUtils.isEmpty(filterName)) {
             selection += " AND (" + AccountEntry.COLUMN_PARENT_ACCOUNT_UID + " IS NULL OR "
-                + AccountEntry.COLUMN_PARENT_ACCOUNT_UID + " = ?) ";
-            selectionArgs = new String[]{AccountType.ROOT.name(), getOrCreateGnuCashRootAccountUID()};
+                + AccountEntry.COLUMN_PARENT_ACCOUNT_UID + " = ?)";
+            selectionArgs = new String[]{AccountType.ROOT.name(), getOrCreateRootAccountUID()};
         } else {
-            selection += " AND (" + AccountEntry.COLUMN_NAME + " LIKE '%" + escapeForLike(filterName) + "%')";
+            selection += " AND (" + AccountEntry.COLUMN_NAME + " LIKE " + sqlEscapeLike(filterName) + ")";
             selectionArgs = new String[]{AccountType.ROOT.name()};
         }
         return fetchAccounts(selection, selectionArgs, null);
@@ -1007,16 +1147,22 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
      *
      * @return Cursor to recently used accounts
      */
-    public Cursor fetchRecentAccounts(int numberOfRecent, @Nullable String filterName) {
-        String selection = AccountEntry.TABLE_NAME + "." + AccountEntry.COLUMN_HIDDEN + " = 0";
+    public Cursor fetchRecentAccounts(int numberOfRecent, @Nullable String filterName, boolean isShowHiddenAccounts) {
+        String selection = "";
+        if (!isShowHiddenAccounts) {
+            selection = AccountEntry.TABLE_NAME + "." + AccountEntry.COLUMN_HIDDEN + " = 0";
+        }
         if (!TextUtils.isEmpty(filterName)) {
-            selection += " AND (" + AccountEntry.TABLE_NAME + "." + AccountEntry.COLUMN_NAME + " LIKE '%" + escapeForLike(filterName) + "%')";
+            if (!selection.isEmpty()) {
+                selection += " AND ";
+            }
+            selection += "(" + AccountEntry.TABLE_NAME + "." + AccountEntry.COLUMN_NAME + " LIKE " + sqlEscapeLike(filterName) + ")";
         }
         return mDb.query(TransactionEntry.TABLE_NAME
                 + " LEFT OUTER JOIN " + SplitEntry.TABLE_NAME + " ON "
                 + TransactionEntry.TABLE_NAME + "." + TransactionEntry.COLUMN_UID + " = "
                 + SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_TRANSACTION_UID
-                + " , " + AccountEntry.TABLE_NAME + " ON " + SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_ACCOUNT_UID
+                + ", " + AccountEntry.TABLE_NAME + " ON " + SplitEntry.TABLE_NAME + "." + SplitEntry.COLUMN_ACCOUNT_UID
                 + " = " + AccountEntry.TABLE_NAME + "." + AccountEntry.COLUMN_UID,
             new String[]{AccountEntry.TABLE_NAME + ".*"},
             selection,
@@ -1033,12 +1179,14 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
      *
      * @return Cursor holding set of favorite accounts
      */
-    public Cursor fetchFavoriteAccounts(@Nullable String filterName) {
+    public Cursor fetchFavoriteAccounts(@Nullable String filterName, boolean isShowHiddenAccounts) {
         Timber.v("Fetching favorite accounts from db");
-        String selection = AccountEntry.COLUMN_HIDDEN + " = 0 AND "
-            + AccountEntry.COLUMN_FAVORITE + "=1";
+        String selection = AccountEntry.COLUMN_FAVORITE + " = 1";
+        if (!isShowHiddenAccounts) {
+            selection += " AND " + AccountEntry.COLUMN_HIDDEN + " = 0";
+        }
         if (!TextUtils.isEmpty(filterName)) {
-            selection += " AND (" + AccountEntry.COLUMN_NAME + " LIKE '%" + escapeForLike(filterName) + "%')";
+            selection += " AND (" + AccountEntry.COLUMN_NAME + " LIKE " + sqlEscapeLike(filterName) + ")";
         }
         return fetchAccounts(selection, null, null);
     }
@@ -1050,13 +1198,12 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
      *
      * @return Unique ID of the GnuCash root account.
      */
-    public String getOrCreateGnuCashRootAccountUID() {
+    public String getOrCreateRootAccountUID() {
         if (rootUID != null) {
             return rootUID;
         }
-        String where = AccountEntry.COLUMN_TYPE + "=?"
-            + " AND " + AccountEntry.COLUMN_CURRENCY + "!=?";
-        String[] whereArgs = new String[]{AccountType.ROOT.name(), Commodity.TEMPLATE};
+        String where = AccountEntry.COLUMN_TYPE + "=?";
+        String[] whereArgs = new String[]{AccountType.ROOT.name()};
         Cursor cursor = fetchAccounts(where, whereArgs, null);
         try {
             if (cursor.moveToFirst()) {
@@ -1068,12 +1215,13 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
             cursor.close();
         }
         // No ROOT exits, create a new one
+        Context context = holder.context;
         Commodity commodity = commoditiesDbAdapter.getDefaultCommodity();
         Account rootAccount = new Account(ROOT_ACCOUNT_NAME, commodity);
         rootAccount.setAccountType(AccountType.ROOT);
         rootAccount.setFullName(ROOT_ACCOUNT_FULL_NAME);
-        rootAccount.setHidden(true);
-        rootAccount.setPlaceHolderFlag(true);
+        rootAccount.setHidden(false);
+        rootAccount.setPlaceholder(false);
         ContentValues contentValues = new ContentValues();
         contentValues.put(AccountEntry.COLUMN_UID, rootAccount.getUID());
         contentValues.put(AccountEntry.COLUMN_NAME, rootAccount.getName());
@@ -1114,7 +1262,7 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
     public Commodity getCommodity(@NonNull String accountUID) {
         Account account = getSimpleRecord(accountUID);
         if (account != null) return account.getCommodity();
-        throw new IllegalArgumentException("Account " + accountUID + " does not exist");
+        throw new IllegalArgumentException("Account not found");
     }
 
     /**
@@ -1122,7 +1270,7 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
      *
      * @param accountUID Unique identifier of the account
      * @return Name of the account as String
-     * @throws java.lang.IllegalArgumentException if accountUID does not exist
+     * @throws java.lang.IllegalArgumentException if accountUID not found
      * @see #getFullyQualifiedAccountName(String)
      */
     public String getAccountName(String accountUID) {
@@ -1152,7 +1300,7 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
             AccountEntry._ID + " = " + accountID,
             null, null, null, null);
         try {
-            if (cursor.moveToNext()) {
+            if (cursor.moveToFirst()) {
                 String uid = cursor.getString(
                     cursor.getColumnIndexOrThrow(AccountEntry.COLUMN_DEFAULT_TRANSFER_ACCOUNT_UID));
                 return TextUtils.isEmpty(uid) ? 0 : getID(uid);
@@ -1173,7 +1321,7 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
         String accountName = getAccountName(accountUID);
         String parentAccountUID = getParentAccountUID(accountUID);
 
-        if (parentAccountUID == null || parentAccountUID.equals(accountUID) || parentAccountUID.equals(getOrCreateGnuCashRootAccountUID())) {
+        if (parentAccountUID == null || parentAccountUID.equals(accountUID) || parentAccountUID.equals(getOrCreateRootAccountUID())) {
             return accountName;
         }
 
@@ -1192,7 +1340,7 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
         String accountName = account.getName();
         String parentAccountUID = account.getParentUID();
 
-        if (TextUtils.isEmpty(parentAccountUID) || parentAccountUID.equalsIgnoreCase(getOrCreateGnuCashRootAccountUID())) {
+        if (TextUtils.isEmpty(parentAccountUID) || parentAccountUID.equalsIgnoreCase(getOrCreateRootAccountUID())) {
             return accountName;
         }
 
@@ -1210,7 +1358,7 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
     public String getAccountFullName(String accountUID) {
         Account account = getSimpleRecord(accountUID);
         if (account != null) return account.getFullName();
-        throw new IllegalArgumentException("account UID: " + accountUID + " does not exist");
+        throw new IllegalArgumentException("Account not found");
     }
 
 
@@ -1257,14 +1405,10 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
      * Updates all opening balances to the current account balances
      */
     public List<Transaction> getAllOpeningBalanceTransactions() {
-        List<Account> accounts = getSimpleAccountList();
+        List<Account> accounts = getSimpleAccounts();
         List<Transaction> openingTransactions = new ArrayList<>();
-        SplitsDbAdapter splitsDbAdapter = transactionsDbAdapter.splitsDbAdapter;
         for (Account account : accounts) {
-            String currencyCode = account.getCommodity().getCurrencyCode();
-            List<String> accountList = new ArrayList<>();
-            accountList.add(account.getUID());
-            Money balance = splitsDbAdapter.computeSplitBalance(accountList, currencyCode);
+            Money balance = getAccountBalance(account, ALWAYS, ALWAYS, false);
             if (balance.isAmountZero())
                 continue;
 
@@ -1315,22 +1459,6 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
     }
 
     /**
-     * Returns the account color for the active account as an Android resource ID.
-     * <p>
-     * Basically, if we are in a top level account, use the default title color.
-     * but propagate a parent account's title color to children who don't have own color
-     * </p>
-     *
-     * @param context    the context
-     * @param accountUID GUID of the account
-     * @return Android resource ID representing the color which can be directly set to a view
-     */
-    @ColorInt
-    public static int getActiveAccountColorResource(@NonNull Context context, @NonNull String accountUID) {
-        return AccountsDbAdapter.getInstance().getActiveAccountColor(context, accountUID);
-    }
-
-    /**
      * Returns the account color for the account as an Android resource ID.
      * <p>
      * Basically, if we are in a top level account, use the default title color.
@@ -1362,18 +1490,38 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
      * @return List of commodities in use
      */
     public List<Commodity> getCommoditiesInUse() {
-        Cursor cursor = mDb.query(true, mTableName, new String[]{AccountEntry.COLUMN_COMMODITY_UID},
-            null, null, null, null, null, null);
-        List<Commodity> commodities = new ArrayList<>();
+        String[] columns = new String[]{AccountEntry.COLUMN_COMMODITY_UID};
+        String where = AccountEntry.COLUMN_TEMPLATE + " = 0";
+        Cursor cursor = mDb.query(true, mTableName, columns, where, null, null, null, null, null);
+        Set<Commodity> accountCommodities = new HashSet<>();
         try {
-            while (cursor.moveToNext()) {
-                String currencyUID = cursor.getString(0);
-                commodities.add(commoditiesDbAdapter.getRecord(currencyUID));
+            if (cursor.moveToFirst()) {
+                do {
+                    String commodityUID = cursor.getString(0);
+                    accountCommodities.add(commoditiesDbAdapter.getRecord(commodityUID));
+                } while (cursor.moveToNext());
             }
         } finally {
             cursor.close();
         }
+        List<Commodity> commodities = new ArrayList<>(accountCommodities);
+        Collections.sort(commodities, new Comparator<Commodity>() {
+            @Override
+            public int compare(Commodity o1, Commodity o2) {
+                return Long.compare(o1.id, o2.id);
+            }
+        });
         return commodities;
+    }
+
+    public long getCommoditiesInUseCount() {
+        String sql = "SELECT COUNT(DISTINCT " + AccountEntry.COLUMN_COMMODITY_UID + ")"
+            + " FROM " + mTableName + " a"
+            + ", " + CommodityEntry.TABLE_NAME + " c"
+            + " WHERE a." + AccountEntry.COLUMN_COMMODITY_UID + " = c." + CommodityEntry.COLUMN_UID
+            + " AND c." + CommodityEntry.COLUMN_NAMESPACE + " != ?";
+        String[] sqlArgs = new String[]{Commodity.TEMPLATE};
+        return DatabaseUtils.longForQuery(mDb, sql, sqlArgs);
     }
 
     /**
@@ -1394,7 +1542,6 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
         mDb.delete(BudgetEntry.TABLE_NAME, null, null);
         mDb.delete(RecurrenceEntry.TABLE_NAME, null, null);
         rootUID = null;
-        cache.clear();
 
         return super.deleteAllRecords();
     }
@@ -1416,7 +1563,7 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
                         account.setDefaultTransferAccountUID(null);
                     }
                     if (uid.equals(account.getParentUID())) {
-                        account.setParentUID(getOrCreateGnuCashRootAccountUID());
+                        account.setParentUID(getOrCreateRootAccountUID());
                     }
                 }
             }
@@ -1463,7 +1610,7 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
                 if (isCached) cache.put(uid, account);
                 return account;
             } else {
-                throw new IllegalArgumentException("Record with " + uid + " does not exist");
+                throw new IllegalArgumentException("Account not found");
             }
         } finally {
             cursor.close();
@@ -1484,6 +1631,45 @@ public class AccountsDbAdapter extends DatabaseAdapter<Account> {
     public AccountType getAccountType(@NonNull String accountUID) {
         Account account = getSimpleRecord(accountUID);
         if (account != null) return account.getAccountType();
-        throw new IllegalArgumentException("account " + accountUID + " does not exist in DB");
+        throw new IllegalArgumentException("Account not found");
+    }
+
+    @NonNull
+    @Override
+    public List<Account> getAllRecords() {
+        String where = AccountEntry.COLUMN_TYPE + " != ?"
+            + " AND " + AccountEntry.COLUMN_TEMPLATE + " = 0";
+        String[] whereArgs = new String[]{AccountType.ROOT.name()};
+        return getAllRecords(where, whereArgs);
+    }
+
+    public Map<String, Money> getAccountsBalances(List<Account> accounts, long startTime, long endTime) {
+        SplitsDbAdapter splitsDbAdapter = transactionsDbAdapter.splitsDbAdapter;
+        Map<String, Money> balances = splitsDbAdapter.computeSplitBalances(accounts, startTime, endTime);
+        for (Account account : accounts) {
+            Money balance = balances.get(account.getUID());
+            if (balance == null) continue;
+            if (!account.getAccountType().hasDebitNormalBalance) {
+                balances.put(account.getUID(), balance.unaryMinus());
+            }
+        }
+        return balances;
+    }
+
+    public List<Account> getDescendants(@NonNull Account account) {
+        return getDescendants(account.getUID());
+    }
+
+    public List<Account> getDescendants(@NonNull String accountUID) {
+        List<Account> result = new ArrayList<>();
+        populateDescendants(accountUID, result);
+        return result;
+    }
+
+    private void populateDescendants(@NonNull String accountUID, @NonNull List<Account> result) {
+        List<String> descendantsUIDs = getDescendantAccountUIDs(accountUID, null, null);
+        for (String descendantsUID : descendantsUIDs) {
+            result.add(getSimpleRecord(descendantsUID));
+        }
     }
 }

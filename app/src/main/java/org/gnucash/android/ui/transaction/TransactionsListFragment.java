@@ -55,10 +55,8 @@ import org.gnucash.android.app.MenuFragment;
 import org.gnucash.android.databinding.CardviewTransactionBinding;
 import org.gnucash.android.databinding.FragmentTransactionsListBinding;
 import org.gnucash.android.db.DatabaseCursorLoader;
-import org.gnucash.android.db.DatabaseSchema;
 import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.db.adapter.DatabaseAdapter;
-import org.gnucash.android.db.adapter.SplitsDbAdapter;
 import org.gnucash.android.db.adapter.TransactionsDbAdapter;
 import org.gnucash.android.model.Money;
 import org.gnucash.android.model.Split;
@@ -67,7 +65,6 @@ import org.gnucash.android.ui.common.FormActivity;
 import org.gnucash.android.ui.common.Refreshable;
 import org.gnucash.android.ui.common.UxArgument;
 import org.gnucash.android.ui.homescreen.WidgetConfigurationActivity;
-import org.gnucash.android.ui.settings.PreferenceActivity;
 import org.gnucash.android.ui.transaction.dialog.BulkMoveDialogFragment;
 import org.gnucash.android.ui.util.CursorRecyclerAdapter;
 import org.gnucash.android.util.BackupManager;
@@ -88,6 +85,7 @@ public class TransactionsListFragment extends MenuFragment implements
     private String mAccountUID;
 
     private boolean mUseCompactView = false;
+    private boolean mUseDoubleEntry = true;
 
     private TransactionRecyclerAdapter mTransactionRecyclerAdapter;
 
@@ -100,9 +98,8 @@ public class TransactionsListFragment extends MenuFragment implements
         Bundle args = getArguments();
         mAccountUID = args.getString(UxArgument.SELECTED_ACCOUNT_UID);
 
-        boolean isDoubleEntryDisabled = !GnuCashApplication.isDoubleEntryEnabled();
-        mUseCompactView = PreferenceActivity.getActiveBookSharedPreferences(context)
-                .getBoolean(getString(R.string.key_use_compact_list), false) || isDoubleEntryDisabled;
+        mUseDoubleEntry = GnuCashApplication.isDoubleEntryEnabled(context);
+        mUseCompactView = GnuCashApplication.getBookPreferences(context).getBoolean(getString(R.string.key_use_compact_list), mUseCompactView);
         //if there was a local override of the global setting, respect it
         if (savedInstanceState != null) {
             mUseCompactView = savedInstanceState.getBoolean(getString(R.string.key_use_compact_list), mUseCompactView);
@@ -112,19 +109,16 @@ public class TransactionsListFragment extends MenuFragment implements
     }
 
     @Override
-    public void onSaveInstanceState(Bundle outState) {
+    public void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
         outState.putBoolean(getString(R.string.key_use_compact_list), mUseCompactView);
     }
 
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container,
+    public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         mBinding = FragmentTransactionsListBinding.inflate(inflater, container, false);
-        View view = mBinding.getRoot();
-
-
-        return view;
+        return mBinding.getRoot();
     }
 
     @Override
@@ -135,19 +129,20 @@ public class TransactionsListFragment extends MenuFragment implements
         actionBar.setDisplayShowTitleEnabled(false);
         actionBar.setDisplayHomeAsUpEnabled(true);
 
-        mBinding.list.setHasFixedSize(true);
+        final FragmentTransactionsListBinding binding = mBinding;
+        binding.list.setHasFixedSize(true);
         if (getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE) {
             GridLayoutManager gridLayoutManager = new GridLayoutManager(getActivity(), 2);
-            mBinding.list.setLayoutManager(gridLayoutManager);
+            binding.list.setLayoutManager(gridLayoutManager);
         } else {
             LinearLayoutManager mLayoutManager = new LinearLayoutManager(getActivity());
-            mBinding.list.setLayoutManager(mLayoutManager);
+            binding.list.setLayoutManager(mLayoutManager);
         }
-        mBinding.list.setEmptyView(mBinding.emptyView);
-        mBinding.list.setTag("transactions");
+        binding.list.setEmptyView(binding.emptyView);
+        binding.list.setTag("transactions");
 
         mTransactionRecyclerAdapter = new TransactionRecyclerAdapter(null);
-        mBinding.list.setAdapter(mTransactionRecyclerAdapter);
+        binding.list.setAdapter(mTransactionRecyclerAdapter);
     }
 
     /**
@@ -194,7 +189,7 @@ public class TransactionsListFragment extends MenuFragment implements
         super.onPrepareOptionsMenu(menu);
         MenuItem item = menu.findItem(R.id.menu_toggle_compact);
         item.setChecked(mUseCompactView);
-        item.setEnabled(GnuCashApplication.isDoubleEntryEnabled()); //always compact for single-entry
+        item.setEnabled(mUseDoubleEntry); //always compact for single-entry
     }
 
     @Override
@@ -202,7 +197,7 @@ public class TransactionsListFragment extends MenuFragment implements
         switch (item.getItemId()) {
             case R.id.menu_toggle_compact:
                 item.setChecked(!item.isChecked());
-                mUseCompactView = !mUseCompactView;
+                mUseCompactView = item.isChecked();
                 refresh();
                 return true;
             default:
@@ -289,7 +284,8 @@ public class TransactionsListFragment extends MenuFragment implements
             private final TextView transactionDate;
             private final ImageView editTransaction;
 
-            private String transactionUID;
+            @Nullable
+            private Transaction transaction;
             @ColorInt
             private final int colorBalanceZero;
 
@@ -319,13 +315,18 @@ public class TransactionsListFragment extends MenuFragment implements
                 itemView.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
-                        onListItemClick(transactionUID);
+                        if (transaction != null) {
+                            onListItemClick(transaction.getUID());
+                        }
                     }
                 });
             }
 
             @Override
             public boolean onMenuItemClick(@NonNull MenuItem item) {
+                if (transaction == null) return false;
+                final String transactionUID = transaction.getUID();
+
                 switch (item.getItemId()) {
                     case R.id.menu_delete:
                         deleteTransaction(transactionUID);
@@ -349,27 +350,26 @@ public class TransactionsListFragment extends MenuFragment implements
             }
 
             public void bind(@NonNull Cursor cursor) {
-                transactionUID = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseSchema.TransactionEntry.COLUMN_UID));
-                transactionUID = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseSchema.TransactionEntry.COLUMN_UID));
+                final Context context = itemView.getContext();
+                transaction = mTransactionsDbAdapter.buildModelInstance(cursor);
+                final String transactionUID = transaction.getUID();
 
-                String description = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseSchema.TransactionEntry.COLUMN_DESCRIPTION));
-                primaryText.setText(description);
+                primaryText.setText(transaction.getDescription());
 
-                Money amount = mTransactionsDbAdapter.getBalance(transactionUID, mAccountUID);
+                Money amount = transaction.getBalance(mAccountUID);
                 displayBalance(transactionAmount, amount, colorBalanceZero);
 
-                long dateMillis = cursor.getLong(cursor.getColumnIndexOrThrow(DatabaseSchema.TransactionEntry.COLUMN_TIMESTAMP));
-                String dateText = TransactionsActivity.getPrettyDateFormat(getActivity(), dateMillis);
+                String dateText = TransactionsActivity.getPrettyDateFormat(context, transaction.getTimeMillis());
                 transactionDate.setText(dateText);
 
-                if (mUseCompactView) {
+                if (mUseCompactView || !mUseDoubleEntry) {
                     secondaryText.setVisibility(View.GONE);
                     editTransaction.setVisibility(View.GONE);
                 } else {
                     secondaryText.setVisibility(View.VISIBLE);
                     editTransaction.setVisibility(View.VISIBLE);
 
-                    List<Split> splits = SplitsDbAdapter.getInstance().getSplitsForTransaction(transactionUID);
+                    List<Split> splits = transaction.getSplits();
                     String text = "";
                     String error = null;
 
@@ -386,8 +386,7 @@ public class TransactionsListFragment extends MenuFragment implements
                             text = getString(R.string.label_split_count, splits.size());
                             error = getString(R.string.imbalance_account_name);
                         }
-                    }
-                    if (splits.size() > 2) {
+                    } else if (splits.size() > 2) {
                         text = getString(R.string.label_split_count, splits.size());
                     }
                     secondaryText.setText(text);
@@ -404,7 +403,7 @@ public class TransactionsListFragment extends MenuFragment implements
         }
     }
 
-    private void deleteTransaction(String transactionUID) {
+    private void deleteTransaction(final String transactionUID) {
         final Activity activity = requireActivity();
         if (GnuCashApplication.shouldBackupTransactions(activity)) {
             BackupManager.backupActiveBookAsync(activity, result -> {
@@ -423,7 +422,7 @@ public class TransactionsListFragment extends MenuFragment implements
     private void duplicateTransaction(String transactionUID) {
         try {
             Transaction transaction = mTransactionsDbAdapter.getRecord(transactionUID);
-            Transaction duplicate = new Transaction(transaction, true);
+            Transaction duplicate = new Transaction(transaction);
             duplicate.setTime(System.currentTimeMillis());
             mTransactionsDbAdapter.addRecord(duplicate, DatabaseAdapter.UpdateMethod.insert);
             refresh();

@@ -16,8 +16,6 @@
 
 package org.gnucash.android.ui.account;
 
-import static org.gnucash.android.util.ColorExtKt.parseColor;
-
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.ContentValues;
@@ -29,7 +27,6 @@ import android.os.Build;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
-import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
@@ -40,6 +37,7 @@ import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
+import androidx.annotation.ColorInt;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
@@ -105,7 +103,7 @@ public class AccountsListFragment extends MenuFragment implements
     /**
      * Tag to save {@link AccountsListFragment#mDisplayMode} to fragment state
      */
-    private static final String STATE_DISPLAY_MODE = "mDisplayMode";
+    private static final String STATE_DISPLAY_MODE = "display_mode";
 
     /**
      * Database adapter for loading Account records from the database
@@ -126,13 +124,16 @@ public class AccountsListFragment extends MenuFragment implements
      * Filter for which accounts should be displayed. Used by search interface
      */
     private String mCurrentFilter;
+    private boolean isShowHiddenAccounts = false;
 
     private FragmentAccountsListBinding mBinding;
     private final List<AccountBalanceTask> accountBalanceTasks = new ArrayList<>();
 
     public static AccountsListFragment newInstance(DisplayMode displayMode) {
+        Bundle args = new Bundle();
+        args.putSerializable(STATE_DISPLAY_MODE, displayMode);
         AccountsListFragment fragment = new AccountsListFragment();
-        fragment.mDisplayMode = displayMode;
+        fragment.setArguments(args);
         return fragment;
     }
 
@@ -183,8 +184,15 @@ public class AccountsListFragment extends MenuFragment implements
         super.onCreate(savedInstanceState);
 
         Bundle args = getArguments();
-        if (args != null)
+        if (args != null) {
             mParentAccountUID = args.getString(UxArgument.PARENT_ACCOUNT_UID);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                mDisplayMode = args.getSerializable(STATE_DISPLAY_MODE, DisplayMode.class);
+            } else {
+                mDisplayMode = (DisplayMode) args.getSerializable(STATE_DISPLAY_MODE);
+            }
+            isShowHiddenAccounts = args.getBoolean(UxArgument.SHOW_HIDDEN, isShowHiddenAccounts);
+        }
 
         if (savedInstanceState != null) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -192,6 +200,9 @@ public class AccountsListFragment extends MenuFragment implements
             } else {
                 mDisplayMode = (DisplayMode) savedInstanceState.getSerializable(STATE_DISPLAY_MODE);
             }
+        }
+        if (mDisplayMode == null) {
+            mDisplayMode = DisplayMode.TOP_LEVEL;
         }
 
         // specify an adapter (see also next example)
@@ -242,7 +253,7 @@ public class AccountsListFragment extends MenuFragment implements
      * It shows the delete confirmation dialog if the account has transactions,
      * else deletes the account immediately
      *
-     * @param activity The activity context.
+     * @param activity   The activity context.
      * @param accountUID The UID of the account
      */
     private void tryDeleteAccount(final Activity activity, final String accountUID) {
@@ -285,14 +296,6 @@ public class AccountsListFragment extends MenuFragment implements
     }
 
     @Override
-    public void onCreateOptionsMenu(@NonNull Menu menu, @NonNull MenuInflater inflater) {
-        super.onCreateOptionsMenu(menu, inflater);
-        if (!TextUtils.isEmpty(mParentAccountUID)) {
-            inflater.inflate(R.menu.sub_account_actions, menu);
-        }
-    }
-
-    @Override
     /**
      * Refresh the account list as a sublist of another account
      * @param parentAccountUID GUID of the parent account
@@ -309,6 +312,7 @@ public class AccountsListFragment extends MenuFragment implements
     @Override
     public void refresh() {
         if (isDetached() || getFragmentManager() == null) return;
+        cancelBalances();
         getLoaderManager().restartLoader(0, null, this);
     }
 
@@ -334,6 +338,10 @@ public class AccountsListFragment extends MenuFragment implements
         if (mAccountRecyclerAdapter != null) {
             mAccountRecyclerAdapter.changeCursor(null);
         }
+        cancelBalances();
+    }
+
+    private void cancelBalances() {
         for (AccountBalanceTask task : accountBalanceTasks) {
             task.cancel(true);
         }
@@ -362,7 +370,7 @@ public class AccountsListFragment extends MenuFragment implements
         String parentAccountUID = arguments == null ? null : arguments.getString(UxArgument.PARENT_ACCOUNT_UID);
 
         Context context = requireContext();
-        return new AccountsCursorLoader(context, parentAccountUID, mDisplayMode, mCurrentFilter);
+        return new AccountsCursorLoader(context, parentAccountUID, mDisplayMode, mCurrentFilter, isShowHiddenAccounts);
     }
 
     @SuppressLint("NotifyDataSetChanged")
@@ -418,22 +426,25 @@ public class AccountsListFragment extends MenuFragment implements
         private final String mParentAccountUID;
         private final String mFilter;
         private final DisplayMode mDisplayMode;
+        private final boolean isShowHiddenAccounts;
 
         /**
          * Initializes the loader to load accounts from the database.
          * If the <code>parentAccountId <= 0</code> then only top-level accounts are loaded.
          * Else only the child accounts of the <code>parentAccountId</code> will be loaded
          *
-         * @param context          Application context
-         * @param parentAccountUID GUID of the parent account
-         * @param displayMode      the mode.
-         * @param filter           Account name filter string
+         * @param context              Application context
+         * @param parentAccountUID     GUID of the parent account
+         * @param displayMode          the mode.
+         * @param filter               Account name filter string
+         * @param isShowHiddenAccounts Hidden accounts are visible?
          */
-        public AccountsCursorLoader(Context context, String parentAccountUID, DisplayMode displayMode, @Nullable String filter) {
+        public AccountsCursorLoader(Context context, String parentAccountUID, DisplayMode displayMode, @Nullable String filter, boolean isShowHiddenAccounts) {
             super(context);
             this.mParentAccountUID = parentAccountUID;
             this.mDisplayMode = displayMode;
             this.mFilter = filter;
+            this.isShowHiddenAccounts = isShowHiddenAccounts;
         }
 
         @Override
@@ -444,18 +455,18 @@ public class AccountsListFragment extends MenuFragment implements
             final Cursor cursor;
 
             if (!TextUtils.isEmpty(mParentAccountUID)) {
-                cursor = dbAdapter.fetchSubAccounts(mParentAccountUID);
+                cursor = dbAdapter.fetchSubAccounts(mParentAccountUID, isShowHiddenAccounts);
             } else {
                 switch (mDisplayMode) {
                     case RECENT:
-                        cursor = dbAdapter.fetchRecentAccounts(10, mFilter);
+                        cursor = dbAdapter.fetchRecentAccounts(10, mFilter, isShowHiddenAccounts);
                         break;
                     case FAVORITES:
-                        cursor = dbAdapter.fetchFavoriteAccounts(mFilter);
+                        cursor = dbAdapter.fetchFavoriteAccounts(mFilter, isShowHiddenAccounts);
                         break;
                     case TOP_LEVEL:
                     default:
-                        cursor = dbAdapter.fetchTopLevelAccounts(mFilter);
+                        cursor = dbAdapter.fetchTopLevelAccounts(mFilter, isShowHiddenAccounts);
                         break;
                 }
             }
@@ -469,6 +480,14 @@ public class AccountsListFragment extends MenuFragment implements
         if (DeleteAccountDialogFragment.TAG.equals(requestKey)) {
             boolean refresh = result.getBoolean(Refreshable.EXTRA_REFRESH);
             if (refresh) refreshActivity();
+        }
+    }
+
+    public void setShowHiddenAccounts(boolean isVisible) {
+        boolean wasVisible = isShowHiddenAccounts;
+        if (wasVisible != isVisible) {
+            isShowHiddenAccounts = isVisible;
+            refresh();
         }
     }
 
@@ -527,11 +546,14 @@ public class AccountsListFragment extends MenuFragment implements
             }
 
             public void bind(@NonNull final Cursor cursor) {
+                if (!isResumed()) return;
+                AccountsDbAdapter accountsDbAdapter = mAccountsDbAdapter;
                 final String accountUID = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseSchema.AccountEntry.COLUMN_UID));
                 this.accountUID = accountUID;
+                Account account = accountsDbAdapter.getSimpleRecord(accountUID);
 
-                accountName.setText(cursor.getString(cursor.getColumnIndexOrThrow(DatabaseSchema.AccountEntry.COLUMN_NAME)));
-                int subAccountCount = mAccountsDbAdapter.getSubAccountCount(accountUID);
+                accountName.setText(account.getName());
+                int subAccountCount = accountsDbAdapter.getSubAccountCount(accountUID);
                 if (subAccountCount > 0) {
                     description.setVisibility(View.VISIBLE);
                     String text = getResources().getQuantityString(R.plurals.label_sub_accounts, subAccountCount, subAccountCount);
@@ -543,17 +565,14 @@ public class AccountsListFragment extends MenuFragment implements
                 // add a summary of transactions to the account view
 
                 // Make sure the balance task is truly multi-thread
-                AccountBalanceTask task = new AccountBalanceTask(mAccountsDbAdapter, accountBalance, description.getCurrentTextColor());
+                AccountBalanceTask task = new AccountBalanceTask(accountsDbAdapter, accountBalance, description.getCurrentTextColor());
                 accountBalanceTasks.add(task);
                 task.execute(accountUID);
 
-                String accountColor = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseSchema.AccountEntry.COLUMN_COLOR_CODE));
-                Integer colorValue = parseColor(accountColor);
-                int colorCode = (colorValue != null) ? colorValue : Account.DEFAULT_COLOR;
-                colorStripView.setBackgroundColor(colorCode);
+                @ColorInt int accountColor = getColor(account, accountsDbAdapter);
+                colorStripView.setBackgroundColor(accountColor);
 
-                boolean isPlaceholderAccount = mAccountsDbAdapter.isPlaceholderAccount(accountUID);
-                if (isPlaceholderAccount) {
+                if (account.isPlaceholder()) {
                     createTransaction.setVisibility(View.INVISIBLE);
                 } else {
                     createTransaction.setOnClickListener(new View.OnClickListener() {
@@ -575,7 +594,7 @@ public class AccountsListFragment extends MenuFragment implements
 //                //TODO: include fetch only active budgets
 //                if (!budgets.isEmpty()) {
 //                    Budget budget = budgets.get(0);
-//                    Money balance = mAccountsDbAdapter.getAccountBalance(accountUID, budget.getStartOfCurrentPeriod(), budget.getEndOfCurrentPeriod());
+//                    Money balance = accountsDbAdapter.getAccountBalance(accountUID, budget.getStartOfCurrentPeriod(), budget.getEndOfCurrentPeriod());
 //                    Money budgetAmount = budget.getAmount(accountUID);
 //
 //                    if (budgetAmount != null) {
@@ -589,7 +608,7 @@ public class AccountsListFragment extends MenuFragment implements
 //                    budgetIndicator.setVisibility(View.GONE);
 //                }
 
-                boolean isFavoriteAccount = mAccountsDbAdapter.isFavoriteAccount(accountUID);
+                boolean isFavoriteAccount = accountsDbAdapter.isFavoriteAccount(accountUID);
                 favoriteStatus.setOnCheckedChangeListener(null);
                 favoriteStatus.setChecked(isFavoriteAccount);
                 favoriteStatus.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
@@ -624,6 +643,25 @@ public class AccountsListFragment extends MenuFragment implements
                     default:
                         return false;
                 }
+            }
+
+            @ColorInt
+            private int getColor(@NonNull Account account, @NonNull AccountsDbAdapter accountsDbAdapter) {
+                @ColorInt int color = account.getColor();
+                if (color == Account.DEFAULT_COLOR) {
+                    color = getParentColor(account, accountsDbAdapter);
+                }
+                return color;
+            }
+
+            @ColorInt
+            private int getParentColor(@NonNull Account account, @NonNull AccountsDbAdapter accountsDbAdapter) {
+                String parentUID = account.getParentUID();
+                if (TextUtils.isEmpty(parentUID)) {
+                    return Account.DEFAULT_COLOR;
+                }
+                Account parentAccount = accountsDbAdapter.getSimpleRecord(parentUID);
+                return getColor(parentAccount, accountsDbAdapter);
             }
         }
     }

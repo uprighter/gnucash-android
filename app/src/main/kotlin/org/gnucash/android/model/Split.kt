@@ -2,9 +2,7 @@ package org.gnucash.android.model
 
 import android.os.Parcel
 import android.os.Parcelable
-import java.lang.StringBuilder
 import org.gnucash.android.db.adapter.AccountsDbAdapter
-import java.sql.Timestamp
 
 /**
  * A split amount in a transaction.
@@ -63,7 +61,12 @@ class Split : BaseModel, Parcelable {
     /**
      * Date of the reconciliation. Database required non-null field
      */
-    var reconcileDate = Timestamp(System.currentTimeMillis())
+    var reconcileDate: Long = System.currentTimeMillis()
+
+    /**
+     * Account UID for a scheduled action.
+     */
+    var scheduledActionAccountUID: String? = null
 
     /**
      * Initialize split with a value and quantity amounts and the owning account
@@ -92,7 +95,7 @@ class Split : BaseModel, Parcelable {
      * as both the value and the quantity of this split.
      * @param accountUID String UID of owning account
      */
-    constructor(amount: Money, accountUID: String?) : this(amount, Money(amount), accountUID) {}
+    constructor(amount: Money, accountUID: String?) : this(amount, Money(amount), accountUID)
 
     /**
      * Clones the `sourceSplit` to create a new instance with same fields
@@ -101,20 +104,18 @@ class Split : BaseModel, Parcelable {
      * @param generateUID Determines if the clone should have a new UID or should
      * maintain the one from source
      */
-    constructor(sourceSplit: Split, generateUID: Boolean) {
+    @JvmOverloads
+    constructor(sourceSplit: Split, generateUID: Boolean = true) {
+        if (!generateUID) {
+            setUID(sourceSplit.uid)
+        }
         memo = sourceSplit.memo
         accountUID = sourceSplit.accountUID
         type = sourceSplit.type
         transactionUID = sourceSplit.transactionUID
-        value = Money(sourceSplit.value)
-        quantity = Money(sourceSplit.quantity)
-
-        //todo: clone reconciled status
-        if (generateUID) {
-            generateUID()
-        } else {
-            setUID(sourceSplit.uid)
-        }
+        value = sourceSplit.value
+        quantity = sourceSplit.quantity
+        scheduledActionAccountUID = sourceSplit.scheduledActionAccountUID
     }
 
     /**
@@ -319,7 +320,7 @@ class Split : BaseModel, Parcelable {
 
         dest.writeString(memo.orEmpty())
         dest.writeString(reconcileState.toString())
-        dest.writeString(reconcileDate.toString())
+        dest.writeLong(reconcileDate)
     }
 
     /**
@@ -339,7 +340,7 @@ class Split : BaseModel, Parcelable {
 
         memo = source.readString()
         reconcileState = source.readString()!![0]
-        reconcileDate = Timestamp.valueOf(source.readString())
+        reconcileDate = source.readLong()
     }
 
     companion object {
@@ -377,7 +378,8 @@ class Split : BaseModel, Parcelable {
             splitType: TransactionType
         ): Money {
             val accountUID = accountGUID ?: return Money.createZeroInstance(amount.commodity)
-            val account = AccountsDbAdapter.getInstance().getSimpleRecord(accountUID) ?: return Money.createZeroInstance(amount.commodity)
+            val account = AccountsDbAdapter.getInstance().getSimpleRecord(accountUID)
+                ?: return Money.createZeroInstance(amount.commodity)
             return getFormattedAmount(amount, account, splitType)
         }
 
@@ -397,8 +399,8 @@ class Split : BaseModel, Parcelable {
             account: Account,
             splitType: TransactionType
         ): Money {
-            val isDebitAccount = account.accountType.hasDebitNormalBalance
             val absAmount = amount.abs()
+            val isDebitAccount = account.accountType.hasDebitNormalBalance
             val isDebitSplit = splitType === TransactionType.DEBIT
             return if ((isDebitAccount && isDebitSplit) || (!isDebitAccount && !isDebitSplit)) {
                 absAmount

@@ -30,10 +30,10 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.Menu;
-import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 
+import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
@@ -55,7 +55,6 @@ import org.gnucash.android.db.adapter.AccountsDbAdapter;
 import org.gnucash.android.db.adapter.CommoditiesDbAdapter;
 import org.gnucash.android.importer.ImportAsyncTask;
 import org.gnucash.android.importer.ImportBookCallback;
-import org.gnucash.android.model.Commodity;
 import org.gnucash.android.service.ScheduledActionService;
 import org.gnucash.android.ui.common.BaseDrawerActivity;
 import org.gnucash.android.ui.common.FormActivity;
@@ -125,6 +124,7 @@ public class AccountsActivity extends BaseDrawerActivity implements
      * Filter for which accounts should be displayed. Used by search interface
      */
     private String mCurrentFilter;
+    private boolean isShowHiddenAccounts = false;
 
     @SuppressLint("NotifyDataSetChanged")
     @Override
@@ -303,11 +303,7 @@ public class AccountsActivity extends BaseDrawerActivity implements
 
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
         boolean firstRun = prefs.getBoolean(getString(R.string.key_first_run), true);
-
         if (firstRun) {
-            //default to using double entry and save the preference explicitly
-            prefs.edit().putBoolean(getString(R.string.key_use_double_entry), true).apply();
-
             startActivity(new Intent(context, FirstRunWizardActivity.class));
             finish();
             return;
@@ -333,10 +329,9 @@ public class AccountsActivity extends BaseDrawerActivity implements
     }
 
     @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        MenuInflater inflater = getMenuInflater();
-        menu.clear();
-        inflater.inflate(R.menu.account_actions, menu);
+    public boolean onCreateOptionsMenu(@NonNull Menu menu) {
+        super.onCreateOptionsMenu(menu);
+        getMenuInflater().inflate(R.menu.account_actions, menu);
         // Associate searchable configuration with the SearchView
         SearchView searchView = mSearchView = (SearchView) menu.findItem(R.id.menu_search).getActionView();
         if (searchView != null) {
@@ -350,13 +345,24 @@ public class AccountsActivity extends BaseDrawerActivity implements
     }
 
     @Override
+    public boolean onPrepareOptionsMenu(Menu menu) {
+        MenuItem itemHidden = menu.findItem(R.id.menu_hidden);
+        showHiddenAccounts(itemHidden, isShowHiddenAccounts);
+        return super.onPrepareOptionsMenu(menu);
+    }
+
+    @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         switch (item.getItemId()) {
             case android.R.id.home:
                 return super.onOptionsItemSelected(item);
 
+            case R.id.menu_hidden:
+                toggleHidden(item);
+                return true;
+
             default:
-                return false;
+                return super.onOptionsItemSelected(item);
         }
     }
 
@@ -368,7 +374,28 @@ public class AccountsActivity extends BaseDrawerActivity implements
      * @param currencyCode Currency code to assign to the imported accounts
      */
     public static void createDefaultAccounts(@NonNull final Activity activity, @NonNull final String currencyCode) {
-        createDefaultAccounts(activity, currencyCode, null);
+        Uri uri = new Uri.Builder()
+            .scheme(ContentResolver.SCHEME_ANDROID_RESOURCE)
+            .authority(BuildConfig.APPLICATION_ID)
+            .path(String.valueOf(R.raw.default_accounts))
+            .build();
+        createDefaultAccounts(activity, currencyCode, uri, null);
+    }
+
+    /**
+     * Creates default accounts with the specified currency code.
+     * If the currency parameter is null, then locale currency will be used if available
+     *
+     * @param activity     Activity for providing context and displaying dialogs
+     * @param currencyCode Currency code to assign to the imported accounts
+     */
+    public static void createDefaultAccounts(@NonNull final Activity activity, @NonNull final String currencyCode, @NonNull String assetId, @Nullable final ImportBookCallback callback) {
+        Uri uri = new Uri.Builder()
+            .scheme(ContentResolver.SCHEME_FILE)
+            .encodedAuthority("/android_asset")
+            .path(assetId)
+            .build();
+        createDefaultAccounts(activity, currencyCode, uri, callback);
     }
 
     /**
@@ -379,30 +406,27 @@ public class AccountsActivity extends BaseDrawerActivity implements
      * @param currencyCode Currency code to assign to the imported accounts
      * @param callback     The callback to call when the book has been imported.
      */
-    public static void createDefaultAccounts(@NonNull final Activity activity, @NonNull final String currencyCode, @Nullable final ImportBookCallback callback) {
-        ImportBookCallback delegate = callback;
-        if (!TextUtils.isEmpty(currencyCode)) {
-            delegate = new ImportBookCallback() {
-                @Override
-                public void onBookImported(@Nullable String bookUID) {
-                    Commodity currency = CommoditiesDbAdapter.getInstance().getCommodity(currencyCode);
-                    if (currency != null) {
-                        AccountsDbAdapter.getInstance().updateAllAccounts(DatabaseSchema.AccountEntry.COLUMN_CURRENCY, currencyCode);
-                        AccountsDbAdapter.getInstance().updateAllAccounts(DatabaseSchema.AccountEntry.COLUMN_COMMODITY_UID, currency.getUID());
-                        GnuCashApplication.setDefaultCurrencyCode(activity, currencyCode);
-                    }
-                    if (callback != null) {
-                        callback.onBookImported(bookUID);
-                    }
+    public static void createDefaultAccounts(
+        @NonNull final Activity activity,
+        @Nullable final String currencyCode,
+        @NonNull final Uri uri,
+        @Nullable final ImportBookCallback callback
+    ) {
+        ImportBookCallback delegate = new ImportBookCallback() {
+            @Override
+            public void onBookImported(@Nullable String bookUID) {
+                if (!TextUtils.isEmpty(currencyCode)) {
+                    CommoditiesDbAdapter commoditiesDbAdapter = CommoditiesDbAdapter.getInstance();
+                    String currencyUID = commoditiesDbAdapter.getCommodityUID(currencyCode);
+                    AccountsDbAdapter.getInstance().updateAllAccounts(DatabaseSchema.AccountEntry.COLUMN_COMMODITY_UID, currencyUID);
+                    commoditiesDbAdapter.setDefaultCurrencyCode(currencyCode);
                 }
-            };
-        }
+                if (callback != null) {
+                    callback.onBookImported(bookUID);
+                }
+            }
+        };
 
-        Uri uri = new Uri.Builder()
-            .scheme(ContentResolver.SCHEME_ANDROID_RESOURCE)
-            .authority(BuildConfig.APPLICATION_ID)
-            .path(String.valueOf(R.raw.default_accounts))
-            .build();
         new ImportAsyncTask(activity, delegate).execute(uri);
     }
 
@@ -467,9 +491,10 @@ public class AccountsActivity extends BaseDrawerActivity implements
 
     @Override
     public void accountSelected(String accountUID) {
-        Intent intent = new Intent(this, TransactionsActivity.class);
-        intent.setAction(Intent.ACTION_VIEW);
-        intent.putExtra(UxArgument.SELECTED_ACCOUNT_UID, accountUID);
+        Intent intent = new Intent(this, TransactionsActivity.class)
+            .setAction(Intent.ACTION_VIEW)
+            .putExtra(UxArgument.SELECTED_ACCOUNT_UID, accountUID)
+            .putExtra(UxArgument.SHOW_HIDDEN, isShowHiddenAccounts);
 
         startActivity(intent);
     }
@@ -527,4 +552,22 @@ public class AccountsActivity extends BaseDrawerActivity implements
         }
     }
 
+    private void toggleHidden(@NonNull MenuItem item) {
+        showHiddenAccounts(item, !item.isChecked());
+    }
+
+    private void showHiddenAccounts(@NonNull MenuItem item, boolean isVisible) {
+        item.setChecked(isVisible);
+        @DrawableRes int visibilityIcon = isVisible ? R.drawable.ic_visibility_off : R.drawable.ic_visibility;
+        item.setIcon(visibilityIcon);
+        isShowHiddenAccounts = isVisible;
+        // apply to each page
+        final int count = mPagerAdapter.getItemCount();
+        for (int i = 0; i < count; i++) {
+            AccountsListFragment fragment = (AccountsListFragment) mPagerAdapter.getFragment(i);
+            if (fragment != null) {
+                fragment.setShowHiddenAccounts(isShowHiddenAccounts);
+            }
+        }
+    }
 }
