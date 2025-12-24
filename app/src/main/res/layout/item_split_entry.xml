@@ -30,7 +30,7 @@ limitations under the License.
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
-            android:text="USD"
+            android:text="$"
             android:textAppearance="?android:textAppearanceMedium"
             android:textColor="@color/debit_red" />
 
@@ -59,7 +59,6 @@ limitations under the License.
             android:layout_height="wrap_content"
             android:layout_gravity="center_vertical"
             android:layout_marginStart="4dp"
-            android:checked="false"
             android:textOff="@string/label_debit"
             android:textOn="@string/label_credit"
             android:textSize="14sp"
@@ -70,11 +69,9 @@ limitations under the License.
             android:layout_width="40dp"
             android:layout_height="40dp"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:paddingStart="22dp"
-            android:paddingTop="6dp"
-            android:paddingEnd="6dp"
-            android:paddingBottom="6dp"
-            android:src="@drawable/ic_close"
+            android:paddingStart="12dp"
+            android:paddingBottom="12dp"
+            android:src="@drawable/ic_delete"
             tools:ignore="ContentDescription" />
     </LinearLayout>
 
@@ -83,7 +80,7 @@ limitations under the License.
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
-        android:minHeight="32dp"
+        android:minHeight="?android:attr/listPreferredItemHeight"
         android:paddingStart="@dimen/dialog_padding"
         android:paddingEnd="@dimen/dialog_padding" />
 

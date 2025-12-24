@@ -11,7 +11,7 @@ import org.gnucash.android.databinding.ListItemScheduledTrxnBinding
 import org.gnucash.android.db.adapter.ScheduledActionDbAdapter
 import org.gnucash.android.model.ScheduledAction
 import org.gnucash.android.ui.common.Refreshable
-import org.gnucash.android.util.BackupManager
+import org.gnucash.android.util.BackupManager.backupActiveBookAsync
 import org.gnucash.android.util.formatMediumDateTime
 
 abstract class ScheduledViewHolder(
@@ -19,7 +19,7 @@ abstract class ScheduledViewHolder(
     protected val refreshable: Refreshable
 ) : RecyclerView.ViewHolder(binding.root), PopupMenu.OnMenuItemClickListener {
     protected val scheduledActionDbAdapter: ScheduledActionDbAdapter =
-        ScheduledActionDbAdapter.getInstance()
+        ScheduledActionDbAdapter.instance
 
     protected val primaryTextView: TextView = binding.primaryText
     protected val descriptionTextView: TextView = binding.secondaryText
@@ -30,11 +30,11 @@ abstract class ScheduledViewHolder(
 
     init {
         menuView.setOnClickListener { v: View ->
-            val popup = PopupMenu(v.context, v)
-            popup.setOnMenuItemClickListener(this@ScheduledViewHolder)
-            val inflater = popup.menuInflater
-            inflater.inflate(R.menu.schedxactions_context_menu, popup.menu)
-            popup.show()
+            val popupMenu = PopupMenu(v.context, v)
+            popupMenu.setOnMenuItemClickListener(this@ScheduledViewHolder)
+            val inflater = popupMenu.menuInflater
+            inflater.inflate(R.menu.schedxactions_context_menu, popupMenu.menu)
+            popupMenu.show()
         }
     }
 
@@ -48,7 +48,7 @@ abstract class ScheduledViewHolder(
         val context = itemView.context
         val lastTime = scheduledAction.lastRunTime
         if (lastTime > 0) {
-            val endTime = scheduledAction.endTime
+            val endTime = scheduledAction.endDate
             val period = if (endTime > 0 && endTime < System.currentTimeMillis()) {
                 context.getString(R.string.label_scheduled_action_ended)
             } else {
@@ -69,7 +69,7 @@ abstract class ScheduledViewHolder(
                 val action = scheduledAction
                 if (action != null) {
                     val activity = itemView.context.findActivity()
-                    BackupManager.backupActiveBookAsync(activity) {
+                    backupActiveBookAsync(activity) {
                         deleteSchedule(action)
                         refreshable.refresh()
                     }

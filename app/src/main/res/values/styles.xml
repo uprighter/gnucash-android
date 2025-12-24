@@ -73,8 +73,7 @@
         <item name="android:layout_marginTop">@dimen/hint_margin</item>
         <item name="android:layout_marginBottom">@dimen/hint_margin</item>
         <item name="android:textColor">@color/light_gray</item>
-        <item name="android:textSize">12sp</item>
-        <item name="android:textAppearance">?android:attr/textAppearanceSmall</item>
+        <item name="android:textAppearance">?android:attr/textAppearanceMedium</item>
     </style>
 
     <style name="ImageButton.Transparent" parent="Widget.AppCompat.ImageButton">
@@ -100,15 +99,18 @@
     </style>
 
     <style name="PasscodeEditText" parent="Widget.AppCompat.EditText">
-        <item name="android:layout_width">wrap_content</item>
-        <item name="android:layout_height">match_parent</item>
+        <item name="android:layout_width">24sp</item>
+        <item name="android:layout_height">24sp</item>
         <item name="android:cursorVisible">false</item>
         <item name="android:focusableInTouchMode">false</item>
         <item name="android:inputType">textPassword|number</item>
         <item name="android:password">true</item>
         <item name="android:maxLength">1</item>
         <item name="android:hint">*</item>
-        <item name="android:textSize">23sp</item>
+        <item name="android:textSize">20sp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:background">@drawable/numeric_button</item>
+        <item name="android:padding">0dp</item>
     </style>
 
     <style name="Divider">
@@ -184,5 +186,12 @@
     <!-- Recurrence -->
     <style name="TextAppearance.RecurrencePickerStyle">
         <item name="android:textSize">15sp</item>
+    </style>
+
+    <style name="Text.Empty" parent="Widget.AppCompat.TextView">
+        <item name="android:gravity">center</item>
+        <item name="android:textAppearance">?android:textAppearanceLarge</item>
+        <item name="android:textColor">@color/theme_accent</item>
+        <item name="android:visibility">gone</item>
     </style>
 </resources>

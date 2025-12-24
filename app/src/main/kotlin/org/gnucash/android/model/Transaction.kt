@@ -18,7 +18,9 @@ package org.gnucash.android.model
 import android.content.Intent
 import org.gnucash.android.BuildConfig
 import org.gnucash.android.db.adapter.AccountsDbAdapter
+import org.gnucash.android.model.Transaction.Companion.computeBalance
 import org.gnucash.android.util.formatShortDate
+import java.math.BigDecimal
 import java.util.Date
 
 /**
@@ -29,6 +31,7 @@ import java.util.Date
  * @author Ngewi Fet <ngewif@gmail.com>
  */
 class Transaction : BaseModel {
+
     /**
      * GUID of commodity associated with this transaction
      */
@@ -41,15 +44,13 @@ class Transaction : BaseModel {
 
     /**
      * Flag indicating if this transaction has been exported before or not
-     * The transactions are typically exported as bank statement in the OFX format
      */
     var isExported = false
 
     /**
      * Timestamp when this transaction occurred
      */
-    var timeMillis: Long = 0
-        private set
+    var time: Long = 0
 
     /**
      * Flag indicating that this transaction is a template
@@ -61,15 +62,20 @@ class Transaction : BaseModel {
      */
     var scheduledActionUID: String? = null
 
+    var number: String? = null
+
     /**
      * Overloaded constructor. Creates a new transaction instance with the
      * provided data and initializes the rest to default values.
      *
-     * @param name Name of the transaction
+     * @param description Description of the transaction
      */
-    constructor(name: String?) {
+    constructor(description: String?) {
+        this.description = description
+    }
+
+    init {
         initDefaults()
-        description = name
     }
 
     /**
@@ -80,20 +86,19 @@ class Transaction : BaseModel {
      * is set to false. Otherwise, a new one is generated.<br />
      * The export flag and the template flag are not copied from the old transaction to the new.
      *
-     * @param transaction    Transaction to be cloned
      * @param generateNewUID Flag to determine if new UID should be assigned or not
      */
-    @JvmOverloads
-    constructor(transaction: Transaction, generateNewUID: Boolean = true) {
-        initDefaults()
+    fun copy(generateNewUID: Boolean = true): Transaction {
+        val clone = Transaction(description)
         if (!generateNewUID) {
-            setUID(transaction.uid)
+            clone.setUID(uid)
         }
-        description = transaction.description
-        note = transaction.note
-        timeMillis = transaction.timeMillis
-        commodity = transaction.commodity
-        splits = transaction.splits.map { Split(it, generateNewUID) }
+        clone.commodity = commodity
+        clone.note = note
+        clone.number = number
+        clone.splits = splits.map { it.copy(generateNewUID) }
+        clone.time = time
+        return clone
     }
 
     /**
@@ -101,7 +106,7 @@ class Transaction : BaseModel {
      */
     private fun initDefaults() {
         commodity = Commodity.DEFAULT_COMMODITY
-        timeMillis = System.currentTimeMillis()
+        time = System.currentTimeMillis()
     }
 
     /**
@@ -188,7 +193,7 @@ class Transaction : BaseModel {
      * @see computeBalance
      */
     fun getBalance(accountUID: String): Money {
-        return computeBalance(accountUID, splits)
+        return computeBalance(accountUID, splits, true)
     }
 
     /**
@@ -200,8 +205,8 @@ class Transaction : BaseModel {
      * @return Money balance of the transaction for the specified account
      * @see computeBalance
      */
-    fun getBalance(account: Account): Money {
-        return computeBalance(account, splits)
+    fun getBalance(account: Account, display: Boolean): Money {
+        return computeBalance(account, splits, display)
     }
 
     /**
@@ -259,7 +264,7 @@ class Transaction : BaseModel {
      */
     var description: String? = ""
         set(value) {
-            field = value?.trim { it <= ' ' }.orEmpty()
+            field = value?.trim().orEmpty()
         }
 
     /**
@@ -268,20 +273,11 @@ class Transaction : BaseModel {
      * @param timestamp Time when transaction occurred as [Date]
      */
     fun setTime(timestamp: Date) {
-        timeMillis = timestamp.time
-    }
-
-    /**
-     * Sets the time when the transaction occurred
-     *
-     * @param timeInMillis Time in milliseconds
-     */
-    fun setTime(timeInMillis: Long) {
-        timeMillis = timeInMillis
+        time = timestamp.time
     }
 
     override fun toString(): String {
-        return "{description: $description, date: ${formatShortDate(timeMillis)}}"
+        return "{description: $description, date: ${formatShortDate(time)}}"
     }
 
     fun getTransferSplit(accountUID: String): Split? {
@@ -289,6 +285,27 @@ class Transaction : BaseModel {
         return splits.firstOrNull { it.accountUID != accountUID && (it.value == amount) }
             ?: splits.firstOrNull { it.accountUID != accountUID }
     }
+
+    fun getDefaultAccountUID(type: TransactionType): String? {
+        if (splits.isEmpty()) {
+            return null
+        }
+        var accountUID: String? = null
+        var valueMax: BigDecimal? = null
+        for (split in splits) {
+            val value: BigDecimal = split.value.toBigDecimal()
+            if (valueMax == null || value > valueMax) {
+                valueMax = value
+                accountUID = split.accountUID
+            } else if (split.type == type && value == valueMax) {
+                accountUID = split.accountUID
+            }
+        }
+        return accountUID
+    }
+
+    // Prefer DEBIT over CREDIT
+    val defaultAccountUID: String? get() = getDefaultAccountUID(TransactionType.DEBIT)
 
     companion object {
         /**
@@ -346,11 +363,10 @@ class Transaction : BaseModel {
          * @param splits  List of splits
          * @return Money list of splits
          */
-        @JvmStatic
-        fun computeBalance(accountUID: String, splits: List<Split>): Money {
-            val accountsDbAdapter = AccountsDbAdapter.getInstance()
-            val account = accountsDbAdapter.getSimpleRecord(accountUID)!!
-            return computeBalance(account, splits)
+        fun computeBalance(accountUID: String, splits: List<Split>, display: Boolean): Money {
+            val accountsDbAdapter = AccountsDbAdapter.instance
+            val account = accountsDbAdapter.getRecord(accountUID)
+            return computeBalance(account, splits, display)
         }
 
         /**
@@ -364,12 +380,15 @@ class Transaction : BaseModel {
          * @param splits  List of splits
          * @return Money list of splits
          */
-        @JvmStatic
-        fun computeBalance(account: Account, splits: List<Split>): Money {
+        fun computeBalance(account: Account, splits: List<Split>, display: Boolean = false): Money {
             val accountUID = account.uid
             val accountType = account.accountType
             val accountCommodity = account.commodity
-            val isDebitAccount = accountType.hasDebitDisplayBalance
+            val isDebitAccount = if (display) {
+                accountType.hasDebitDisplayBalance
+            } else {
+                accountType.hasDebitNormalBalance
+            }
             var balance = Money.createZeroInstance(accountCommodity)
             for (split in splits) {
                 if (split.accountUID != accountUID) continue
@@ -397,7 +416,6 @@ class Transaction : BaseModel {
          * @param shouldReduceBalance `true` if type should reduce balance, `false` otherwise
          * @return TransactionType for the account
          */
-        @JvmStatic
         fun getTypeForBalance(
             accountType: AccountType,
             shouldReduceBalance: Boolean
@@ -417,19 +435,17 @@ class Transaction : BaseModel {
          * @param transaction Transaction used to create intent
          * @return Intent with transaction details as extras
          */
-        @JvmStatic
         fun createIntent(transaction: Transaction): Intent {
             val stringBuilder = StringBuilder()
             for (split in transaction.splits) {
                 stringBuilder.append(split.toCsv()).append("\n")
             }
-            val intent = Intent(Intent.ACTION_INSERT)
+            return Intent(Intent.ACTION_INSERT)
                 .setType(MIME_TYPE)
                 .putExtra(Intent.EXTRA_TITLE, transaction.description)
                 .putExtra(Intent.EXTRA_TEXT, transaction.note)
                 .putExtra(Account.EXTRA_CURRENCY_CODE, transaction.currencyCode)
                 .putExtra(EXTRA_SPLITS, stringBuilder.toString())
-            return intent
         }
     }
 }

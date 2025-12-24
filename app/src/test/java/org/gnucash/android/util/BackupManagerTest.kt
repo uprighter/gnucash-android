@@ -3,6 +3,7 @@ package org.gnucash.android.util
 import junit.framework.TestCase.fail
 import org.assertj.core.api.Assertions.assertThat
 import org.gnucash.android.R
+import org.gnucash.android.app.GnuCashApplication
 import org.gnucash.android.db.adapter.BooksDbAdapter
 import org.gnucash.android.importer.GncXmlImporter
 import org.gnucash.android.test.unit.GnuCashTest
@@ -15,9 +16,14 @@ class BackupManagerTest : GnuCashTest() {
 
     @Before
     fun setUp() {
-        booksDbAdapter = BooksDbAdapter.getInstance()
+        booksDbAdapter = BooksDbAdapter.instance
         booksDbAdapter.deleteAllRecords()
         assertThat(booksDbAdapter.recordsCount).isZero()
+        try {
+            val activeBookUID = GnuCashApplication.activeBookUID
+            assertThat(activeBookUID).isNull()
+        } catch (_: BooksDbAdapter.NoActiveBookFoundException) {
+        }
     }
 
     @Test
@@ -30,7 +36,7 @@ class BackupManagerTest : GnuCashTest() {
         BackupManager.backupAllBooks()
 
         for (bookUID in booksDbAdapter.allBookUIDs) {
-            assertThat(BackupManager.getBackupList(context, bookUID).size).isOne()
+            assertThat(BackupManager.getBackupList(context, bookUID)).hasSize(1)
         }
     }
 
@@ -43,7 +49,7 @@ class BackupManagerTest : GnuCashTest() {
         Thread.sleep(1000) // FIXME: Use Mockito to get a different date in Exporter.buildExportFilename
         assertThat(BackupManager.backupActiveBook()).isTrue()
 
-        assertThat(BackupManager.getBackupList(context, bookUID).size).isEqualTo(2)
+        assertThat(BackupManager.getBackupList(context, bookUID)).hasSize(2)
     }
 
     @Test

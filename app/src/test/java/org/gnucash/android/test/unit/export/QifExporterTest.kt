@@ -30,7 +30,6 @@ import org.gnucash.android.model.Account
 import org.gnucash.android.model.AccountType
 import org.gnucash.android.model.Book
 import org.gnucash.android.model.Commodity
-import org.gnucash.android.model.Commodity.Companion.getInstance
 import org.gnucash.android.model.Money
 import org.gnucash.android.model.Money.Companion.createZeroInstance
 import org.gnucash.android.model.Split
@@ -44,10 +43,11 @@ import java.io.BufferedReader
 import java.io.File
 import java.io.FileReader
 import java.io.IOException
+import java.util.Calendar
 import java.util.zip.ZipFile
 
 class QifExporterTest : BookHelperTest() {
-    private var bookUID: String? = null
+    private lateinit var bookUID: String
     private lateinit var db: SQLiteDatabase
 
     @Before
@@ -62,8 +62,8 @@ class QifExporterTest : BookHelperTest() {
 
     @After
     override fun tearDown() {
-        val booksDbAdapter = BooksDbAdapter.getInstance()
-        booksDbAdapter.deleteBook(context, bookUID!!)
+        val booksDbAdapter = BooksDbAdapter.instance
+        booksDbAdapter.deleteBook(context, bookUID)
         db.close()
     }
 
@@ -74,10 +74,10 @@ class QifExporterTest : BookHelperTest() {
     @Test
     fun testWithNoTransactionsToExport_shouldNotCreateAnyFile() {
         val exportParameters = ExportParams(ExportFormat.QIF)
-        exportParameters.exportStartTime = TimestampHelper.getTimestampFromEpochZero()
+        exportParameters.exportStartTime = TimestampHelper.timestampFromEpochZero
         exportParameters.exportTarget = ExportParams.ExportTarget.SD_CARD
-        exportParameters.setDeleteTransactionsAfterExport(false)
-        val exporter = QifExporter(context, exportParameters, bookUID!!)
+        exportParameters.deleteTransactionsAfterExport = false
+        val exporter = QifExporter(context, exportParameters, bookUID)
         val exportedFile = exporter.export()
         assertThat(exportedFile).isNull()
     }
@@ -92,21 +92,21 @@ class QifExporterTest : BookHelperTest() {
 
         val account = Account("Basic Account")
         val transaction = Transaction("One transaction")
-        transaction.addSplit(Split(createZeroInstance("EUR"), account.uid))
+        transaction.addSplit(Split(createZeroInstance("EUR"), account))
         account.addTransaction(transaction)
 
         accountsDbAdapter.addRecord(account)
 
         val exportParameters = ExportParams(ExportFormat.QIF)
-        exportParameters.exportStartTime = TimestampHelper.getTimestampFromEpochZero()
+        exportParameters.exportStartTime = TimestampHelper.timestampFromEpochZero
         exportParameters.exportTarget = ExportParams.ExportTarget.SD_CARD
-        exportParameters.setDeleteTransactionsAfterExport(false)
+        exportParameters.deleteTransactionsAfterExport = false
 
-        val exporter = QifExporter(context, exportParameters, bookUID!!)
+        val exporter = QifExporter(context, exportParameters, bookUID)
         val exportedFile = exporter.export()
 
         assertThat(exportedFile).isNotNull()
-        val file = File(exportedFile!!.path)
+        val file = File(exportedFile!!.path!!)
         assertThat(file).exists().hasExtension("qif")
         assertThat(file.length()).isGreaterThan(0L)
         file.delete()
@@ -122,16 +122,16 @@ class QifExporterTest : BookHelperTest() {
         val holder = DatabaseHolder(context, db)
         val accountsDbAdapter = AccountsDbAdapter(holder)
 
-        val account = Account("Basic Account", getInstance("EUR"))
+        val account = Account("Basic Account", Commodity.getInstance("EUR"))
         val transaction = Transaction("One transaction")
-        transaction.addSplit(Split(createZeroInstance("EUR"), account.uid))
+        transaction.addSplit(Split(createZeroInstance("EUR"), account))
         account.addTransaction(transaction)
         accountsDbAdapter.addRecord(account)
 
-        val foreignAccount = Account("US Konto", getInstance("USD"))
+        val foreignAccount = Account("US Konto", Commodity.getInstance("USD"))
         val multiCurr = Transaction("multi-currency")
-        val split1 = Split(Money("12", "USD"), Money("15", "EUR"), foreignAccount.uid)
-        val split2 = split1.createPair(account.uid)
+        val split1 = Split(Money("12", "USD"), Money("15", "EUR"), foreignAccount)
+        val split2 = split1.createPair(account)
         multiCurr.addSplit(split1)
         multiCurr.addSplit(split2)
         foreignAccount.addTransaction(multiCurr)
@@ -139,15 +139,15 @@ class QifExporterTest : BookHelperTest() {
         accountsDbAdapter.addRecord(foreignAccount)
 
         val exportParameters = ExportParams(ExportFormat.QIF)
-        exportParameters.exportStartTime = TimestampHelper.getTimestampFromEpochZero()
+        exportParameters.exportStartTime = TimestampHelper.timestampFromEpochZero
         exportParameters.exportTarget = ExportParams.ExportTarget.SD_CARD
-        exportParameters.setDeleteTransactionsAfterExport(false)
+        exportParameters.deleteTransactionsAfterExport = false
 
-        val exporter = QifExporter(context, exportParameters, bookUID!!)
+        val exporter = QifExporter(context, exportParameters, bookUID)
         val exportedFile = exporter.export()
 
         assertThat(exportedFile).isNotNull()
-        val file = File(exportedFile!!.path)
+        val file = File(exportedFile!!.path!!)
         assertThat(file).exists().hasExtension("zip")
         assertThat(ZipFile(file).size()).isEqualTo(2)
         file.delete()
@@ -160,30 +160,36 @@ class QifExporterTest : BookHelperTest() {
     fun memoAndDescription_shouldBeExported() {
         val expectedDescription = "my description"
         val expectedMemo = "my memo"
+        val expectedNumber = "n123"
         val expectedAccountName = "Basic Account"
+        val expectedTime = Calendar.getInstance().apply {
+            set(2025, Calendar.SEPTEMBER, 12)
+        }.timeInMillis
 
         val holder = DatabaseHolder(context, db)
         val accountsDbAdapter = AccountsDbAdapter(holder)
 
         val account = Account(expectedAccountName)
         val transaction = Transaction("One transaction")
-        transaction.addSplit(Split(Money("123.45", "EUR"), account.uid))
+        transaction.addSplit(Split(Money(-123.45, "EUR"), account))
         transaction.description = expectedDescription
         transaction.note = expectedMemo
+        transaction.number = expectedNumber
+        transaction.time = expectedTime
         account.addTransaction(transaction)
 
         accountsDbAdapter.addRecord(account)
 
         val exportParameters = ExportParams(ExportFormat.QIF)
-        exportParameters.exportStartTime = TimestampHelper.getTimestampFromEpochZero()
+        exportParameters.exportStartTime = TimestampHelper.timestampFromEpochZero
         exportParameters.exportTarget = ExportParams.ExportTarget.SD_CARD
-        exportParameters.setDeleteTransactionsAfterExport(false)
+        exportParameters.deleteTransactionsAfterExport = false
 
-        val exporter = QifExporter(context, exportParameters, bookUID!!)
+        val exporter = QifExporter(context, exportParameters, bookUID)
         val exportedFile = exporter.export()
 
         assertThat(exportedFile).isNotNull()
-        val file = File(exportedFile!!.path)
+        val file = File(exportedFile!!.path!!)
         assertThat(file).exists().hasExtension("qif")
         val fileContent = readFileContent(file)
         assertThat(fileContent).isNotEmpty()
@@ -195,14 +201,15 @@ class QifExporterTest : BookHelperTest() {
         assertThat(lines[2]).isEqualTo(QifHelper.TYPE_PREFIX + "Cash")
         assertThat(lines[3]).isEqualTo(QifHelper.ENTRY_TERMINATOR)
         assertThat(lines[4]).isEqualTo(QifHelper.TRANSACTION_TYPE_PREFIX + "Cash")
-        assertThat(lines[5]).startsWith(QifHelper.DATE_PREFIX)
+        assertThat(lines[5]).isEqualTo(QifHelper.DATE_PREFIX + "2025/9/12")
         assertThat(lines[6]).isEqualTo(QifHelper.CATEGORY_PREFIX + "[" + expectedAccountName + "]")
         assertThat(lines[7]).isEqualTo(QifHelper.PAYEE_PREFIX + expectedDescription)
-        assertThat(lines[8]).isEqualTo(QifHelper.MEMO_PREFIX + expectedMemo)
-        assertThat(lines[9]).isEqualTo(QifHelper.SPLIT_CATEGORY_PREFIX + "[Imbalance-USD]")
-        assertThat(lines[10]).isEqualTo(QifHelper.SPLIT_AMOUNT_PREFIX + "-123.45")
-        assertThat(lines[11]).isEqualTo(QifHelper.TOTAL_AMOUNT_PREFIX + "-123.45")
-        assertThat(lines[12]).isEqualTo(QifHelper.ENTRY_TERMINATOR)
+        assertThat(lines[8]).isEqualTo(QifHelper.NUMBER_PREFIX + expectedNumber)
+        assertThat(lines[9]).isEqualTo(QifHelper.MEMO_PREFIX + expectedMemo)
+        assertThat(lines[10]).isEqualTo(QifHelper.SPLIT_CATEGORY_PREFIX + "[Imbalance-USD]")
+        assertThat(lines[11]).isEqualTo(QifHelper.SPLIT_AMOUNT_PREFIX + "-123.45")
+        assertThat(lines[12]).isEqualTo(QifHelper.TOTAL_AMOUNT_PREFIX + "-123.45")
+        assertThat(lines[13]).isEqualTo(QifHelper.ENTRY_TERMINATOR)
         file.delete()
     }
 
@@ -214,21 +221,21 @@ class QifExporterTest : BookHelperTest() {
         val bookUID = importGnuCashXml("simpleTransactionImport.xml")
         assertThat(BooksDbAdapter.isBookDatabase(bookUID)).isTrue()
 
-        assertThat(transactionsDbAdapter!!.recordsCount).isOne()
+        assertThat(transactionsDbAdapter.recordsCount).isOne()
 
-        val transaction = transactionsDbAdapter!!.getRecord("b33c8a6160494417558fd143731fc26a")
-        assertThat(transaction.splits.size).isEqualTo(2)
+        val transaction = transactionsDbAdapter.getRecord("b33c8a6160494417558fd143731fc26a")
+        assertThat(transaction.splits).hasSize(2)
 
         val exportParameters = ExportParams(ExportFormat.QIF)
-        exportParameters.exportStartTime = TimestampHelper.getTimestampFromEpochZero()
+        exportParameters.exportStartTime = TimestampHelper.timestampFromEpochZero
         exportParameters.exportTarget = ExportParams.ExportTarget.SD_CARD
-        exportParameters.setDeleteTransactionsAfterExport(false)
+        exportParameters.deleteTransactionsAfterExport = false
 
         val exporter = QifExporter(context, exportParameters, bookUID)
         val exportedFile = exporter.export()
 
         assertThat(exportedFile).isNotNull()
-        val file = File(exportedFile!!.path)
+        val file = File(exportedFile!!.path!!)
         assertThat(file).exists().hasExtension("qif")
         val fileContent = readFileContent(file)
         assertThat(fileContent).isNotEmpty()
@@ -267,18 +274,18 @@ class QifExporterTest : BookHelperTest() {
         assertThat(transaction.description).isEqualTo("Tandoori Mahal")
 
         // Check splits
-        assertThat(transaction.splits.size).isEqualTo(3)
+        assertThat(transaction.splits).hasSize(3)
 
         val exportParameters = ExportParams(ExportFormat.QIF)
-        exportParameters.exportStartTime = TimestampHelper.getTimestampFromEpochZero()
+        exportParameters.exportStartTime = TimestampHelper.timestampFromEpochZero
         exportParameters.exportTarget = ExportParams.ExportTarget.SD_CARD
-        exportParameters.setDeleteTransactionsAfterExport(false)
+        exportParameters.deleteTransactionsAfterExport = false
 
         val exporter = QifExporter(context, exportParameters, bookUID)
         val exportedFile = exporter.export()
 
         assertThat(exportedFile).isNotNull()
-        val file = File(exportedFile!!.path)
+        val file = File(exportedFile!!.path!!)
         assertThat(file).exists().hasExtension("qif")
         val fileContent = readFileContent(file)
         assertThat(fileContent).isNotEmpty()
@@ -314,6 +321,9 @@ class QifExporterTest : BookHelperTest() {
         val expectedMemo = "my memo"
         val expectedAccountName1 = "Basic Account"
         val expectedAccountName2 = "Cash in Wallet"
+        val expectedTime = Calendar.getInstance().apply {
+            set(2025, Calendar.JULY, 29)
+        }.timeInMillis
 
         val holder = DatabaseHolder(context, db)
         val accountsDbAdapter = AccountsDbAdapter(holder)
@@ -328,25 +338,26 @@ class QifExporterTest : BookHelperTest() {
 
         val transactionsDbAdapter = TransactionsDbAdapter(holder)
         val transaction = Transaction("One transaction")
-        val split1 = Split(Money(123.45, Commodity.EUR), account1.uid)
-        val split2 = split1.createPair(account2.uid)
+        val split1 = Split(Money(-123.45, Commodity.EUR), account1)
+        val split2 = split1.createPair(account2)
         split2.accountUID = account2.uid
         transaction.addSplit(split1)
         transaction.addSplit(split2)
         transaction.description = expectedDescription
         transaction.note = expectedMemo
+        transaction.time = expectedTime
         transactionsDbAdapter.addRecord(transaction)
 
         val exportParameters = ExportParams(ExportFormat.QIF)
-        exportParameters.exportStartTime = TimestampHelper.getTimestampFromEpochZero()
+        exportParameters.exportStartTime = TimestampHelper.timestampFromEpochZero
         exportParameters.exportTarget = ExportParams.ExportTarget.SD_CARD
-        exportParameters.setDeleteTransactionsAfterExport(false)
+        exportParameters.deleteTransactionsAfterExport = false
 
-        val exporter = QifExporter(context, exportParameters, bookUID!!)
+        val exporter = QifExporter(context, exportParameters, bookUID)
         val exportedFile = exporter.export()
 
         assertThat(exportedFile).isNotNull()
-        val file = File(exportedFile!!.path)
+        val file = File(exportedFile!!.path!!)
         assertThat(file).exists().hasExtension("qif")
         val fileContent = readFileContent(file)
         assertThat(fileContent).isNotEmpty()
@@ -358,7 +369,7 @@ class QifExporterTest : BookHelperTest() {
         assertThat(lines[2]).isEqualTo(QifHelper.TYPE_PREFIX + "Cash")
         assertThat(lines[3]).isEqualTo(QifHelper.ENTRY_TERMINATOR)
         assertThat(lines[4]).isEqualTo(QifHelper.TRANSACTION_TYPE_PREFIX + "Cash")
-        assertThat(lines[5]).startsWith(QifHelper.DATE_PREFIX)
+        assertThat(lines[5]).isEqualTo(QifHelper.DATE_PREFIX + "2025/7/29")
         assertThat(lines[6]).isEqualTo(QifHelper.CATEGORY_PREFIX + "[" + expectedAccountName1 + "]")
         assertThat(lines[7]).isEqualTo(QifHelper.PAYEE_PREFIX + expectedDescription)
         assertThat(lines[8]).isEqualTo(QifHelper.MEMO_PREFIX + expectedMemo)

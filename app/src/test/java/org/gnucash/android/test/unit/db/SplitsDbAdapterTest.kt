@@ -17,7 +17,7 @@ package org.gnucash.android.test.unit.db
 
 import android.database.sqlite.SQLiteException
 import org.assertj.core.api.Assertions.assertThat
-import org.gnucash.android.db.DatabaseSchema
+import org.gnucash.android.db.DatabaseSchema.TransactionEntry
 import org.gnucash.android.db.adapter.AccountsDbAdapter
 import org.gnucash.android.db.adapter.SplitsDbAdapter
 import org.gnucash.android.db.adapter.TransactionsDbAdapter
@@ -43,9 +43,9 @@ class SplitsDbAdapterTest : GnuCashTest() {
 
     @Before
     fun setUp() {
-        splitsDbAdapter = SplitsDbAdapter.getInstance()
-        transactionsDbAdapter = TransactionsDbAdapter.getInstance()
-        accountsDbAdapter = AccountsDbAdapter.getInstance()
+        splitsDbAdapter = SplitsDbAdapter.instance
+        transactionsDbAdapter = TransactionsDbAdapter.instance
+        accountsDbAdapter = AccountsDbAdapter.instance
         account = Account("Test account")
         accountsDbAdapter.addRecord(account)
     }
@@ -75,7 +75,7 @@ class SplitsDbAdapterTest : GnuCashTest() {
     fun shouldHaveTransactionInDatabase() {
         val transaction = Transaction("") //not added to the db
 
-        val split = Split(createZeroInstance(Commodity.DEFAULT_COMMODITY), account.uid)
+        val split = Split(createZeroInstance(Commodity.DEFAULT_COMMODITY), account)
         split.transactionUID = transaction.uid
         splitsDbAdapter.addRecord(split)
     }
@@ -85,7 +85,7 @@ class SplitsDbAdapterTest : GnuCashTest() {
         val transaction = Transaction("")
         transactionsDbAdapter.addRecord(transaction)
 
-        val split = Split(createZeroInstance(Commodity.DEFAULT_COMMODITY), account.uid)
+        val split = Split(createZeroInstance(Commodity.DEFAULT_COMMODITY), account)
         split.transactionUID = transaction.uid
         splitsDbAdapter.addRecord(split)
 
@@ -105,14 +105,14 @@ class SplitsDbAdapterTest : GnuCashTest() {
 
         assertThat(transaction.isExported).isTrue()
 
-        val split = Split(createZeroInstance(Commodity.DEFAULT_COMMODITY), account.uid)
+        val split = Split(createZeroInstance(Commodity.DEFAULT_COMMODITY), account)
         split.transactionUID = transaction.uid
         splitsDbAdapter.addRecord(split)
 
         val isExported = transactionsDbAdapter.getAttribute(
             transaction.uid,
-            DatabaseSchema.TransactionEntry.COLUMN_EXPORTED
-        )
-        assertThat(isExported.toBoolean()).isFalse()
+            TransactionEntry.COLUMN_EXPORTED
+        ).toBoolean()
+        assertThat(isExported).isFalse()
     }
 }

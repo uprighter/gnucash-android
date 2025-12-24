@@ -167,9 +167,9 @@
     <!-- Default title for color picker dialog [CHAR LIMIT=30] -->
     <string name="color_picker_default_title">Оберіть колір</string>
     <!-- Content description for a color square. -->
-    <string name="color_swatch_description">Color <xliff:g example="14" id="color_index">%1$d</xliff:g></string>
+    <string name="color_swatch_description">Color <xliff:g example="14" id="color_index">%1$s</xliff:g></string>
     <!-- Content description for a selected color square. -->
-    <string name="color_swatch_description_selected">Color <xliff:g example="14" id="color_index">%1$d</xliff:g> selected</string>
+    <string name="color_swatch_description_selected">Color <xliff:g example="14" id="color_index">%1$s</xliff:g> selected</string>
     <string name="label_account_color_and_type">Колір і тип рахунку</string>
     <string name="label_delete_sub_accounts">Видалити субрахунки</string>
     <string name="title_recent_accounts">Недавні</string>
@@ -254,10 +254,9 @@
     <string name="menu_settings" msgid="3524924670246877187">"Налаштування"</string>
     <string name="username">Ім’я користувача</string>
     <string name="password">Пароль</string>
-    <string name="owncloud_pref">ownСloud</string>
     <string name="owncloud_server_invalid">Сервер не знайдено</string>
     <string name="owncloud_user_invalid">Невірне ім’я користувача або пароль</string>
-    <string name="owncloud_dir_invalid">Назва не повинна містити: \\ &lt; &gt; : \&quot; | * ?</string>
+    <string name="owncloud_dir_invalid">Назва не повинна містити: \\ / &lt; &gt; : \&quot; | * ?</string>
     <string name="owncloud_server_ok">Сервер знайдено</string>
     <string name="owncloud_user_ok">Ім’я користувача та пароль вірні</string>
     <string name="owncloud_dir_ok">Ім’я теки підходить</string>
@@ -491,4 +490,6 @@
     <string name="title_progress_processing_prices">Обробка цін</string>
     <string name="title_progress_processing_schedules">Обробка графіків</string>
     <string name="title_progress_processing_transactions">Обробка транзакцій</string>
+    <!-- msgid "Number" -->
+    <string name="number">Число</string>
 </resources>

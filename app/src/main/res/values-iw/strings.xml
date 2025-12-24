@@ -149,8 +149,8 @@
     <string name="file_format_ofx">הבורסה הפיננסית הפתוח</string>
     <string name="file_format_xml">GnuCash XML</string>
     <string name="color_picker_default_title" comment="color_picker_default_title Default title for color picker dialog [CHAR LIMIT=30]">בחר צבע</string>
-    <string name="color_swatch_description" comment="color_swatch_description Content description for a color square.">צבע <xliff:g example="14" id="color_index">%1$d</xliff:g></string>
-    <string name="color_swatch_description_selected" comment="color_swatch_description_selected Content description for a selected color square.">צבע <xliff:g example="14" id="color_index">%1$d</xliff:g> נבחר</string>
+    <string name="color_swatch_description" comment="color_swatch_description Content description for a color square.">צבע <xliff:g example="14" id="color_index">%1$s</xliff:g></string>
+    <string name="color_swatch_description_selected" comment="color_swatch_description_selected Content description for a selected color square.">צבע <xliff:g example="14" id="color_index">%1$s</xliff:g> נבחר</string>
     <string name="label_account_color_and_type">צבע חשבון וסוג</string>
     <string name="label_delete_sub_accounts">מחק תתי-חשבונות</string>
     <string name="title_recent_accounts">אחרונים</string>
@@ -237,7 +237,7 @@
     <string name="password">סיסמה</string>
     <string name="owncloud_server_invalid">שרת OC לא נמצא</string>
     <string name="owncloud_user_invalid">שם משתמש וסיסמה עבור OC לא תקינים</string>
-    <string name="owncloud_dir_invalid">תווים לא תקינים: \\ &lt; &gt; : \&quot; | * ?</string>
+    <string name="owncloud_dir_invalid">תווים לא תקינים: \\ / &lt; &gt; : \&quot; | * ?</string>
     <string name="owncloud_server_ok">שרת OC תקין</string>
     <string name="owncloud_user_ok">שם משתמש/סיסמה עבור OC תקינים</string>
     <string name="owncloud_dir_ok">שם תיקייה תקין</string>
@@ -469,4 +469,6 @@
     <string name="title_progress_processing_prices">עיבוד מחירים</string>
     <string name="title_progress_processing_schedules">עיבוד לוחות זמנים</string>
     <string name="title_progress_processing_transactions">עיבוד עסקאות</string>
+    <!-- msgid "Number" -->
+    <string name="number">מספר</string>
 </resources>

@@ -1,0 +1,201 @@
+package org.gnucash.android.ui.settings.dialog
+
+import android.app.Dialog
+import android.content.Context
+import android.content.DialogInterface
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.widget.EditText
+import android.widget.TextView
+import androidx.appcompat.app.AlertDialog
+import androidx.core.net.toUri
+import androidx.core.view.isVisible
+import androidx.preference.TwoStatePreference
+import com.owncloud.android.lib.common.OwnCloudClient
+import com.owncloud.android.lib.common.OwnCloudClientFactory
+import com.owncloud.android.lib.common.OwnCloudCredentialsFactory
+import com.owncloud.android.lib.common.operations.OnRemoteOperationListener
+import com.owncloud.android.lib.resources.files.FileUtils
+import com.owncloud.android.lib.resources.status.GetStatusRemoteOperation
+import com.owncloud.android.lib.resources.users.GetUserInfoRemoteOperation
+import org.gnucash.android.R
+import org.gnucash.android.databinding.DialogOwncloudAccountBinding
+import org.gnucash.android.lang.equals
+import org.gnucash.android.lang.trim
+import org.gnucash.android.ui.settings.OwnCloudPreferences
+import org.gnucash.android.ui.util.dialog.VolatileDialogFragment
+import timber.log.Timber
+
+/**
+ * A fragment for adding an ownCloud account.
+ */
+class OwnCloudDialogFragment : VolatileDialogFragment() {
+    private var serverAddress: String? = null
+    private var username: String? = null
+    private var password: String? = null
+    private var directory: String? = null
+
+    private var ocCheckBox: TwoStatePreference? = null
+    private lateinit var serverText: EditText
+    private lateinit var usernameText: EditText
+    private lateinit var passwordText: EditText
+    private lateinit var directoryText: EditText
+    private lateinit var errorText: TextView
+
+    private lateinit var preferences: OwnCloudPreferences
+
+    private val handler = Handler(Looper.getMainLooper())
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        val context = requireContext()
+        preferences = OwnCloudPreferences(context)
+
+        serverAddress = preferences.server
+        username = preferences.username
+        password = preferences.password
+        directory = preferences.dir
+    }
+
+    override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
+        val binding = DialogOwncloudAccountBinding.inflate(layoutInflater)
+        val context = binding.root.context
+
+        serverText = binding.owncloudHostname
+        usernameText = binding.owncloudUsername
+        passwordText = binding.owncloudPassword
+        directoryText = binding.owncloudDir
+
+        serverText.setText(serverAddress)
+        directoryText.setText(directory)
+        passwordText.setText(password) // TODO: Remove - debugging only
+        usernameText.setText(username)
+
+        errorText = binding.owncloudError
+        errorText.isVisible = false
+
+        val dialog = AlertDialog.Builder(context, theme)
+            .setTitle(R.string.owncloud_pref)
+            .setView(binding.root)
+            .setNegativeButton(R.string.btn_cancel) { _, _ ->
+                // Dismisses itself
+            }
+            .setNeutralButton(R.string.btn_test, null)
+            .setPositiveButton(R.string.btn_save) { _, _ ->
+                if ((serverText.getText() equals serverAddress) &&
+                    (usernameText.getText() equals username) &&
+                    (passwordText.getText() equals password) &&
+                    (directoryText.getText() equals directory) &&
+                    isOK(errorText)
+                ) {
+                    save()
+                }
+            }
+            .create()
+
+        // Keep the dialog visible to the test.
+        dialog.setOnShowListener {
+            dialog.getButton(DialogInterface.BUTTON_NEUTRAL).setOnClickListener {
+                checkData()
+            }
+        }
+
+        return dialog
+    }
+
+    private fun isOK(textView: TextView): Boolean {
+        val context = textView.context
+        val text = textView.getText()
+        return text.isNullOrEmpty() || (text equals context.getText(R.string.owncloud_dir_ok))
+    }
+
+    private fun save() {
+        preferences.server = serverAddress
+        preferences.username = username
+        preferences.password = password
+        preferences.dir = directory
+        preferences.isSync = true
+
+        ocCheckBox?.isChecked = true
+    }
+
+    private fun checkData() {
+        val context = serverText.context
+        serverText.error = null
+        directoryText.error = null
+        errorText.isVisible = false
+
+        serverAddress = serverText.getText().trim()
+        directory = directoryText.getText().trim()
+        username = usernameText.getText().trim()
+        password = passwordText.getText().trim()
+
+        if (serverAddress.isNullOrEmpty()) {
+            serverText.error = context.getString(R.string.owncloud_server_invalid)
+            return
+        }
+        if (directory.isNullOrEmpty() || !FileUtils.isValidName(directory)) {
+            directoryText.error = context.getString(R.string.owncloud_dir_invalid)
+            return
+        }
+
+        val serverUri = serverAddress?.toUri()
+        val client = OwnCloudClientFactory.createOwnCloudClient(serverUri, context, true)
+        client.credentials = OwnCloudCredentialsFactory.newBasicCredentials(username, password)
+
+        fetchStatus(context, client)
+    }
+
+    private fun fetchStatus(context: Context, client: OwnCloudClient) {
+        val listenerStatus = OnRemoteOperationListener { _, result ->
+            if (result.isSuccess) {
+                serverText.error = context.getString(R.string.owncloud_server_ok)
+                directoryText.error = context.getString(R.string.owncloud_dir_ok)
+
+                fetchUser(context, client)
+            } else {
+                val message = result.getLogMessage(context)
+                Timber.e(result.exception, message)
+
+                errorText.text = message
+                errorText.isVisible = true
+            }
+        }
+        val operation = GetStatusRemoteOperation(context)
+        operation.execute(client, listenerStatus, handler)
+    }
+
+    private fun fetchUser(context: Context, client: OwnCloudClient) {
+        val listener = OnRemoteOperationListener { _, result ->
+            if (result.isSuccess) {
+                Timber.i("User status OK")
+            } else {
+                val message = result.getLogMessage(context)
+                Timber.e(result.exception, message)
+
+                errorText.text = message
+                errorText.isVisible = true
+            }
+        }
+        val operation = GetUserInfoRemoteOperation()
+        operation.execute(client, listener, handler)
+    }
+
+    companion object {
+        const val TAG = "owncloud_dialog"
+
+        /**
+         * Use this factory method to create a new instance of
+         * this fragment using the provided parameters.
+         *
+         * @return A new instance of fragment OwnCloudDialogFragment.
+         */
+        fun newInstance(preference: TwoStatePreference? = null): OwnCloudDialogFragment {
+            val fragment = OwnCloudDialogFragment()
+            fragment.ocCheckBox = preference
+            return fragment
+        }
+    }
+}

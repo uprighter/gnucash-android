@@ -2,10 +2,8 @@ package org.gnucash.android.ui.transaction
 
 import android.annotation.SuppressLint
 import android.content.Intent
-import android.view.View
 import org.gnucash.android.R
 import org.gnucash.android.databinding.ListItemScheduledTrxnBinding
-import org.gnucash.android.export.ExportParams
 import org.gnucash.android.model.ScheduledAction
 import org.gnucash.android.ui.common.FormActivity
 import org.gnucash.android.ui.common.Refreshable
@@ -22,9 +20,17 @@ internal class ScheduledExportViewHolder(
         super.bind(scheduledAction)
         val context = itemView.context
 
-        val params = ExportParams.parseTag(scheduledAction.tag)
-        var exportDestination = params.exportLocation.getDocumentName(context)
-        if (exportDestination.isEmpty()) {
+        val params = scheduledAction.getExportParams()
+        if (params == null) {
+            primaryTextView.text = null
+            descriptionTextView.text = null
+            amountTextView.text = null
+            itemView.setOnClickListener(null)
+            return
+        }
+
+        var exportDestination = params.exportLocation?.getDocumentName(context)
+        if (exportDestination.isNullOrEmpty()) {
             exportDestination = params.exportLocation.toString()
         }
         val description = context.getString(

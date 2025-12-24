@@ -96,6 +96,18 @@ class Money(
      * Overloaded constructor.
      * Accepts strings as arguments and parses them to create the Money object
      *
+     * @param amount       Numerical value of the Money
+     * @param currencyCode Currency code as specified by ISO 4217
+     */
+    constructor(amount: Double, currencyCode: String) : this(
+        BigDecimal(amount),
+        currencyCode
+    )
+
+    /**
+     * Overloaded constructor.
+     * Accepts strings as arguments and parses them to create the Money object
+     *
      * @param amount    Numerical value of the Money
      * @param commodity Commodity of the money
      */
@@ -269,7 +281,6 @@ class Money(
      * @param locale Locale to use when formatting the object. Defaults to Locale.getDefault().
      * @return String containing formatted Money representation
      */
-    @JvmOverloads
     fun formattedString(locale: Locale = Locale.getDefault()): String {
         if (commodity.isTemplate) return amount.toPlainString()
         val precision = commodity.smallestFractionDigits
@@ -277,7 +288,7 @@ class Money(
             if (commodity.isCurrency) {
                 try {
                     currency = commodity.currency
-                } catch (ignore: IllegalArgumentException) {
+                } catch (_: IllegalArgumentException) {
                 }
             }
             decimalFormatSymbols = decimalFormatSymbols.apply { currencySymbol = commodity.symbol }
@@ -295,7 +306,6 @@ class Money(
      * @param locale Locale to use when formatting the object. Defaults to Locale.getDefault().
      * @return String containing formatted Money representation
      */
-    @JvmOverloads
     fun formattedStringWithoutSymbol(
         locale: Locale = Locale.getDefault(),
         withGrouping: Boolean = true
@@ -316,7 +326,7 @@ class Money(
      * @return Negated `Money` object
      */
     operator fun unaryMinus(): Money {
-        return Money(amount.negate(), commodity)
+        return Money(-amount, commodity)
     }
 
     /**
@@ -456,8 +466,7 @@ class Money(
             commodity,
             factor.commodity
         )
-        val amount = amount.multiply(factor.amount)
-        return Money(amount, commodity)
+        return Money(amount * factor.amount, commodity)
     }
 
     /**
@@ -468,7 +477,7 @@ class Money(
      * @return Money object whose value is the product of this objects values and `multiplier`
      */
     operator fun times(factor: BigDecimal): Money {
-        return Money(amount.multiply(factor), commodity)
+        return Money(amount * factor, commodity)
     }
 
     /**
@@ -493,7 +502,7 @@ class Money(
     }
 
     operator fun times(price: Price): Money {
-        return withCommodity(price.currency).times(price.toBigDecimal())
+        return withCommodity(price.currency) * price.toBigDecimal()
     }
 
     /**
@@ -607,7 +616,6 @@ class Money(
          * @param currencyCode Currency to use for this money instance
          * @return Money object with value 0 and currency `currencyCode`
          */
-        @JvmStatic
         fun createZeroInstance(currencyCode: String): Money {
             val commodity = Commodity.getInstance(currencyCode)
             return createZeroInstance(commodity)
@@ -619,7 +627,6 @@ class Money(
          * @param commodity Commodity to use for this money instance
          * @return Money object with value 0 and commodity
          */
-        @JvmStatic
         fun createZeroInstance(commodity: Commodity): Money {
             return Money(BigDecimal.ZERO, commodity)
         }

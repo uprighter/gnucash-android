@@ -5,12 +5,12 @@ import android.content.Context
 import android.os.Bundle
 import android.view.View
 import android.widget.TextView
-import android.widget.Toast
 import androidx.annotation.StringRes
 import org.gnucash.android.R
 import org.gnucash.android.ui.passcode.PasscodeHelper.getPasscode
 import org.gnucash.android.ui.passcode.PasscodeHelper.isPasscodeEnabled
 import org.gnucash.android.ui.passcode.PasscodeHelper.setPasscode
+import org.gnucash.android.ui.snackLong
 import timber.log.Timber
 
 class PasscodeModifyFragment : KeyboardFragment() {
@@ -53,7 +53,7 @@ class PasscodeModifyFragment : KeyboardFragment() {
     override fun onPasscodeEntered(code: String) {
         val codeOld = passcodeOriginal
         Timber.d("Passcode: %s", code)
-        val activity = requireActivity()
+        val activity = activity ?: return
 
         when (state) {
             STATE_VERIFY -> if (code == codeOld || codeOld == null) {
@@ -125,11 +125,7 @@ class PasscodeModifyFragment : KeyboardFragment() {
     }
 
     private fun showWrongPasswordConfirmation() {
-        Toast.makeText(
-            requireContext(),
-            R.string.toast_invalid_passcode_confirmation,
-            Toast.LENGTH_LONG
-        ).show()
+        snackLong(R.string.toast_invalid_passcode_confirmation)
     }
 
     companion object {
