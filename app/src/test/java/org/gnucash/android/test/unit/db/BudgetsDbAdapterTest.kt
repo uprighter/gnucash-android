@@ -47,10 +47,10 @@ class BudgetsDbAdapterTest : GnuCashTest() {
 
     @Before
     fun setUp() {
-        accountsDbAdapter = AccountsDbAdapter.getInstance()
-        budgetsDbAdapter = BudgetsDbAdapter.getInstance()
+        accountsDbAdapter = AccountsDbAdapter.instance
+        budgetsDbAdapter = BudgetsDbAdapter.instance
         budgetAmountsDbAdapter = budgetsDbAdapter.budgetAmountsDbAdapter
-        recurrenceDbAdapter = RecurrenceDbAdapter.getInstance()
+        recurrenceDbAdapter = RecurrenceDbAdapter.instance
 
         account = Account("Budgeted account")
         secondAccount = Account("Another account")
@@ -121,7 +121,7 @@ class BudgetsDbAdapterTest : GnuCashTest() {
     }
 
     private fun bulkCreateBudgets(): List<Budget> {
-        val budgets: MutableList<Budget> = ArrayList()
+        val budgets = mutableListOf<Budget>()
         var budget = Budget("", Recurrence(PeriodType.MONTH))
         budget.addAmount(
             BudgetAmount(createZeroInstance(Commodity.DEFAULT_COMMODITY), account.uid)

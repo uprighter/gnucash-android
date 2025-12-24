@@ -19,8 +19,8 @@ import android.Manifest
 import android.content.Context
 import android.content.SharedPreferences
 import android.net.ConnectivityManager
+import androidx.core.content.edit
 import androidx.test.espresso.Espresso.onView
-import androidx.test.espresso.Espresso.pressBack
 import androidx.test.espresso.action.ViewActions.clearText
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.closeSoftKeyboard
@@ -28,18 +28,18 @@ import androidx.test.espresso.action.ViewActions.replaceText
 import androidx.test.espresso.action.ViewActions.scrollTo
 import androidx.test.espresso.action.ViewActions.typeText
 import androidx.test.espresso.assertion.ViewAssertions.matches
-import androidx.test.espresso.contrib.DrawerActions
-import androidx.test.espresso.matcher.RootMatchers.withDecorView
+import androidx.test.espresso.contrib.DrawerActions.open
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.rule.ActivityTestRule
 import androidx.test.rule.GrantPermissionRule
+import org.assertj.core.api.Assertions.assertThat
 import org.gnucash.android.R
 import org.gnucash.android.app.GnuCashApplication
 import org.gnucash.android.db.adapter.AccountsDbAdapter
 import org.gnucash.android.db.adapter.CommoditiesDbAdapter
-import org.gnucash.android.db.adapter.DatabaseAdapter
+import org.gnucash.android.export.ExportFormat
 import org.gnucash.android.model.Account
 import org.gnucash.android.model.Commodity
 import org.gnucash.android.model.Money
@@ -47,9 +47,7 @@ import org.gnucash.android.model.Split
 import org.gnucash.android.model.Transaction
 import org.gnucash.android.test.ui.util.DisableAnimationsRule
 import org.gnucash.android.ui.account.AccountsActivity
-import org.hamcrest.Matchers
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
+import org.gnucash.android.ui.settings.OwnCloudPreferences
 import org.junit.Assume
 import org.junit.Before
 import org.junit.BeforeClass
@@ -91,31 +89,34 @@ class OwnCloudExportTest : GnuAndroidTest() {
 
         GnuCashApplication.initializeDatabaseAdapters(context)
 
-        val accountsDbAdapter = AccountsDbAdapter.getInstance()
+        val accountsDbAdapter = AccountsDbAdapter.instance
         accountsDbAdapter.deleteAllRecords()
 
-        val currencyCode = GnuCashApplication.getDefaultCurrencyCode()
+        val currencyCode = GnuCashApplication.defaultCurrencyCode
         Commodity.DEFAULT_COMMODITY =
-            CommoditiesDbAdapter.getInstance()!!.getCurrency(currencyCode)!!
+            CommoditiesDbAdapter.instance!!.getCurrency(currencyCode)!!
 
         val account = Account("ownCloud")
         val transaction = Transaction("birds")
-        transaction.setTime(System.currentTimeMillis())
-        val split = Split(Money("11.11", currencyCode), account.uid)
+        transaction.time = System.currentTimeMillis()
+        val split = Split(Money("11.11", currencyCode), account)
         transaction.addSplit(split)
         transaction.addSplit(
             split.createPair(
-                accountsDbAdapter.getOrCreateImbalanceAccountUID(context, Commodity.DEFAULT_COMMODITY)
+                accountsDbAdapter.getOrCreateImbalanceAccountUID(
+                    context,
+                    Commodity.DEFAULT_COMMODITY
+                )
             )
         )
         account.addTransaction(transaction)
 
-        accountsDbAdapter.addRecord(account, DatabaseAdapter.UpdateMethod.insert)
+        accountsDbAdapter.insert(account)
 
-        prefs.edit()
-            .putBoolean(context.getString(R.string.key_owncloud_sync), false)
-            .putInt(context.getString(R.string.key_last_export_destination), 0)
-            .apply()
+        prefs.edit {
+            putBoolean(context.getString(R.string.key_owncloud_sync), false)
+            putInt(context.getString(R.string.key_last_export_destination), 0)
+        }
     }
 
     /**
@@ -124,13 +125,11 @@ class OwnCloudExportTest : GnuAndroidTest() {
     @Test
     fun ownCloudCredentials() {
         Assume.assumeTrue(hasActiveInternetConnection(context))
-        onView(withId(R.id.drawer_layout)).perform(DrawerActions.open())
+        onView(withId(R.id.drawer_layout)).perform(open())
         onView(withText(R.string.title_settings))
             .perform(scrollTo(), click())
-        onView(withText(R.string.header_backup_and_export_settings))
-            .perform(click())
-        onView(withText(R.string.title_owncloud_sync_preference))
-            .perform(click())
+        clickViewText(R.string.header_backup_and_export_settings)
+        clickViewText(R.string.title_owncloud_sync_preference)
         onView(withId(R.id.owncloud_hostname))
             .check(matches(isDisplayed()))
 
@@ -160,56 +159,53 @@ class OwnCloudExportTest : GnuAndroidTest() {
             )
         // owncloud demo server is offline, so fake check data succeeded.
         if (OC_DEMO_DISABLED) return
-        onView(withId(BUTTON_POSITIVE)).perform(click())
+        clickViewId(BUTTON_POSITIVE)
         sleep(5000)
-        onView(withId(BUTTON_POSITIVE)).perform(click())
+        clickViewId(BUTTON_POSITIVE)
 
-        assertEquals(
-            prefs.getString(context.getString(R.string.key_owncloud_server), null), OC_SERVER
-        )
-        assertEquals(
-            prefs.getString(context.getString(R.string.key_owncloud_username), null), OC_USERNAME
-        )
-        assertEquals(
-            prefs.getString(context.getString(R.string.key_owncloud_password), null), OC_PASSWORD
-        )
-        assertEquals(prefs.getString(context.getString(R.string.key_owncloud_dir), null), OC_DIR)
-
-        assertTrue(prefs.getBoolean(context.getString(R.string.key_owncloud_sync), false))
+        assertThat(prefs.getString(context.getString(R.string.key_owncloud_server), null))
+            .isEqualTo(OC_SERVER)
+        assertThat(prefs.getString(context.getString(R.string.key_owncloud_username), null))
+            .isEqualTo(OC_USERNAME)
+        assertThat(prefs.getString(context.getString(R.string.key_owncloud_password), null))
+            .isEqualTo(OC_PASSWORD)
+        assertThat(prefs.getString(context.getString(R.string.key_owncloud_dir), null))
+            .isEqualTo(OC_DIR)
+        assertThat(prefs.getBoolean(context.getString(R.string.key_owncloud_sync), false)).isTrue()
     }
 
-    /** / FIXME: 20.04.2017 This test now fails since introduction of SAF. */
+    @Test
     fun ownCloudExport() {
         Assume.assumeTrue(hasActiveInternetConnection(context))
-        prefs.edit().putBoolean(context.getString(R.string.key_owncloud_sync), true).commit()
+        prefs.edit { putBoolean(context.getString(R.string.key_owncloud_sync), true) }
+        val preferences = OwnCloudPreferences(context)
+        preferences.server = OC_SERVER
+        preferences.username = OC_USERNAME
+        preferences.password = OC_PASSWORD
+        preferences.dir = OC_DIR
 
-        onView(withId(R.id.drawer_layout)).perform(DrawerActions.open())
-        onView(withText(R.string.nav_menu_export))
-            .perform(click())
-        closeSoftKeyboard()
-        pressBack() //close the SAF file picker window
-        onView(withId(R.id.spinner_export_destination))
-            .perform(click())
+        onView(withId(R.id.drawer_layout)).perform(open())
+        clickViewText(R.string.nav_menu_export)
+        clickViewId(R.id.spinner_export_destination)
         val destinations = context.resources.getStringArray(R.array.export_destinations)
-        onView(withText(destinations[3])).perform(click())
-        onView(withId(R.id.menu_save)).perform(click())
-        assertToastDisplayed(
-            String.format(
-                context.getString(R.string.toast_exported_to),
-                "ownCloud -> $OC_DIR"
-            )
-        )
-    }
+        clickViewText(destinations[2])
 
-    /**
-     * Checks that a specific toast message is displayed
-     *
-     * @param toastString String that should be displayed
-     */
-    private fun assertToastDisplayed(toastString: String) {
-        onView(withText(toastString))
-            .inRoot(withDecorView(Matchers.not(Matchers.`is`(activityRule.activity.window.decorView))))
-            .check(matches(isDisplayed()))
+        // Close the dialog
+        clickViewId(BUTTON_POSITIVE)
+        // Export
+        clickViewId(R.id.menu_save)
+
+        if (OC_DEMO_DISABLED) {
+            val toast = context.getString(R.string.toast_export_error, ExportFormat.XML.name)
+            assertToastDisplayed(activityRule.activity, toast)
+        } else {
+            sleep(2000)
+            val targetLocation = "ownCloud -> $OC_DIR"
+            assertToastDisplayed(
+                activityRule.activity,
+                String.format(context.getString(R.string.toast_exported_to), targetLocation)
+            )
+        }
     }
 
     companion object {
@@ -226,6 +222,7 @@ class OwnCloudExportTest : GnuAndroidTest() {
         @BeforeClass
         @JvmStatic
         fun prepareTestCase() {
+            configureDevice()
             preventFirstRunDialogs()
         }
 

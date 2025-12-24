@@ -3,6 +3,8 @@ package org.gnucash.android.model
 import android.os.Parcel
 import android.os.Parcelable
 import org.gnucash.android.db.adapter.AccountsDbAdapter
+import org.gnucash.android.model.Split.Companion.CREATOR
+import org.gnucash.android.model.Split.Companion.getFormattedAmount
 
 /**
  * A split amount in a transaction.
@@ -25,12 +27,14 @@ class Split : BaseModel, Parcelable {
      * @see quantity
      */
     var value: Money = Money.createZeroInstance(Commodity.DEFAULT_COMMODITY)
-        private set
+        set(value) {
+            field = value.abs()
+        }
 
     /**
      * Transaction UID which this split belongs to
      */
-    var transactionUID: String? = ""
+    var transactionUID: String? = null
 
     /**
      * Account UID which this split belongs to
@@ -40,7 +44,7 @@ class Split : BaseModel, Parcelable {
     /**
      * The [TransactionType] of this transaction, credit or debit
      */
-    var type: TransactionType = TransactionType.CREDIT
+    var type: TransactionType = TransactionType.DEBIT
 
     /**
      * Memo associated with this split
@@ -79,10 +83,27 @@ class Split : BaseModel, Parcelable {
      * @param accountUID String UID of transfer account
      */
     constructor(value: Money, quantity: Money, accountUID: String?) {
+        this.value = value
         this.quantity = quantity
-        setValue(value)
+        this.type = if (value.isNegative) TransactionType.CREDIT else TransactionType.DEBIT
         this.accountUID = accountUID
     }
+
+    /**
+     * Initialize split with a value and quantity amounts and the owning account
+     *
+     * The transaction type is set to CREDIT. The amounts are stored unsigned.
+     *
+     * @param value      Money value amount of this split in the currency of the transaction.
+     * @param quantity   Money value amount of this split in the currency of the
+     * owning account.
+     * @param account The transfer account
+     */
+    constructor(value: Money, quantity: Money, account: Account) : this(
+        value,
+        quantity,
+        account.uid
+    )
 
     /**
      * Initialize split with a value amount and the owning account
@@ -95,41 +116,37 @@ class Split : BaseModel, Parcelable {
      * as both the value and the quantity of this split.
      * @param accountUID String UID of owning account
      */
-    constructor(amount: Money, accountUID: String?) : this(amount, Money(amount), accountUID)
+    constructor(amount: Money, accountUID: String?) : this(amount, amount, accountUID)
+
+    /**
+     * Initialize split with a value amount and the owning account
+     *
+     *
+     * The transaction type is set to CREDIT. The amount is stored unsigned.
+     *
+     * @param amount     Money value amount of this split. Value is always in the
+     * currency the owning transaction. This amount will be assigned
+     * as both the value and the quantity of this split.
+     * @param account The owning account
+     */
+    constructor(amount: Money, account: Account) : this(amount, account.uid)
 
     /**
      * Clones the `sourceSplit` to create a new instance with same fields
      *
-     * @param sourceSplit Split to be cloned
      * @param generateUID Determines if the clone should have a new UID or should
      * maintain the one from source
      */
-    @JvmOverloads
-    constructor(sourceSplit: Split, generateUID: Boolean = true) {
+    fun copy(generateUID: Boolean = true): Split {
+        val clone = Split(value, quantity, accountUID)
         if (!generateUID) {
-            setUID(sourceSplit.uid)
+            clone.setUID(uid)
         }
-        memo = sourceSplit.memo
-        accountUID = sourceSplit.accountUID
-        type = sourceSplit.type
-        transactionUID = sourceSplit.transactionUID
-        value = sourceSplit.value
-        quantity = sourceSplit.quantity
-        scheduledActionAccountUID = sourceSplit.scheduledActionAccountUID
-    }
-
-    /**
-     * Sets the value amount of the split.
-     *
-     *
-     * The value is in the currency of the containing transaction.
-     * It's stored unsigned.
-     *
-     * @param value Money value of this split
-     * @see quantity
-     */
-    fun setValue(value: Money) {
-        this.value = value.abs()
+        clone.memo = memo
+        clone.scheduledActionAccountUID = scheduledActionAccountUID
+        clone.transactionUID = transactionUID
+        clone.type = type
+        return clone
     }
 
     /**
@@ -150,13 +167,26 @@ class Split : BaseModel, Parcelable {
      * @return New split pair of current split
      * @see TransactionType.invert
      */
-    fun createPair(accountUID: String?): Split {
+    fun createPair(accountUID: String): Split {
         val pair = Split(value, accountUID)
         pair.type = type.invert()
         pair.memo = memo
         pair.transactionUID = transactionUID
         pair.quantity = quantity
         return pair
+    }
+
+    /**
+     * Creates a split which is a pair of this instance.
+     * A pair split has all the same attributes except that the SplitType is inverted and it belongs
+     * to another account.
+     *
+     * @param account The account
+     * @return New split pair of current split
+     * @see TransactionType.invert
+     */
+    fun createPair(account: Account): Split {
+        return createPair(account.uid)
     }
 
     /**
@@ -333,7 +363,7 @@ class Split : BaseModel, Parcelable {
         setUID(source.readString())
         accountUID = source.readString()
         transactionUID = source.readString()
-        type = TransactionType.valueOf(source.readString()!!)
+        type = TransactionType.of(source.readString()!!)
 
         value = source.readMoney()!!
         quantity = source.readMoney()!!
@@ -378,7 +408,7 @@ class Split : BaseModel, Parcelable {
             splitType: TransactionType
         ): Money {
             val accountUID = accountGUID ?: return Money.createZeroInstance(amount.commodity)
-            val account = AccountsDbAdapter.getInstance().getSimpleRecord(accountUID)
+            val account = AccountsDbAdapter.instance.getRecordOrNull(accountUID)
                 ?: return Money.createZeroInstance(amount.commodity)
             return getFormattedAmount(amount, account, splitType)
         }
@@ -421,7 +451,6 @@ class Split : BaseModel, Parcelable {
          * @param splitCsvString String containing formatted split
          * @return Split instance parsed from the string
          */
-        @JvmStatic
         fun parseSplit(splitCsvString: String): Split {
             //TODO: parse reconciled state and date
             val tokens =
@@ -431,7 +460,7 @@ class Split : BaseModel, Parcelable {
                 val amount = Money(tokens[0], tokens[1])
                 val split = Split(amount, tokens[2])
                 split.transactionUID = tokens[3]
-                split.type = TransactionType.valueOf(tokens[4])
+                split.type = TransactionType.of(tokens[4])
                 if (tokens.size == 6) {
                     split.memo = tokens[5]
                 }
@@ -449,7 +478,7 @@ class Split : BaseModel, Parcelable {
                 split.setUID(tokens[0])
                 split.quantity = quantity
                 split.transactionUID = tokens[7]
-                split.type = TransactionType.valueOf(tokens[9])
+                split.type = TransactionType.of(tokens[9])
                 if (tokens.size == 11) {
                     split.memo = tokens[10]
                 }

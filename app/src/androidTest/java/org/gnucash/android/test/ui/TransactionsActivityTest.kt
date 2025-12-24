@@ -18,50 +18,47 @@ package org.gnucash.android.test.ui
 import android.Manifest
 import android.content.ContentValues
 import android.content.Intent
+import androidx.core.content.edit
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.clearText
-import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.closeSoftKeyboard
 import androidx.test.espresso.action.ViewActions.pressBack
 import androidx.test.espresso.action.ViewActions.replaceText
 import androidx.test.espresso.action.ViewActions.typeText
 import androidx.test.espresso.assertion.ViewAssertions.matches
-import androidx.test.espresso.matcher.RootMatchers.withDecorView
 import androidx.test.espresso.matcher.ViewMatchers.hasDescendant
 import androidx.test.espresso.matcher.ViewMatchers.isChecked
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withParent
-import androidx.test.espresso.matcher.ViewMatchers.withTagValue
 import androidx.test.espresso.matcher.ViewMatchers.withText
-import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.ActivityTestRule
 import androidx.test.rule.GrantPermissionRule
-import androidx.test.uiautomator.UiDevice
 import org.assertj.core.api.Assertions.assertThat
 import org.gnucash.android.R
 import org.gnucash.android.app.GnuCashApplication
-import org.gnucash.android.db.DatabaseSchema
+import org.gnucash.android.db.DatabaseSchema.AccountEntry
 import org.gnucash.android.db.adapter.AccountsDbAdapter
 import org.gnucash.android.db.adapter.CommoditiesDbAdapter
-import org.gnucash.android.db.adapter.DatabaseAdapter
 import org.gnucash.android.db.adapter.SplitsDbAdapter
 import org.gnucash.android.db.adapter.TransactionsDbAdapter
 import org.gnucash.android.model.Account
 import org.gnucash.android.model.Commodity
-import org.gnucash.android.model.Commodity.Companion.getInstance
 import org.gnucash.android.model.Money
 import org.gnucash.android.model.Split
 import org.gnucash.android.model.Transaction
 import org.gnucash.android.model.TransactionType
 import org.gnucash.android.receivers.TransactionRecorder
 import org.gnucash.android.test.ui.util.DisableAnimationsRule
+import org.gnucash.android.test.ui.util.performClick
+import org.gnucash.android.test.ui.util.withTagValue
 import org.gnucash.android.ui.common.UxArgument
-import org.gnucash.android.ui.transaction.TransactionFormFragment.DATE_FORMATTER
-import org.gnucash.android.ui.transaction.TransactionFormFragment.TIME_FORMATTER
+import org.gnucash.android.ui.transaction.TransactionFormFragment.Companion.DATE_FORMATTER
+import org.gnucash.android.ui.transaction.TransactionFormFragment.Companion.TIME_FORMATTER
 import org.gnucash.android.ui.transaction.TransactionsActivity
+import org.gnucash.android.ui.transaction.TransactionsListFragment
+import org.gnucash.android.util.set
 import org.hamcrest.Matchers.allOf
-import org.hamcrest.Matchers.`is`
 import org.hamcrest.Matchers.not
 import org.junit.After
 import org.junit.Before
@@ -70,6 +67,7 @@ import org.junit.ClassRule
 import org.junit.Rule
 import org.junit.Test
 import java.math.BigDecimal
+import java.text.DecimalFormat
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -91,6 +89,11 @@ class TransactionsActivityTest : GnuAndroidTest() {
     private lateinit var baseAccount: Account
     private lateinit var transferAccount: Account
 
+    val formatter = (NumberFormat.getInstance(Locale.getDefault()) as DecimalFormat).apply {
+        minimumFractionDigits = 0
+        isGroupingUsed = false
+    }
+
     @Before
     fun setUp() {
         setDoubleEntryEnabled(true)
@@ -100,11 +103,11 @@ class TransactionsActivityTest : GnuAndroidTest() {
 
         baseAccount = Account(TRANSACTIONS_ACCOUNT_NAME, COMMODITY)
         baseAccount.setUID(TRANSACTIONS_ACCOUNT_UID)
-        accountsDbAdapter.addRecord(baseAccount, DatabaseAdapter.UpdateMethod.insert)
+        accountsDbAdapter.insert(baseAccount)
 
         transferAccount = Account(TRANSFER_ACCOUNT_NAME, COMMODITY)
         transferAccount.setUID(TRANSFER_ACCOUNT_UID)
-        accountsDbAdapter.addRecord(transferAccount, DatabaseAdapter.UpdateMethod.insert)
+        accountsDbAdapter.insert(transferAccount)
 
         assertThat(accountsDbAdapter.recordsCount)
             .isEqualTo(3) //including ROOT account
@@ -113,14 +116,14 @@ class TransactionsActivityTest : GnuAndroidTest() {
         transaction = Transaction(TRANSACTION_NAME)
         transaction.commodity = COMMODITY
         transaction.note = "What up?"
-        transaction.setTime(transactionTimeMillis)
+        transaction.time = transactionTimeMillis
         val split = Split(Money(TRANSACTION_AMOUNT, CURRENCY_CODE), TRANSACTIONS_ACCOUNT_UID)
         split.type = TransactionType.DEBIT
 
         transaction.addSplit(split)
         transaction.addSplit(split.createPair(TRANSFER_ACCOUNT_UID))
 
-        transactionsDbAdapter.addRecord(transaction, DatabaseAdapter.UpdateMethod.insert)
+        transactionsDbAdapter.insert(transaction)
         assertThat(transactionsDbAdapter.recordsCount).isOne()
 
         val intent = Intent(Intent.ACTION_VIEW)
@@ -130,14 +133,16 @@ class TransactionsActivityTest : GnuAndroidTest() {
 
     @After
     fun tearDown() {
-        transactionsActivity.finish()
+        if (::transactionsActivity.isInitialized) {
+            transactionsActivity.finish()
+        }
     }
 
     private fun validateTransactionListDisplayed() {
         onView(
             allOf(
                 withId(android.R.id.list),
-                withTagValue(`is`("transactions"))
+                withTagValue(TransactionsListFragment.TAG)
             )
         ).check(matches(isDisplayed()))
     }
@@ -160,8 +165,7 @@ class TransactionsActivityTest : GnuAndroidTest() {
         validateTransactionListDisplayed()
 
         val beforeCount = transactionsDbAdapter.getTransactionsCount(TRANSACTIONS_ACCOUNT_UID)
-        onView(withId(R.id.fab_create_transaction))
-            .perform(click())
+        clickViewId(R.id.fab_add)
 
         onView(withId(R.id.input_transaction_name))
             .check(matches(isDisplayed()))
@@ -169,28 +173,14 @@ class TransactionsActivityTest : GnuAndroidTest() {
 
         closeSoftKeyboard()
 
-        onView(withId(R.id.menu_save))
-            .check(matches(isDisplayed()))
-            .perform(click())
+        clickViewId(R.id.menu_save)
         onView(withText(R.string.title_add_transaction))
             .check(matches(isDisplayed()))
 
-        assertToastDisplayed(R.string.toast_transaction_amount_required)
+        assertToastDisplayed(transactionsActivity, R.string.toast_transaction_amount_required)
 
         val afterCount = transactionsDbAdapter.getTransactionsCount(TRANSACTIONS_ACCOUNT_UID)
         assertThat(afterCount).isEqualTo(beforeCount)
-    }
-
-    /**
-     * Checks that a specific toast message is displayed
-     *
-     * @param toastString String that should be displayed
-     */
-    private fun assertToastDisplayed(toastString: Int) {
-        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).waitForIdle()
-        onView(withText(toastString))
-            .inRoot(withDecorView(not(transactionsActivity.window.decorView)))
-            .check(matches(isDisplayed()))
     }
 
     private fun validateEditTransactionFields(transaction: Transaction) {
@@ -204,13 +194,13 @@ class TransactionsActivityTest : GnuAndroidTest() {
         onView(withId(R.id.input_transaction_amount))
             .check(matches(withText(formatter.format(balance.toDouble()))))
         onView(withId(R.id.input_date))
-            .check(matches(withText(DATE_FORMATTER.print(transaction.timeMillis))))
+            .check(matches(withText(DATE_FORMATTER.print(transaction.time))))
         onView(withId(R.id.input_time))
-            .check(matches(withText(TIME_FORMATTER.print(transaction.timeMillis))))
+            .check(matches(withText(TIME_FORMATTER.print(transaction.time))))
         onView(withId(R.id.notes))
             .check(matches(withText(transaction.note)))
 
-        validateTimeInput(transaction.timeMillis)
+        validateTimeInput(transaction.time)
     }
 
     //TODO: Add test for only one account but with double-entry enabled
@@ -219,8 +209,7 @@ class TransactionsActivityTest : GnuAndroidTest() {
         setDefaultTransactionType(TransactionType.DEBIT)
         validateTransactionListDisplayed()
 
-        onView(withId(R.id.fab_create_transaction))
-            .perform(click())
+        clickViewId(R.id.fab_add)
 
         onView(withId(R.id.input_transaction_name))
             .perform(typeText("Lunch"))
@@ -237,7 +226,7 @@ class TransactionsActivityTest : GnuAndroidTest() {
                     )
                 )
             )
-            .perform(click())
+            .performClick()
             .check(matches(withText(R.string.label_spend)))
 
         val expectedValue = NumberFormat.getInstance().format(-899)
@@ -245,8 +234,7 @@ class TransactionsActivityTest : GnuAndroidTest() {
             .check(matches(withText(expectedValue)))
 
         val transactionsCount = transactionCount
-        onView(withId(R.id.menu_save))
-            .perform(click())
+        clickViewId(R.id.menu_save)
 
         validateTransactionListDisplayed()
 
@@ -264,18 +252,15 @@ class TransactionsActivityTest : GnuAndroidTest() {
     fun testAddMultiCurrencyTransaction() {
         transactionsDbAdapter.deleteTransactionsForAccount(TRANSACTIONS_ACCOUNT_UID)
 
-        val euro = getInstance("EUR")
+        val euro = Commodity.getInstance("EUR")
         val euroAccount = Account("Euro Konto", euro)
         accountsDbAdapter.addRecord(euroAccount)
 
-        val transactionCount = transactionsDbAdapter.getTransactionsCount(
-            TRANSACTIONS_ACCOUNT_UID
-        )
+        val transactionCount = transactionsDbAdapter.getTransactionsCount(TRANSACTIONS_ACCOUNT_UID)
         setDefaultTransactionType(TransactionType.DEBIT)
         validateTransactionListDisplayed()
 
-        onView(withId(R.id.fab_create_transaction))
-            .perform(click())
+        clickViewId(R.id.fab_add)
 
         val transactionName = "Multicurrency lunch"
         onView(withId(R.id.input_transaction_name))
@@ -284,23 +269,18 @@ class TransactionsActivityTest : GnuAndroidTest() {
             .perform(typeText("10"))
         pressBack() //close calculator keyboard
 
-        onView(withId(R.id.input_transfer_account_spinner))
-            .perform(click())
-        onView(withText(euroAccount.fullName))
-            .check(matches(isDisplayed()))
-            .perform(click())
+        clickViewId(R.id.input_transfer_account_spinner)
+        clickViewText(euroAccount.fullName)
 
-        onView(withId(R.id.menu_save))
-            .perform(click())
+        clickViewId(R.id.menu_save)
 
         onView(withText(R.string.msg_provide_exchange_rate))
             .check(matches(isDisplayed()))
-        onView(withId(R.id.radio_converted_amount))
-            .perform(click())
+        clickViewId(R.id.radio_converted_amount)
         onView(withId(R.id.input_converted_amount))
             .perform(typeText("5"))
         closeSoftKeyboard()
-        onView(withId(BUTTON_POSITIVE)).perform(click())
+        clickViewId(BUTTON_POSITIVE)
 
         val allTransactions = transactionsDbAdapter.getAllTransactionsForAccount(
             TRANSACTIONS_ACCOUNT_UID
@@ -327,16 +307,14 @@ class TransactionsActivityTest : GnuAndroidTest() {
     fun testEditTransaction() {
         validateTransactionListDisplayed()
 
-        onView(withId(R.id.edit_transaction))
-            .perform(click())
+        clickViewId(R.id.edit_transaction)
 
         validateEditTransactionFields(transaction)
 
         val trnName = "Pasta"
         onView(withId(R.id.input_transaction_name))
             .perform(clearText(), typeText(trnName))
-        onView(withId(R.id.menu_save))
-            .perform(click())
+        clickViewId(R.id.menu_save)
 
         val editedTransaction = transactionsDbAdapter.getRecord(transaction.uid)
         assertThat(editedTransaction.description).isEqualTo(trnName)
@@ -355,7 +333,6 @@ class TransactionsActivityTest : GnuAndroidTest() {
      * Tests that transactions splits are automatically balanced and an imbalance account will be created
      * This test case assumes that single entry is used
      */
-    //TODO: move this to the unit tests
     fun testAutoBalanceTransactions() {
         setDoubleEntryEnabled(false)
         transactionsDbAdapter.deleteAllRecords()
@@ -365,8 +342,7 @@ class TransactionsActivityTest : GnuAndroidTest() {
         assertThat(imbalanceAcctUID).isNull()
 
         validateTransactionListDisplayed()
-        onView(withId(R.id.fab_create_transaction))
-            .perform(click())
+        clickViewId(R.id.fab_add)
         onView(withId(R.id.fragment_transaction_form))
             .check(matches(isDisplayed()))
 
@@ -376,9 +352,9 @@ class TransactionsActivityTest : GnuAndroidTest() {
             .perform(typeText("499"))
 
         //no double entry so no split editor
-        //TODO: check that the split drawable is not displayed
-        onView(withId(R.id.menu_save))
-            .perform(click())
+        onView(withId(R.id.btn_split_editor))
+            .check(matches(not(isDisplayed())))
+        clickViewId(R.id.menu_save)
 
         assertThat(transactionsDbAdapter.recordsCount).isOne()
         val transaction = transactionsDbAdapter.allTransactions[0]
@@ -386,7 +362,7 @@ class TransactionsActivityTest : GnuAndroidTest() {
         imbalanceAcctUID = accountsDbAdapter.getImbalanceAccountUID(context, COMMODITY)
         assertThat(imbalanceAcctUID).isNotNull()
         assertThat(imbalanceAcctUID).isNotEmpty()
-        assertThat(accountsDbAdapter.isHiddenAccount(imbalanceAcctUID))
+        assertThat(accountsDbAdapter.isHiddenAccount(imbalanceAcctUID!!))
             .isTrue() //imbalance account should be hidden in single entry mode
 
         assertThat(transaction.splits).extracting("accountUID", String::class.java)
@@ -408,25 +384,24 @@ class TransactionsActivityTest : GnuAndroidTest() {
         assertThat(imbalanceAcctUID).isNull()
 
         validateTransactionListDisplayed()
-        onView(withId(R.id.fab_create_transaction))
-            .perform(click())
+        clickViewId(R.id.fab_add)
 
         onView(withId(R.id.input_transaction_name))
             .perform(typeText("Autobalance"))
         onView(withId(R.id.input_transaction_amount))
             .perform(typeText("499"))
         closeSoftKeyboard()
-        onView(withId(R.id.btn_split_editor))
-            .perform(click())
+        clickViewId(R.id.btn_split_editor)
 
-        onView(withId(R.id.split_list_layout)).check(
-            matches(
-                allOf(
-                    isDisplayed(),
-                    hasDescendant(withId(R.id.input_split_amount))
+        onView(withId(R.id.split_list_layout))
+            .check(
+                matches(
+                    allOf(
+                        isDisplayed(),
+                        hasDescendant(withId(R.id.input_split_amount))
+                    )
                 )
             )
-        )
 
         onView(
             allOf(
@@ -441,14 +416,12 @@ class TransactionsActivityTest : GnuAndroidTest() {
             )
         ).perform(typeText("400"))
 
-        onView(withId(R.id.menu_save))
-            .perform(click())
+        clickViewId(R.id.menu_save)
         //after we use split editor, we should not be able to toggle the transaction type
         onView(withId(R.id.input_transaction_type))
             .check(matches(not(isDisplayed())))
 
-        onView(withId(R.id.menu_save))
-            .perform(click())
+        clickViewId(R.id.menu_save)
 
         val transactions = transactionsDbAdapter.allTransactions
         assertThat(transactions).hasSize(1)
@@ -462,16 +435,14 @@ class TransactionsActivityTest : GnuAndroidTest() {
         )
         assertThat(imbalanceAcctUID).isNotNull()
         assertThat(imbalanceAcctUID).isNotEmpty()
-        assertThat(accountsDbAdapter.isHiddenAccount(imbalanceAcctUID)).isFalse()
+        assertThat(accountsDbAdapter.isHiddenAccount(imbalanceAcctUID!!)).isFalse()
 
         //at least one split will belong to the imbalance account
         assertThat(transaction.splits).extracting("accountUID", String::class.java)
             .contains(imbalanceAcctUID)
 
-        val imbalanceSplits = splitsDbAdapter.getSplitsForTransactionInAccount(
-            transaction.uid,
-            imbalanceAcctUID
-        )
+        val imbalanceSplits = splitsDbAdapter
+            .getSplitsForTransactionInAccount(transaction.uid, imbalanceAcctUID)
         assertThat(imbalanceSplits).hasSize(1)
 
         val split = imbalanceSplits[0]
@@ -481,69 +452,59 @@ class TransactionsActivityTest : GnuAndroidTest() {
 
 
     private fun setDoubleEntryEnabled(enabled: Boolean) {
-        GnuCashApplication.getBookPreferences(context)
-            .edit()
-            .putBoolean(
-                context.getString(R.string.key_use_double_entry),
-                enabled
-            )
-            .apply()
+        GnuCashApplication.getBookPreferences(context).edit {
+            putBoolean(context.getString(R.string.key_use_double_entry), enabled)
+        }
     }
 
     @Test
     fun testDefaultTransactionType() {
         setDefaultTransactionType(TransactionType.CREDIT)
 
-        onView(withId(R.id.fab_create_transaction))
-            .perform(click())
-        onView(withId(R.id.input_transaction_type)).check(
-            matches(
-                allOf(
-                    isChecked(),
-                    withText(R.string.label_spend)
+        clickViewId(R.id.fab_add)
+        onView(withId(R.id.input_transaction_type))
+            .check(
+                matches(
+                    allOf(
+                        isChecked(),
+                        withText(R.string.label_spend)
+                    )
                 )
             )
-        )
     }
 
     private fun setDefaultTransactionType(type: TransactionType) {
         GnuCashApplication.getBookPreferences(context)
-            .edit()
-            .putString(
-                context.getString(R.string.key_default_transaction_type),
-                type.value
-            )
-            .commit()
+            .edit {
+                putString(
+                    context.getString(R.string.key_default_transaction_type),
+                    type.value
+                )
+            }
     }
 
     //FIXME: Improve on this test
     fun childAccountsShouldUseParentTransferAccountSetting() {
         val transferAccount = Account("New Transfer Acct")
-        accountsDbAdapter.addRecord(transferAccount, DatabaseAdapter.UpdateMethod.insert)
-        accountsDbAdapter.addRecord(
-            Account("Higher account"),
-            DatabaseAdapter.UpdateMethod.insert
-        )
+        accountsDbAdapter.insert(transferAccount)
+        accountsDbAdapter.insert(Account("Higher account"))
 
         val childAccount = Account("Child Account")
         childAccount.parentUID = TRANSACTIONS_ACCOUNT_UID
-        accountsDbAdapter.addRecord(childAccount, DatabaseAdapter.UpdateMethod.insert)
+        accountsDbAdapter.insert(childAccount)
         val contentValues = ContentValues()
-        contentValues.put(
-            DatabaseSchema.AccountEntry.COLUMN_DEFAULT_TRANSFER_ACCOUNT_UID,
-            transferAccount.uid
-        )
+        contentValues[AccountEntry.COLUMN_DEFAULT_TRANSFER_ACCOUNT_UID] = transferAccount.uid
         accountsDbAdapter.updateRecord(TRANSACTIONS_ACCOUNT_UID, contentValues)
 
         val intent = Intent(transactionsActivity, TransactionsActivity::class.java)
-            .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             .setAction(Intent.ACTION_INSERT_OR_EDIT)
             .putExtra(UxArgument.SELECTED_ACCOUNT_UID, childAccount.uid)
         transactionsActivity.startActivity(intent)
 
         onView(withId(R.id.input_transaction_amount))
             .perform(typeText("1299"))
-        clickOnView(R.id.menu_save)
+        clickViewId(R.id.menu_save)
 
         //if our transfer account has a transaction then the right transfer account was used
         val transactions =
@@ -554,26 +515,26 @@ class TransactionsActivityTest : GnuAndroidTest() {
     @Test
     fun testToggleTransactionType() {
         validateTransactionListDisplayed()
-        onView(withId(R.id.edit_transaction))
-            .perform(click())
+        clickViewId(R.id.edit_transaction)
 
         validateEditTransactionFields(transaction)
 
-        onView(withId(R.id.input_transaction_type)).check(
-            matches(
-                allOf(
-                    isDisplayed(),
-                    withText(R.string.label_receive)
+        onView(withId(R.id.input_transaction_type))
+            .check(
+                matches(
+                    allOf(
+                        isDisplayed(),
+                        withText(R.string.label_receive)
+                    )
                 )
             )
-        ).perform(click())
+            .performClick()
             .check(matches(withText(R.string.label_spend)))
 
         onView(withId(R.id.input_transaction_amount))
             .check(matches(withText("-9.99")))
 
-        onView(withId(R.id.menu_save))
-            .perform(click())
+        clickViewId(R.id.menu_save)
 
         val transactions = transactionsDbAdapter.getAllTransactionsForAccount(
             TRANSACTIONS_ACCOUNT_UID
@@ -588,11 +549,10 @@ class TransactionsActivityTest : GnuAndroidTest() {
     fun testOpenTransactionEditShouldNotModifyTransaction() {
         validateTransactionListDisplayed()
 
-        onView(withId(R.id.edit_transaction))
-            .perform(click())
+        clickViewId(R.id.edit_transaction)
         validateTimeInput(transactionTimeMillis)
 
-        clickOnView(R.id.menu_save)
+        clickViewId(R.id.menu_save)
 
         val transactions = transactionsDbAdapter.getAllTransactionsForAccount(
             TRANSACTIONS_ACCOUNT_UID
@@ -602,7 +562,7 @@ class TransactionsActivityTest : GnuAndroidTest() {
         val transaction = transactions[0]
         assertThat(TRANSACTION_NAME).isEqualTo(transaction.description)
         val expectedDate = transactionTimeMillis
-        val trxDate = transaction.timeMillis
+        val trxDate = transaction.time
         assertThat(DATE_FORMATTER.print(expectedDate))
             .isEqualTo(DATE_FORMATTER.print(trxDate))
         assertThat(TIME_FORMATTER.print(expectedDate))
@@ -622,29 +582,24 @@ class TransactionsActivityTest : GnuAndroidTest() {
 
     @Test
     fun testDeleteTransaction() {
-        onView(withId(R.id.options_menu))
-            .perform(click())
-        onView(withText(R.string.menu_delete))
-            .perform(click())
+        clickViewId(R.id.options_menu)
+        clickViewText(R.string.menu_delete)
+        sleep(1000) // wait for backup to finish
 
-        assertThat(0).isEqualTo(
-            transactionsDbAdapter.getTransactionsCount(TRANSACTIONS_ACCOUNT_UID)
-        )
+        assertThat(transactionsDbAdapter.getTransactionsCount(TRANSACTIONS_ACCOUNT_UID)).isZero()
     }
 
     @Test
     fun testMoveTransaction() {
         val account = Account("Move account", COMMODITY)
-        accountsDbAdapter.addRecord(account, DatabaseAdapter.UpdateMethod.insert)
+        accountsDbAdapter.insert(account)
 
         assertThat(transactionsDbAdapter.getAllTransactionsForAccount(account.uid)).isEmpty()
 
-        onView(withId(R.id.options_menu))
-            .perform(click())
-        onView(withText(R.string.menu_move_transaction))
-            .perform(click())
+        clickViewId(R.id.options_menu)
+        clickViewText(R.string.menu_move_transaction)
 
-        onView(withId(BUTTON_POSITIVE)).perform(click())
+        clickViewId(BUTTON_POSITIVE)
 
         assertThat(transactionsDbAdapter.getAllTransactionsForAccount(TRANSACTIONS_ACCOUNT_UID)).isEmpty()
 
@@ -660,37 +615,30 @@ class TransactionsActivityTest : GnuAndroidTest() {
         transactionsDbAdapter.deleteAllRecords()
 
         val account = Account("Z Account", COMMODITY)
-        accountsDbAdapter.addRecord(account, DatabaseAdapter.UpdateMethod.insert)
+        accountsDbAdapter.insert(account)
 
         //create new transaction "Transaction Acct" --> "Transfer Account"
-        onView(withId(R.id.fab_create_transaction))
-            .perform(click())
+        clickViewId(R.id.fab_add)
         onView(withId(R.id.input_transaction_name))
             .perform(typeText("Test Split"))
         onView(withId(R.id.input_transaction_amount))
             .perform(typeText("1024"))
 
-        onView(withId(R.id.menu_save))
-            .perform(click())
+        clickViewId(R.id.menu_save)
 
         assertThat(transactionsDbAdapter.getTransactionsCount(TRANSACTIONS_ACCOUNT_UID)).isOne()
 
         sleep(500)
-        onView(withText("Test Split")).perform(click())
-        onView(withId(R.id.fab_edit_transaction))
-            .perform(click())
+        clickViewText("Test Split")
+        clickViewId(R.id.fab_edit)
 
-        onView(withId(R.id.btn_split_editor))
-            .perform(click())
+        clickViewId(R.id.btn_split_editor)
 
-        onView(withText(TRANSACTIONS_ACCOUNT_NAME))
-            .perform(click())
-        onView(withText(account.fullName)).perform(click())
+        clickViewText(TRANSACTIONS_ACCOUNT_NAME)
+        clickViewText(account.fullName)
 
-        onView(withId(R.id.menu_save))
-            .perform(click())
-        onView(withId(R.id.menu_save))
-            .perform(click())
+        clickViewId(R.id.menu_save)
+        clickViewId(R.id.menu_save)
 
         assertThat(
             transactionsDbAdapter.getTransactionsCount(
@@ -710,10 +658,8 @@ class TransactionsActivityTest : GnuAndroidTest() {
             transactionsDbAdapter.getAllTransactionsForAccount(TRANSACTIONS_ACCOUNT_UID)
         ).hasSize(1)
 
-        onView(withId(R.id.options_menu))
-            .perform(click())
-        onView(withText(R.string.menu_duplicate_transaction))
-            .perform(click())
+        clickViewId(R.id.options_menu)
+        clickViewText(R.string.menu_duplicate_transaction)
 
         val dummyAccountTrns = transactionsDbAdapter.getAllTransactionsForAccount(
             TRANSACTIONS_ACCOUNT_UID
@@ -723,8 +669,8 @@ class TransactionsActivityTest : GnuAndroidTest() {
         assertThat(dummyAccountTrns[0].description).isEqualTo(
             dummyAccountTrns[1].description
         )
-        assertThat(dummyAccountTrns[0].timeMillis).isNotEqualTo(
-            dummyAccountTrns[1].timeMillis
+        assertThat(dummyAccountTrns[0].time).isNotEqualTo(
+            dummyAccountTrns[1].time
         )
     }
 
@@ -738,7 +684,7 @@ class TransactionsActivityTest : GnuAndroidTest() {
             .putExtra(Intent.EXTRA_TEXT, "Intents for sale")
             .putExtra(Transaction.EXTRA_AMOUNT, BigDecimal.valueOf(4.99))
             .putExtra(Transaction.EXTRA_ACCOUNT_UID, TRANSACTIONS_ACCOUNT_UID)
-            .putExtra(Transaction.EXTRA_TRANSACTION_TYPE, TransactionType.DEBIT.name)
+            .putExtra(Transaction.EXTRA_TRANSACTION_TYPE, TransactionType.DEBIT.value)
             .putExtra(Account.EXTRA_CURRENCY_CODE, "USD")
 
         TransactionRecorder().onReceive(transactionsActivity, transactionIntent)
@@ -775,8 +721,7 @@ class TransactionsActivityTest : GnuAndroidTest() {
 
         accountsDbAdapter.addRecord(account)
 
-        onView(withId(R.id.fab_create_transaction))
-            .perform(click())
+        clickViewId(R.id.fab_add)
         val trnDescription = "Multi-currency trn"
         onView(withId(R.id.input_transaction_name))
             .perform(typeText(trnDescription))
@@ -786,23 +731,19 @@ class TransactionsActivityTest : GnuAndroidTest() {
             .perform(typeText("10"))
         closeSoftKeyboard()
 
-        onView(withId(R.id.input_transfer_account_spinner))
-            .perform(click())
-        onView(withText(account.fullName)).perform(click())
+        clickViewId(R.id.input_transfer_account_spinner)
+        clickViewText(account.fullName)
 
         //at this point, the transfer funds dialog should be shown
         onView(withText(R.string.msg_provide_exchange_rate))
             .check(matches(isDisplayed()))
-        onView(withId(R.id.radio_converted_amount))
-            .perform(click())
+        clickViewId(R.id.radio_converted_amount)
         onView(withId(R.id.input_converted_amount))
             .perform(typeText("5"))
 
         closeSoftKeyboard()
-        onView(withId(BUTTON_POSITIVE))
-            .perform(click()) //close currency exchange dialog
-        onView(withId(R.id.menu_save))
-            .perform(click()) //save transaction
+        clickViewId(BUTTON_POSITIVE) //close currency exchange dialog
+        clickViewId(R.id.menu_save) //save transaction
 
         val transactions = transactionsDbAdapter.getAllTransactionsForAccount(account.uid)
         assertThat(transactions).hasSize(1)
@@ -818,11 +759,10 @@ class TransactionsActivityTest : GnuAndroidTest() {
                 withParent(hasDescendant(withText(trnDescription))),
                 withId(R.id.edit_transaction)
             )
-        ).perform(click())
+        ).performClick()
 
         //do nothing to the transaction, just save it
-        onView(withId(R.id.menu_save))
-            .perform(click())
+        clickViewId(R.id.menu_save)
 
         transaction = transactionsDbAdapter.getRecord(transaction.uid)
 
@@ -863,7 +803,7 @@ class TransactionsActivityTest : GnuAndroidTest() {
         val multiTransaction = Transaction(trnDescription)
         val split1 = Split(expectedValue, TRANSACTIONS_ACCOUNT_UID)
         split1.type = TransactionType.DEBIT
-        val split2 = Split(expectedValue, expectedQty, euroAccount.uid)
+        val split2 = Split(expectedValue, expectedQty, euroAccount)
         split2.type = TransactionType.CREDIT
         multiTransaction.addSplit(split1)
         multiTransaction.addSplit(split2)
@@ -872,8 +812,10 @@ class TransactionsActivityTest : GnuAndroidTest() {
         transactionsDbAdapter.addRecord(multiTransaction)
 
         val savedTransaction = transactionsDbAdapter.getRecord(multiTransaction.uid)
-        assertThat(savedTransaction.splits).extracting("quantity", Money::class.java).contains(expectedQty)
-        assertThat(savedTransaction.splits).extracting("value", Money::class.java).contains(expectedValue)
+        assertThat(savedTransaction.splits).extracting("quantity", Money::class.java)
+            .contains(expectedQty)
+        assertThat(savedTransaction.splits).extracting("value", Money::class.java)
+            .contains(expectedValue)
 
         refreshTransactionsList()
         onView(withText(trnDescription))
@@ -883,18 +825,15 @@ class TransactionsActivityTest : GnuAndroidTest() {
                 withParent(hasDescendant(withText(trnDescription))),
                 withId(R.id.edit_transaction)
             )
-        ).perform(click())
+        ).performClick()
 
         //now change the transfer account to be no longer multi-currency
         onView(withId(R.id.input_transfer_account_spinner))
             .check(matches(isDisplayed()))
-        onView(withId(R.id.input_transfer_account_spinner))
-            .perform(click())
-        onView(withText(transferAccount.fullName))
-            .perform(click())
+        clickViewId(R.id.input_transfer_account_spinner)
+        clickViewText(transferAccount.fullName)
 
-        onView(withId(R.id.menu_save))
-            .perform(click())
+        clickViewId(R.id.menu_save)
 
         //no splits should be in the euro account anymore
         val euroTransxns =
@@ -944,7 +883,7 @@ class TransactionsActivityTest : GnuAndroidTest() {
         val multiTransaction = Transaction(trnDescription)
         val split1 = Split(expectedValue, TRANSACTIONS_ACCOUNT_UID)
         split1.type = TransactionType.CREDIT
-        val split2 = Split(expectedValue, expectedQty, accountOther.uid)
+        val split2 = Split(expectedValue, expectedQty, accountOther)
         split2.type = TransactionType.DEBIT
         multiTransaction.addSplit(split1)
         multiTransaction.addSplit(split2)
@@ -973,31 +912,26 @@ class TransactionsActivityTest : GnuAndroidTest() {
                 withParent(hasDescendant(withText(trnDescription))),
                 withId(R.id.edit_transaction)
             )
-        ).perform(click())
+        ).performClick()
 
-        onView(withId(R.id.input_transfer_account_spinner))
-            .perform(click())
-        onView(withText(TRANSFER_ACCOUNT_NAME)).perform(click())
+        clickViewId(R.id.input_transfer_account_spinner)
+        clickViewText(TRANSFER_ACCOUNT_NAME)
 
-        onView(withId(R.id.input_transfer_account_spinner))
-            .perform(click())
-        onView(withText(accountOther.fullName)).perform(click())
+        clickViewId(R.id.input_transfer_account_spinner)
+        clickViewText(accountOther.fullName)
         // Exchange dialog should be shown already.
-        onView(withId(R.id.radio_converted_amount))
-            .check(matches(isDisplayed()))
-            .perform(click())
+        clickViewId(R.id.radio_converted_amount)
+            .check(matches(isChecked()))
         onView(withId(R.id.input_converted_amount))
             .check(matches(isDisplayed()))
             .perform(typeText("5"))
         closeSoftKeyboard()
-        onView(withId(BUTTON_POSITIVE)).perform(click())
+        clickViewId(BUTTON_POSITIVE)
 
-        onView(withId(R.id.input_transfer_account_spinner))
-            .perform(click())
-        onView(withText(TRANSFER_ACCOUNT_NAME)).perform(click())
+        clickViewId(R.id.input_transfer_account_spinner)
+        clickViewText(TRANSFER_ACCOUNT_NAME)
 
-        onView(withId(R.id.menu_save))
-            .perform(click())
+        clickViewId(R.id.menu_save)
 
         val editedTransaction = transactionsDbAdapter.getRecord(multiTransaction.uid)
         assertThat(
@@ -1021,13 +955,37 @@ class TransactionsActivityTest : GnuAndroidTest() {
         assertThat(transferAcctSplit.value).isEqualTo(expectedValue)
     }
 
-    /**
-     * Simple wrapper for clicking on views with espresso
-     *
-     * @param viewId View resource ID
-     */
-    private fun clickOnView(viewId: Int) {
-        onView(withId(viewId)).perform(click())
+    @Test
+    fun single_entry_transaction() {
+        setDoubleEntryEnabled(false)
+        transactionsDbAdapter.deleteAllRecords()
+        assertThat(transactionsDbAdapter.recordsCount).isZero()
+
+        validateTransactionListDisplayed()
+        clickViewId(R.id.fab_add)
+        onView(withId(R.id.fragment_transaction_form))
+            .check(matches(isDisplayed()))
+        onView(withId(R.id.input_transaction_type))
+            .check(matches(isDisplayed()))
+        //no double-entry so no split editor
+        onView(withId(R.id.btn_split_editor))
+            .check(matches(not(isDisplayed())))
+
+        onView(withId(R.id.input_transaction_name))
+            .perform(typeText("Amazon"))
+        onView(withId(R.id.input_transaction_amount))
+            .perform(typeText("100"))
+
+        clickViewId(R.id.input_transaction_type)
+        clickViewId(R.id.menu_save)
+
+        assertThat(transactionsDbAdapter.recordsCount).isOne()
+        val transaction = transactionsDbAdapter.allTransactions[0]
+        val splits = transaction.splits
+        assertThat(splits).hasSize(2)
+        assertThat(splits[0].value.toDouble()).isEqualTo(100.00)
+        assertThat(splits[1].value.toDouble()).isEqualTo(100.00)
+        assertThat(splits[0].isPairOf(splits[1])).isTrue()
     }
 
     /**
@@ -1066,9 +1024,10 @@ class TransactionsActivityTest : GnuAndroidTest() {
         @BeforeClass
         @JvmStatic
         fun prepareTestCase() {
+            configureDevice()
             preventFirstRunDialogs()
 
-            accountsDbAdapter = AccountsDbAdapter.getInstance()
+            accountsDbAdapter = AccountsDbAdapter.instance
             transactionsDbAdapter = accountsDbAdapter.transactionsDbAdapter
             splitsDbAdapter = transactionsDbAdapter.splitsDbAdapter
             commoditiesDbAdapter = accountsDbAdapter.commoditiesDbAdapter

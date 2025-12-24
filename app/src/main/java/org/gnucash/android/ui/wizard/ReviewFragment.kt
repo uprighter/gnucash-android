@@ -1,7 +1,6 @@
 package org.gnucash.android.ui.wizard
 
 import android.os.Bundle
-import android.text.TextUtils
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -15,6 +14,7 @@ import com.tech.freak.wizardpager.model.AbstractWizardModel
 import com.tech.freak.wizardpager.model.ModelCallbacks
 import com.tech.freak.wizardpager.model.Page
 import com.tech.freak.wizardpager.model.ReviewItem
+import org.gnucash.android.R
 
 class ReviewFragment : Fragment(), ModelCallbacks, AdapterView.OnItemClickListener {
 
@@ -136,8 +136,8 @@ class ReviewFragment : Fragment(), ModelCallbacks, AdapterView.OnItemClickListen
 
             val reviewItem: ReviewItem = reviewItems[position]
             var value = reviewItem.displayValue
-            if (TextUtils.isEmpty(value)) {
-                value = "(None)"
+            if (value.isNullOrEmpty()) {
+                value = rootView.context.getString(R.string.none)
             }
             (rootView.findViewById<TextView>(android.R.id.text1)!!).text = reviewItem.title
             (rootView.findViewById<TextView>(android.R.id.text2)!!).text = value

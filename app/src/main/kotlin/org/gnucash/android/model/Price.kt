@@ -133,7 +133,8 @@ class Price : BaseModel {
         val formatter = (NumberFormat.getNumberInstance() as DecimalFormat).apply {
             maximumFractionDigits = precision
         }
-        return formatter.format(numerator.divide(denominator, MathContext.DECIMAL64))
+        val amount = formatter.format(numerator.divide(denominator, MathContext.DECIMAL64))
+        return "$commodity/$currency=$amount"
     }
 
     fun toBigDecimal(): BigDecimal {
@@ -216,7 +217,6 @@ class Price : BaseModel {
         companion object {
             private val values = Type.values()
 
-            @JvmStatic
             fun of(key: String?): Type {
                 val value = key?.lowercase(Locale.ROOT) ?: return Unknown
                 return values.firstOrNull { it.value == value } ?: Unknown

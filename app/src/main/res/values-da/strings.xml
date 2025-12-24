@@ -164,9 +164,9 @@
     <!-- Default title for color picker dialog [CHAR LIMIT=30] -->
     <string name="color_picker_default_title">Select a Color</string>
     <!-- Content description for a color square. -->
-    <string name="color_swatch_description">Color <xliff:g example="14" id="color_index">%1$d</xliff:g></string>
+    <string name="color_swatch_description">Color <xliff:g example="14" id="color_index">%1$s</xliff:g></string>
     <!-- Content description for a selected color square. -->
-    <string name="color_swatch_description_selected">Color <xliff:g example="14" id="color_index">%1$d</xliff:g> selected</string>
+    <string name="color_swatch_description_selected">Color <xliff:g example="14" id="color_index">%1$s</xliff:g> selected</string>
     <string name="label_account_color_and_type">Account Color &amp; Type</string>
     <string name="label_delete_sub_accounts">Delete sub-accounts</string>
     <string name="title_recent_accounts">Recent</string>
@@ -253,7 +253,7 @@
     <string name="password">Password</string>
     <string name="owncloud_server_invalid">OC server not found</string>
     <string name="owncloud_user_invalid">OC username/password invalid</string>
-    <string name="owncloud_dir_invalid">Invalid chars: \\ &lt; &gt; : \&quot; | * ?</string>
+    <string name="owncloud_dir_invalid">Invalid chars: \\ / &lt; &gt; : \&quot; | * ?</string>
     <string name="owncloud_server_ok">OC server OK</string>
     <string name="owncloud_user_ok">OC username/password OK</string>
     <string name="owncloud_dir_ok">Dir name OK</string>
@@ -483,4 +483,6 @@
     <string name="title_progress_processing_prices">Behandling af priser</string>
     <string name="title_progress_processing_schedules">Behandling af tidsplaner</string>
     <string name="title_progress_processing_transactions">Behandling af transaktioner</string>
+    <!-- msgid "Number" -->
+    <string name="number">Nummer</string>
 </resources>

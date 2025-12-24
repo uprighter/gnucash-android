@@ -17,15 +17,12 @@ package org.gnucash.android.test.ui
 
 import android.Manifest
 import androidx.test.espresso.Espresso.onView
-import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.swipeUp
-import androidx.test.espresso.assertion.ViewAssertions.matches
-import androidx.test.espresso.contrib.DrawerActions
+import androidx.test.espresso.contrib.DrawerActions.open
 import androidx.test.espresso.intent.Intents
 import androidx.test.espresso.intent.matcher.IntentMatchers
 import androidx.test.espresso.intent.rule.IntentsTestRule
 import androidx.test.espresso.matcher.ViewMatchers.hasDescendant
-import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withParent
 import androidx.test.espresso.matcher.ViewMatchers.withText
@@ -36,6 +33,7 @@ import org.gnucash.android.app.GnuCashApplication
 import org.gnucash.android.db.adapter.BooksDbAdapter
 import org.gnucash.android.model.Book
 import org.gnucash.android.test.ui.util.DisableAnimationsRule
+import org.gnucash.android.test.ui.util.performClick
 import org.gnucash.android.ui.account.AccountsActivity
 import org.gnucash.android.ui.settings.PreferenceActivity
 import org.hamcrest.Matchers.allOf
@@ -59,11 +57,10 @@ class MultiBookTest : GnuAndroidTest() {
 
     @Test
     fun shouldOpenBookManager() {
-        onView(withId(R.id.drawer_layout)).perform(DrawerActions.open())
-        onView(withId(R.id.book_name))
-            .check(matches(isDisplayed())).perform(click())
+        onView(withId(R.id.drawer_layout)).perform(open())
+        clickViewId(R.id.book_name)
 
-        onView(withText(R.string.menu_manage_books)).perform(click())
+        clickViewText(R.string.menu_manage_books)
 
         Intents.intended(IntentMatchers.hasComponent(PreferenceActivity::class.java.name))
     }
@@ -71,12 +68,12 @@ class MultiBookTest : GnuAndroidTest() {
     fun testLoadBookFromBookManager() {
         val book = Book()
         book.displayName = "Launch Codes"
-        BooksDbAdapter.getInstance().addRecord(book)
+        booksDbAdapter.insert(book)
 
         shouldOpenBookManager()
-        onView(withText(book.displayName)).perform(click())
+        clickViewText(book.displayName)
 
-        assertThat(GnuCashApplication.getActiveBookUID()).isEqualTo(book.uid)
+        assertThat(GnuCashApplication.activeBookUID).isEqualTo(book.uid)
     }
 
     @Test
@@ -84,15 +81,15 @@ class MultiBookTest : GnuAndroidTest() {
         val bookCount = booksDbAdapter.recordsCount
         assertThat(bookCount).isOne()
 
-        onView(withId(R.id.drawer_layout)).perform(DrawerActions.open())
+        onView(withId(R.id.drawer_layout)).perform(open())
         onView(withId(R.id.drawer_layout)).perform(swipeUp())
-        onView(withText(R.string.title_settings)).perform(click())
+        clickViewText(R.string.title_settings)
 
         Intents.intended(IntentMatchers.hasComponent(PreferenceActivity::class.java.name))
 
-        onView(withText(R.string.header_account_settings)).perform(click())
-        onView(withText(R.string.title_create_default_accounts)).perform(click())
-        onView(withId(android.R.id.button1)).perform(click())
+        clickViewText(R.string.header_account_settings)
+        clickViewText(R.string.title_create_default_accounts)
+        clickViewId(android.R.id.button1)
 
         /* TODO: 18.05.2016 wait for import to finish instead */
         sleep(2000) //give import time to finish
@@ -111,25 +108,21 @@ class MultiBookTest : GnuAndroidTest() {
 
         shouldOpenBookManager()
 
-        onView(withId(R.id.menu_create))
-            .check(matches(isDisplayed()))
-            .perform(click()) // select the accounts template
+        clickViewId(R.id.menu_create) // select the accounts template
 
-        onView(withText("Common Accounts"))
-            .check(matches(isDisplayed()))
-            .perform(click()) // create book from the accounts template
+        clickViewText("Common Accounts") // create book from the accounts template
 
         assertThat(booksDbAdapter.recordsCount).isEqualTo(bookCount + 1)
     }
 
-    //@Test TODO: Finish implementation of this test
+    @Test
     fun testDeleteBook() {
         val bookCount = booksDbAdapter.recordsCount
 
         val book = Book()
         val displayName = "To Be Deleted"
         book.displayName = displayName
-        booksDbAdapter.addRecord(book)
+        booksDbAdapter.insert(book)
 
         assertThat(booksDbAdapter.recordsCount).isEqualTo(bookCount + 1)
 
@@ -140,10 +133,14 @@ class MultiBookTest : GnuAndroidTest() {
                 withParent(hasDescendant(withText(displayName))),
                 withId(R.id.options_menu)
             )
-        ).perform(click())
+        ).performClick()
 
-        onView(withText(R.string.menu_delete)).perform(click())
-        onView(withText(R.string.btn_delete_book)).perform(click())
+        // Show delete confirmation dialog.
+        clickViewText(R.string.menu_delete)
+        // Check the "I'm sure" checkbox.
+        clickViewText(R.string.yes_sure)
+        // Delete the book.
+        clickViewText(R.string.btn_delete_book)
 
         assertThat(booksDbAdapter.recordsCount).isEqualTo(bookCount)
     }
@@ -158,8 +155,9 @@ class MultiBookTest : GnuAndroidTest() {
         @BeforeClass
         @JvmStatic
         fun prepTestCase() {
+            configureDevice()
             preventFirstRunDialogs()
-            booksDbAdapter = BooksDbAdapter.getInstance()
+            booksDbAdapter = BooksDbAdapter.instance
         }
     }
 }

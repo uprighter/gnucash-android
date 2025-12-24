@@ -164,9 +164,9 @@
     <!-- Default title for color picker dialog [CHAR LIMIT=30] -->
     <string name="color_picker_default_title">색상 선택</string>
     <!-- Content description for a color square. -->
-    <string name="color_swatch_description">Color <xliff:g example="14" id="color_index">%1$d</xliff:g></string>
+    <string name="color_swatch_description">Color <xliff:g example="14" id="color_index">%1$s</xliff:g></string>
     <!-- Content description for a selected color square. -->
-    <string name="color_swatch_description_selected">Color <xliff:g example="14" id="color_index">%1$d</xliff:g> selected</string>
+    <string name="color_swatch_description_selected">Color <xliff:g example="14" id="color_index">%1$s</xliff:g> selected</string>
     <string name="label_account_color_and_type">계정의 색상과 종류</string>
     <string name="label_delete_sub_accounts">하위 계정 삭제</string>
     <string name="title_recent_accounts">최근 계정</string>
@@ -253,7 +253,7 @@
     <string name="password">비밀번호</string>
     <string name="owncloud_server_invalid">Owncloud 서버를 찾을 수 없습니다</string>
     <string name="owncloud_user_invalid">Owncloud의 사용자 이름 또는 비밀번호가 맞지 않습니다</string>
-    <string name="owncloud_dir_invalid">사용할 수 없는 문자: \\ &lt; &gt; : \&quot; | * ?</string>
+    <string name="owncloud_dir_invalid">사용할 수 없는 문자: \\ / &lt; &gt; : \&quot; | * ?</string>
     <string name="owncloud_server_ok">Owncloud서버 정상</string>
     <string name="owncloud_user_ok">아이디와 비밀번호 확인</string>
     <string name="owncloud_dir_ok">폴더 확인</string>
@@ -481,4 +481,6 @@
     <string name="title_progress_processing_prices">가격 처리</string>
     <string name="title_progress_processing_schedules">일정 처리</string>
     <string name="title_progress_processing_transactions">거래 처리</string>
+    <!-- msgid "Number" -->
+    <string name="number">번호</string>
 </resources>

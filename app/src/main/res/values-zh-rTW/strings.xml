@@ -165,9 +165,9 @@
     <!-- Default title for color picker dialog [CHAR LIMIT=30] -->
     <string name="color_picker_default_title">選擇顏色</string>
     <!-- Content description for a color square. -->
-    <string name="color_swatch_description">Color <xliff:g example="14" id="color_index">%1$d</xliff:g></string>
+    <string name="color_swatch_description">Color <xliff:g example="14" id="color_index">%1$s</xliff:g></string>
     <!-- Content description for a selected color square. -->
-    <string name="color_swatch_description_selected">Color <xliff:g example="14" id="color_index">%1$d</xliff:g> selected</string>
+    <string name="color_swatch_description_selected">Color <xliff:g example="14" id="color_index">%1$s</xliff:g> selected</string>
     <string name="label_account_color_and_type">科目顏色和類型</string>
     <string name="label_delete_sub_accounts">删除子科目</string>
     <string name="title_recent_accounts">最近使用</string>
@@ -254,7 +254,7 @@
     <string name="password">密碼</string>
     <string name="owncloud_server_invalid">找不到 ownCloud 伺服器</string>
     <string name="owncloud_user_invalid">ownCloud 使用者名稱/密碼無效</string>
-    <string name="owncloud_dir_invalid">無效字元: \\ &lt; &gt; : \&quot; | * ?</string>
+    <string name="owncloud_dir_invalid">無效字元: \\ / &lt; &gt; : \&quot; | * ?</string>
     <string name="owncloud_server_ok">OC 伺服器 OK</string>
     <string name="owncloud_user_ok">OC 使用者名稱/密碼 OK</string>
     <string name="owncloud_dir_ok">目錄名稱 OK</string>
@@ -484,4 +484,6 @@
     <string name="title_progress_processing_prices">加工價格</string>
     <string name="title_progress_processing_schedules">處理時間表</string>
     <string name="title_progress_processing_transactions">處理交易</string>
+    <!-- msgid "Number" -->
+    <string name="number">編號</string>
 </resources>

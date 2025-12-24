@@ -67,7 +67,7 @@
                     android:layout_height="wrap_content"
                     android:gravity="center_vertical"
                     android:minWidth="32dp"
-                    android:text="USD"
+                    android:text="$"
                     android:textAppearance="?android:textAppearanceMedium"
                     android:textColor="@color/debit_red" />
 
@@ -83,7 +83,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:hint="@string/label_transaction_amount"
-                        android:nextFocusDown="@+id/input_transfer_account_spinner"
+                        android:nextFocusDown="@+id/notes"
                         android:textColor="@color/debit_red"
                         android:textSize="20sp" />
                 </com.google.android.material.textfield.TextInputLayout>
@@ -161,6 +161,30 @@
 
                 <ImageView
                     style="@style/FormIcon"
+                    android:src="@drawable/ic_123" />
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1">
+
+                    <EditText
+                        android:id="@+id/number"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="@string/hint_number"
+                        android:inputType="textNoSuggestions"
+                        android:singleLine="true"
+                        android:textAppearance="?android:textAppearanceSmall" />
+                </com.google.android.material.textfield.TextInputLayout>
+            </LinearLayout>
+
+            <View style="@style/Divider" />
+
+            <LinearLayout style="@style/FormRow">
+
+                <ImageView
+                    style="@style/FormIcon"
                     android:src="@drawable/ic_notes" />
 
                 <com.google.android.material.textfield.TextInputLayout
@@ -173,7 +197,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:hint="@string/hint_notes"
-                        android:inputType="textMultiLine|textCapSentences"
+                        android:inputType="textMultiLine|textCapSentences|textLongMessage"
                         android:singleLine="false"
                         android:textAppearance="?android:textAppearanceSmall" />
                 </com.google.android.material.textfield.TextInputLayout>
@@ -197,19 +221,11 @@
                     android:text="@string/label_tap_to_create_schedule" />
 
             </LinearLayout>
-
-            <CheckBox
-                android:id="@+id/checkbox_save_template"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="@dimen/form_row_bottom_margin"
-                android:text="@string/label_save_template"
-                android:visibility="gone" />
-            <!-- Not exposing the transaction template checkbox to the UI at this time -->
         </LinearLayout>
     </ScrollView>
 
     <include
         android:id="@+id/calculator_keyboard"
-        layout="@layout/kbd_calculator" />
+        layout="@layout/kbd_calculator"
+        android:visibility="gone" />
 </FrameLayout>

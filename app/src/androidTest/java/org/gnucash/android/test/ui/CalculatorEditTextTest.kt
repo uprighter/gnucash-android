@@ -20,7 +20,6 @@ import android.content.Intent
 import android.text.InputType
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.Espresso.pressBack
-import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.ViewMatchers.assertThat
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
@@ -62,10 +61,10 @@ class CalculatorEditTextTest : GnuAndroidTest() {
 
     @Before
     fun setUp() {
-        accountsDbAdapter = AccountsDbAdapter.getInstance()
+        accountsDbAdapter = AccountsDbAdapter.instance
         accountsDbAdapter.deleteAllRecords()
 
-        val commoditiesDbAdapter = CommoditiesDbAdapter.getInstance()!!
+        val commoditiesDbAdapter = accountsDbAdapter.commoditiesDbAdapter
         val commodity = commoditiesDbAdapter.getCurrency(CURRENCY_CODE)!!
 
         val account = Account(DUMMY_ACCOUNT_NAME, commodity)
@@ -85,7 +84,9 @@ class CalculatorEditTextTest : GnuAndroidTest() {
 
     @After
     fun tearDown() {
-        transactionsActivity.finish()
+        if (::transactionsActivity.isInitialized) {
+            transactionsActivity.finish()
+        }
     }
 
     /**
@@ -93,16 +94,14 @@ class CalculatorEditTextTest : GnuAndroidTest() {
      */
     @Test
     fun testShowingHidingOfCalculatorKeyboard() {
-        clickOnView(R.id.fab_create_transaction)
+        clickViewId(R.id.fab_add)
 
         // Verify the input type is correct
-        onView(withId(R.id.input_transaction_amount)).check(
-            matches(allOf(withInputType(InputType.TYPE_CLASS_NUMBER)))
-        )
+        onView(withId(R.id.input_transaction_amount))
+            .check(matches(withInputType(InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL)))
 
         // Giving the focus to the amount field shows the keyboard
-        onView(withId(R.id.input_transaction_amount))
-            .perform(click())
+        clickViewId(R.id.input_transaction_amount)
         assertThat(isKeyboardOpen, `is`(false))
         onView(withId(R.id.calculator_keyboard))
             .check(matches(isDisplayed()))
@@ -114,25 +113,16 @@ class CalculatorEditTextTest : GnuAndroidTest() {
             .check(matches(not(isDisplayed())))
 
         // Clicking the amount field already focused shows the keyboard again
-        clickOnView(R.id.input_transaction_amount)
+        clickViewId(R.id.input_transaction_amount)
         assertThat(isKeyboardOpen, `is`(false))
         onView(withId(R.id.calculator_keyboard))
             .check(matches(isDisplayed()))
 
         // Changing the focus to another field keeps the software keyboard open
-        clickOnView(R.id.input_transaction_name)
+        clickViewId(R.id.input_transaction_name)
         assertThat(isKeyboardOpen, `is`(true))
         onView(withId(R.id.calculator_keyboard))
             .check(matches(not(isDisplayed())))
-    }
-
-    /**
-     * Simple wrapper for clicking on views with espresso
-     *
-     * @param viewId View resource ID
-     */
-    private fun clickOnView(viewId: Int) {
-        onView(withId(viewId)).perform(click())
     }
 
     companion object {
@@ -150,6 +140,7 @@ class CalculatorEditTextTest : GnuAndroidTest() {
         @BeforeClass
         @JvmStatic
         fun prepTestCase() {
+            configureDevice()
             preventFirstRunDialogs()
         }
     }

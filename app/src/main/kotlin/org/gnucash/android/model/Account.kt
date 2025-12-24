@@ -40,7 +40,7 @@ class Account : BaseModel {
      */
     var name: String = ""
         set(value) {
-            field = value.trim { it <= ' ' }
+            field = value.trim()
         }
 
     /**
@@ -102,7 +102,6 @@ class Account : BaseModel {
      * @param name      Name of the account
      * @param commodity [Commodity] to be used by transactions in this account
      */
-    @JvmOverloads
     constructor(name: String, commodity: Commodity = Commodity.DEFAULT_COMMODITY) {
         this.name = name
         this.fullName = this.name
@@ -114,6 +113,7 @@ class Account : BaseModel {
      *
      * @param transaction [Transaction] to be added to the account
      */
+    @Deprecated("add transaction directly to the db")
     fun addTransaction(transaction: Transaction) {
         transaction.commodity = commodity
         _transactions.add(transaction)
@@ -125,6 +125,7 @@ class Account : BaseModel {
      * @return Array list of transactions for the account
      */
     var transactions: List<Transaction>
+        @Deprecated("use transactions db adapter")
         get() = _transactions
         /**
          * Sets a list of transactions for this account.
@@ -137,14 +138,6 @@ class Account : BaseModel {
         set(value) {
             _transactions = value.toMutableList()
         }
-
-    /**
-     * Returns the number of transactions in this account
-     *
-     * @return Number transactions in account
-     */
-    val transactionCount: Int
-        get() = _transactions.size
 
     /**
      * The color of the account.
@@ -207,6 +200,10 @@ class Account : BaseModel {
 
     override fun toString(): String = fullName ?: name
 
+    override fun hashCode(): Int {
+        return toString().hashCode()
+    }
+
     companion object {
         /**
          * The MIME type for accounts in GnucashMobile
@@ -221,7 +218,6 @@ class Account : BaseModel {
          */
         // TODO: get it from a theme value?
         @ColorInt
-        @JvmField
         val DEFAULT_COLOR = Color.rgb(237, 236, 235)
 
         /**

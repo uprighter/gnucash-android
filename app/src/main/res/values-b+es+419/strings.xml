@@ -165,9 +165,9 @@
     <!-- Default title for color picker dialog [CHAR LIMIT=30] -->
     <string name="color_picker_default_title">Seleccionar un color</string>
     <!-- Content description for a color square. -->
-    <string name="color_swatch_description">Color <xliff:g example="14" id="color_index">%1$d</xliff:g></string>
+    <string name="color_swatch_description">Color <xliff:g example="14" id="color_index">%1$s</xliff:g></string>
     <!-- Content description for a selected color square. -->
-    <string name="color_swatch_description_selected">Color <xliff:g example="14" id="color_index">%1$d</xliff:g> selected</string>
+    <string name="color_swatch_description_selected">Color <xliff:g example="14" id="color_index">%1$s</xliff:g> selected</string>
     <string name="label_account_color_and_type">Color y tipo de cuenta</string>
     <string name="label_delete_sub_accounts">Borrar sub-cuentas</string>
     <string name="title_recent_accounts">Reciente</string>
@@ -254,7 +254,7 @@
     <string name="password">Contraseña</string>
     <string name="owncloud_server_invalid">Servidor OC no encontrado</string>
     <string name="owncloud_user_invalid">Usuario/contraseña OC no válidos</string>
-    <string name="owncloud_dir_invalid">Caracteres inválidos: \\ &lt; &gt; : \&quot; | * ?</string>
+    <string name="owncloud_dir_invalid">Caracteres inválidos: \\ / &lt; &gt; : \&quot; | * ?</string>
     <string name="owncloud_server_ok">Servidor OC correcto</string>
     <string name="owncloud_user_ok">Usuario/contraseña OC correctos</string>
     <string name="owncloud_dir_ok">Nombre del directorio correcto</string>
@@ -484,4 +484,6 @@
     <string name="title_progress_processing_prices">Procesamiento de los precios</string>
     <string name="title_progress_processing_schedules">Procesamiento de los cronogramas</string>
     <string name="title_progress_processing_transactions">Procesamiento de las transacciones</string>
+    <!-- msgid "Number" -->
+    <string name="number">Número</string>
 </resources>

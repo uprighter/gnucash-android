@@ -165,9 +165,9 @@
     <!-- Default title for color picker dialog [CHAR LIMIT=30] -->
     <string name="color_picker_default_title">选择一种颜色</string>
     <!-- Content description for a color square. -->
-    <string name="color_swatch_description">Color <xliff:g example="14" id="color_index">%1$d</xliff:g></string>
+    <string name="color_swatch_description">Color <xliff:g example="14" id="color_index">%1$s</xliff:g></string>
     <!-- Content description for a selected color square. -->
-    <string name="color_swatch_description_selected">Color <xliff:g example="14" id="color_index">%1$d</xliff:g> selected</string>
+    <string name="color_swatch_description_selected">Color <xliff:g example="14" id="color_index">%1$s</xliff:g> selected</string>
     <string name="label_account_color_and_type">科目颜色和类型</string>
     <string name="label_delete_sub_accounts">删除子科目</string>
     <string name="title_recent_accounts">最近的</string>
@@ -254,7 +254,7 @@
     <string name="password">密码</string>
     <string name="owncloud_server_invalid">找不到 OC 服务器</string>
     <string name="owncloud_user_invalid">OC 用户名/密码无效</string>
-    <string name="owncloud_dir_invalid">无效字符： \\ &lt; &gt; : \&quot; | * ?</string>
+    <string name="owncloud_dir_invalid">无效字符： \\ / &lt; &gt; : \&quot; | * ?</string>
     <string name="owncloud_server_ok">OC 服务器正常</string>
     <string name="owncloud_user_ok">OC 用户名/密码正确</string>
     <string name="owncloud_dir_ok">目录名正确</string>
@@ -416,7 +416,6 @@
     <string name="light_ui_title">"明亮模式"</string>
     <string name="dark_ui_title" msgid="3373976268671557416">"深色模式"</string>
     <string name="yes_sure">是的，我确定。</string>
-    <string name="key_export_accounts_csv">导出帐户_csv_key</string>
     <string name="summary_export_accounts_csv">导出所有账户 (无交易) 到 CSV</string>
     <string name="title_export_accounts_csv">导出为 CSV</string>
     <string name="label_csv_separator">分隔符</string>
@@ -485,4 +484,6 @@
     <string name="title_progress_processing_prices">处理价格</string>
     <string name="title_progress_processing_schedules">处理进度表</string>
     <string name="title_progress_processing_transactions">处理交易</string>
+    <!-- msgid "Number" -->
+    <string name="number">编号</string>
 </resources>

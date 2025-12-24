@@ -1,23 +1,22 @@
 package org.gnucash.android.ui.adapter
 
 import android.content.Context
-import android.widget.ArrayAdapter
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import org.gnucash.android.db.DatabaseSchema
+import kotlinx.coroutines.withContext
+import org.gnucash.android.db.DatabaseSchema.CommodityEntry
 import org.gnucash.android.db.adapter.CommoditiesDbAdapter
-import org.gnucash.android.lang.VoidCallback
 import org.gnucash.android.model.Commodity
 
-class CommoditiesAdapter @JvmOverloads constructor(
+class CommoditiesAdapter(
     context: Context,
-    private val adapter: CommoditiesDbAdapter = CommoditiesDbAdapter.getInstance()!!,
+    private val adapter: CommoditiesDbAdapter = CommoditiesDbAdapter.instance,
     private val scope: CoroutineScope
-) : ArrayAdapter<CommoditiesAdapter.Label>(context, android.R.layout.simple_spinner_item) {
+) : SpinnerArrayAdapter<Commodity>(context) {
 
     private var loadJob: Job? = null
 
@@ -33,12 +32,8 @@ class CommoditiesAdapter @JvmOverloads constructor(
         setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
     }
 
-    override fun hasStableIds(): Boolean {
-        return true
-    }
-
     fun getCommodity(position: Int): Commodity? {
-        return getItem(position)?.commodity
+        return getItem(position)?.value
     }
 
     fun getPosition(mnemonic: String): Int {
@@ -60,27 +55,27 @@ class CommoditiesAdapter @JvmOverloads constructor(
         return -1
     }
 
-    fun load(callback: VoidCallback? = null) {
+    fun load(callback: ((CommoditiesAdapter) -> Unit)? = null): CommoditiesAdapter {
         loadJob?.cancel()
         loadJob = scope.launch(Dispatchers.IO) {
             val records = loadData(adapter)
-            val labels = records.map { Label(it) }
-            scope.launch(Dispatchers.Main) {
+            val labels = records.map { commodity ->
+                SpinnerItem(commodity, commodity.formatListItem())
+            }
+            withContext(Dispatchers.Main) {
                 clear()
                 addAll(labels)
-                callback?.invoke()
+                callback?.invoke(this@CommoditiesAdapter)
             }
         }
+        return this
     }
 
     private fun loadData(adapter: CommoditiesDbAdapter): List<Commodity> {
-        val where = DatabaseSchema.CommodityEntry.COLUMN_MNEMONIC + " <> ?" +
-                " AND " + DatabaseSchema.CommodityEntry.COLUMN_NAMESPACE + " <> ?";
-        val whereArgs = arrayOf(Commodity.TEMPLATE, Commodity.TEMPLATE)
-        return adapter.getAllRecords(where, whereArgs)
-    }
-
-    data class Label(val commodity: Commodity) {
-        override fun toString(): String = commodity.formatListItem()
+        val where = CommodityEntry.COLUMN_MNEMONIC + " <> ?" +
+                " AND " + CommodityEntry.COLUMN_NAMESPACE + " <> ?"
+        val whereArgs = arrayOf<String?>(Commodity.TEMPLATE, Commodity.TEMPLATE)
+        val orderBy = CommodityEntry.COLUMN_MNEMONIC + " ASC"
+        return adapter.getAllRecords(where, whereArgs, orderBy)
     }
 }

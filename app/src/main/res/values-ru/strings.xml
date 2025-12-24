@@ -167,9 +167,9 @@
     <!-- Default title for color picker dialog [CHAR LIMIT=30] -->
     <string name="color_picker_default_title">Выберите цвет</string>
     <!-- Content description for a color square. -->
-    <string name="color_swatch_description">Color <xliff:g example="14" id="color_index">%1$d</xliff:g></string>
+    <string name="color_swatch_description">Color <xliff:g example="14" id="color_index">%1$s</xliff:g></string>
     <!-- Content description for a selected color square. -->
-    <string name="color_swatch_description_selected">Color <xliff:g example="14" id="color_index">%1$d</xliff:g> selected</string>
+    <string name="color_swatch_description_selected">Color <xliff:g example="14" id="color_index">%1$s</xliff:g> selected</string>
     <string name="label_account_color_and_type">Цвет &amp; Тип счёта</string>
     <string name="label_delete_sub_accounts">Удалить дочерние счета</string>
     <string name="title_recent_accounts">Последние</string>
@@ -256,7 +256,7 @@
     <string name="password">Пароль</string>
     <string name="owncloud_server_invalid">OC сервер не найден</string>
     <string name="owncloud_user_invalid">OC неверное имя/пароль</string>
-    <string name="owncloud_dir_invalid">Недопустимые символы: \\ &lt; &gt; : \&quot; | * ?</string>
+    <string name="owncloud_dir_invalid">Недопустимые символы: \\ / &lt; &gt; : \&quot; | * ?</string>
     <string name="owncloud_server_ok">OC сервер ОК</string>
     <string name="owncloud_user_ok">OC имя/пароль ОК</string>
     <string name="owncloud_dir_ok">Имя папки ОК</string>
@@ -422,7 +422,6 @@
     <string name="light_ui_title">"Яркий тема"</string>
     <string name="dark_ui_title" msgid="3373976268671557416">"Тёмная тема"</string>
     <string name="yes_sure">Да, я уверен</string>
-    <string name="key_export_accounts_csv">Экспорт в CSV</string>
     <string name="summary_export_accounts_csv">Экспортировать все счета (без проводок) в CSV</string>
     <string name="title_export_accounts_csv">Экспорт в CSV</string>
     <string name="label_csv_separator">Разделитель</string>
@@ -491,4 +490,6 @@
     <string name="title_progress_processing_prices">Обработка цен</string>
     <string name="title_progress_processing_schedules">Обработка графиков</string>
     <string name="title_progress_processing_transactions">Обработка транзакций</string>
+    <!-- msgid "Number" -->
+    <string name="number">Номер</string>
 </resources>

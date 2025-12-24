@@ -17,20 +17,20 @@ package org.gnucash.android.test.ui
 
 import android.Manifest
 import android.content.Intent
-import android.preference.PreferenceManager
 import android.view.View
+import androidx.preference.PreferenceManager
 import androidx.test.espresso.Espresso.onData
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.Espresso.openActionBarOverflowOrOptionsMenu
 import androidx.test.espresso.Espresso.pressBack
 import androidx.test.espresso.action.ViewActions.clearText
-import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.closeSoftKeyboard
 import androidx.test.espresso.action.ViewActions.scrollTo
 import androidx.test.espresso.action.ViewActions.swipeRight
 import androidx.test.espresso.action.ViewActions.typeText
 import androidx.test.espresso.assertion.ViewAssertions.doesNotExist
 import androidx.test.espresso.assertion.ViewAssertions.matches
+import androidx.test.espresso.matcher.RootMatchers.isPlatformPopup
 import androidx.test.espresso.matcher.ViewMatchers.hasDescendant
 import androidx.test.espresso.matcher.ViewMatchers.isChecked
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
@@ -44,20 +44,21 @@ import androidx.test.rule.GrantPermissionRule
 import org.assertj.core.api.Assertions.assertThat
 import org.gnucash.android.R
 import org.gnucash.android.db.adapter.AccountsDbAdapter
-import org.gnucash.android.db.adapter.DatabaseAdapter
 import org.gnucash.android.db.adapter.SplitsDbAdapter
 import org.gnucash.android.db.adapter.TransactionsDbAdapter
 import org.gnucash.android.model.Account
 import org.gnucash.android.model.AccountType
 import org.gnucash.android.model.Commodity
-import org.gnucash.android.model.Commodity.Companion.getInstance
 import org.gnucash.android.model.Money
 import org.gnucash.android.model.Split
 import org.gnucash.android.model.Transaction
 import org.gnucash.android.receivers.AccountCreator
 import org.gnucash.android.test.ui.util.DisableAnimationsRule
+import org.gnucash.android.test.ui.util.performClick
+import org.gnucash.android.test.ui.util.withTagValue
 import org.gnucash.android.ui.account.AccountsActivity
-import org.gnucash.android.ui.adapter.AccountTypesAdapter
+import org.gnucash.android.ui.adapter.SpinnerItem
+import org.gnucash.android.ui.transaction.TransactionsListFragment
 import org.hamcrest.Description
 import org.hamcrest.Matcher
 import org.hamcrest.Matchers.allOf
@@ -75,9 +76,6 @@ import org.junit.Test
 import java.math.BigDecimal
 
 class AccountsActivityTest : GnuAndroidTest() {
-    // Don't add static here, otherwise it gets set to null by super.tearDown()
-    private val ACCOUNTS_CURRENCY = getInstance(ACCOUNTS_CURRENCY_CODE)
-
     private lateinit var accountsActivity: AccountsActivity
 
     @Rule
@@ -91,20 +89,21 @@ class AccountsActivityTest : GnuAndroidTest() {
 
     @Before
     fun setUp() {
-        accountsActivity = activityRule.activity
-
         accountsDbAdapter.deleteAllRecords() //clear the data
 
-        val simpleAccount = Account(SIMPLE_ACCOUNT_NAME, getInstance(ACCOUNTS_CURRENCY_CODE))
+        val simpleAccount = Account(SIMPLE_ACCOUNT_NAME)
         simpleAccount.setUID(SIMPLE_ACCOUNT_UID)
-        accountsDbAdapter.addRecord(simpleAccount, DatabaseAdapter.UpdateMethod.insert)
+        accountsDbAdapter.insert(simpleAccount)
 
+        accountsActivity = activityRule.activity
         refreshAccountsList()
     }
 
     @After
     fun tearDown() {
-        accountsActivity.finish()
+        if (::accountsActivity.isInitialized) {
+            accountsActivity.finish()
+        }
     }
 
     fun testDisplayAccountsList() {
@@ -114,7 +113,7 @@ class AccountsActivityTest : GnuAndroidTest() {
         refreshAccountsList()
         sleep(1000)
         onView(withText("Assets")).perform(scrollTo())
-        onView(withText("Expenses")).perform(click())
+        clickViewText("Expenses")
         onView(withText("Books")).perform(scrollTo())
     }
 
@@ -124,7 +123,7 @@ class AccountsActivityTest : GnuAndroidTest() {
 
         val account = Account(SEARCH_ACCOUNT_NAME)
         account.parentUID = SIMPLE_ACCOUNT_UID
-        accountsDbAdapter.addRecord(account, DatabaseAdapter.UpdateMethod.insert)
+        accountsDbAdapter.insert(account)
 
         // before search query
         onView(withText(SIMPLE_ACCOUNT_NAME))
@@ -133,7 +132,7 @@ class AccountsActivityTest : GnuAndroidTest() {
             .check(doesNotExist())
 
         //enter search query
-        onView(withId(R.id.menu_search)).perform(click())
+        clickViewId(R.id.menu_search)
         onView(withId(R.id.search_src_text))
             .perform(typeText(SEARCH_ACCOUNT_NAME.substring(0, 2)))
         sleep(100) //give search filter time to finish
@@ -157,7 +156,7 @@ class AccountsActivityTest : GnuAndroidTest() {
     @Test
     fun testCreateAccount() {
         assertThat(accountsDbAdapter.allRecords).hasSize(1)
-        onView(allOf(isDisplayed(), withId(R.id.fab_create_account))).perform(click())
+        clickViewId(R.id.fab_add)
         sleep(1000)
 
         val NEW_ACCOUNT_NAME = "A New Account"
@@ -165,9 +164,9 @@ class AccountsActivityTest : GnuAndroidTest() {
             .perform(typeText(NEW_ACCOUNT_NAME), closeSoftKeyboard())
         onView(withId(R.id.placeholder_status))
             .check(matches(isNotChecked()))
-            .perform(click())
+            .performClick()
 
-        onView(withId(R.id.menu_save)).perform(click())
+        clickViewId(R.id.menu_save)
 
         val accounts = accountsDbAdapter.allRecords
         assertThat(accounts).isNotNull()
@@ -182,9 +181,9 @@ class AccountsActivityTest : GnuAndroidTest() {
     @Test
     fun should_IncludeFutureTransactionsInAccountBalance() {
         val transaction = Transaction("Future transaction")
-        val split1 = Split(Money("4.15", ACCOUNTS_CURRENCY_CODE), SIMPLE_ACCOUNT_UID)
+        val split1 = Split(Money("4.15", Commodity.DEFAULT_COMMODITY), SIMPLE_ACCOUNT_UID)
         transaction.addSplit(split1)
-        transaction.setTime(System.currentTimeMillis() + 4815162342L)
+        transaction.time = System.currentTimeMillis() + 4815162342L
         transactionsDbAdapter.addRecord(transaction)
 
         refreshAccountsList()
@@ -197,29 +196,27 @@ class AccountsActivityTest : GnuAndroidTest() {
     fun testChangeParentAccount() {
         val accountName = "Euro Account"
         val account = Account(accountName, Commodity.EUR)
-        accountsDbAdapter.addRecord(account, DatabaseAdapter.UpdateMethod.insert)
+        accountsDbAdapter.insert(account)
 
         refreshAccountsList()
 
-        onView(withText(accountName)).perform(click())
+        clickViewText(accountName)
         openActionBarOverflowOrOptionsMenu(accountsActivity)
-        onView(withText(R.string.title_edit_account))
-            .perform(click())
+        clickViewText(R.string.title_edit_account)
         onView(withId(R.id.fragment_account_form))
             .check(matches(isDisplayed()))
         closeSoftKeyboard()
         onView(withId(R.id.checkbox_parent_account))
             .perform(scrollTo())
             .check(matches(isNotChecked()))
-            .perform(click())
+            .performClick()
 
         // FIXME: explicitly select the parent account
-        onView(withId(R.id.input_parent_account))
-            .check(matches(isEnabled())).perform(click())
+        clickViewId(R.id.input_parent_account)
 
-        onView(withText(SIMPLE_ACCOUNT_NAME)).perform(click())
+        clickViewText(SIMPLE_ACCOUNT_NAME)
 
-        onView(withId(R.id.menu_save)).perform(click())
+        clickViewId(R.id.menu_save)
 
         val editedAccount = accountsDbAdapter.getRecord(account.uid)
         val parentUID = editedAccount.parentUID
@@ -237,17 +234,19 @@ class AccountsActivityTest : GnuAndroidTest() {
     fun shouldHideParentAccountViewWhenNoParentsExist() {
         val textTrading =
             context.resources.getStringArray(R.array.account_type_entry_values)[AccountType.TRADING.labelIndex]
-        val labelTrading = AccountTypesAdapter.Label(AccountType.TRADING, textTrading)
+        val labelTrading = SpinnerItem(AccountType.TRADING, textTrading)
 
-        onView(allOf(withText(SIMPLE_ACCOUNT_NAME), isDisplayed()))
-            .perform(click())
-        onView(withId(R.id.fragment_transaction_list))
-            .perform(swipeRight())
-        onView(withId(R.id.fab_create_transaction))
-            .check(matches(isDisplayed())).perform(click())
-        sleep(1000)
+        clickViewText(SIMPLE_ACCOUNT_NAME)
+        onView(
+            allOf(
+                withId(android.R.id.list),
+                withTagValue(TransactionsListFragment.TAG)
+            )
+        ).perform(swipeRight())
+        clickViewId(R.id.fab_add)
+
         onView(withId(R.id.checkbox_parent_account))
-            .check(matches(allOf(isChecked())))
+            .check(matches(isChecked()))
         onView(withId(R.id.input_account_name))
             .perform(typeText("Trading account"))
         closeSoftKeyboard()
@@ -256,27 +255,26 @@ class AccountsActivityTest : GnuAndroidTest() {
         onView(withId(R.id.checkbox_parent_account))
             .check(matches(isDisplayed()))
 
-        onView(withId(R.id.input_account_type_spinner))
-            .perform(click())
+        clickViewId(R.id.input_account_type_spinner)
 
         onData(
             allOf(
-                `is`(instanceOf<Any>(AccountTypesAdapter.Label::class.java)),
+                `is`(instanceOf<Any>(SpinnerItem::class.java)),
                 `is`(labelTrading)
             )
-        ).perform(click())
+        ).performClick()
 
         onView(withId(R.id.input_parent_account))
             .check(matches(not(isDisplayed())))
         onView(withId(R.id.checkbox_parent_account))
             .check(matches(not(isDisplayed())))
 
-        onView(withId(R.id.menu_save)).perform(click())
+        clickViewId(R.id.menu_save)
         sleep(1000)
         //no sub-accounts
         assertThat(accountsDbAdapter.getSubAccountCount(SIMPLE_ACCOUNT_UID)).isZero()
         assertThat(
-            accountsDbAdapter.getSubAccountCount(accountsDbAdapter.getOrCreateRootAccountUID())
+            accountsDbAdapter.getSubAccountCount(accountsDbAdapter.rootAccountUID)
         ).isEqualTo(2)
         assertThat(accountsDbAdapter.simpleAccounts).extracting(
             "accountType",
@@ -294,9 +292,8 @@ class AccountsActivityTest : GnuAndroidTest() {
                 withId(R.id.options_menu),
                 isDisplayed()
             )
-        ).perform(click())
-        onView(withText(R.string.title_edit_account))
-            .check(matches(isDisplayed())).perform(click())
+        ).performClick()
+        clickViewText(R.string.title_edit_account)
         onView(withId(R.id.fragment_account_form))
             .check(matches(isDisplayed()))
 
@@ -305,13 +302,13 @@ class AccountsActivityTest : GnuAndroidTest() {
             .perform(clearText())
             .perform(typeText(editedAccountName))
 
-        onView(withId(R.id.menu_save)).perform(click())
+        clickViewId(R.id.menu_save)
 
         val accounts = accountsDbAdapter.allRecords
         val latest = accounts[0] //will be the first due to alphabetical sorting
 
         assertThat(latest.name).isEqualTo(editedAccountName)
-        assertThat(latest.commodity.currencyCode).isEqualTo(ACCOUNTS_CURRENCY_CODE)
+        assertThat(latest.commodity).isEqualTo(Commodity.DEFAULT_COMMODITY)
     }
 
     @Test
@@ -322,28 +319,27 @@ class AccountsActivityTest : GnuAndroidTest() {
                 withId(R.id.options_menu),
                 isDisplayed()
             )
-        ).perform(click())
+        ).performClick()
 
-        val account = Account("Transfer Account")
-        account.commodity = ACCOUNTS_CURRENCY
+        val accountsCurrency = Commodity.DEFAULT_COMMODITY
+        val account = Account("Transfer Account", accountsCurrency)
         val transaction = Transaction("Simple transaction")
-        transaction.commodity = ACCOUNTS_CURRENCY
-        val split = Split(Money(BigDecimal.TEN, ACCOUNTS_CURRENCY), account.uid)
+        transaction.commodity = accountsCurrency
+        val split = Split(Money(BigDecimal.TEN, accountsCurrency), account)
         transaction.addSplit(split)
         transaction.addSplit(split.createPair(SIMPLE_ACCOUNT_UID))
         account.addTransaction(transaction)
-        accountsDbAdapter.addRecord(account, DatabaseAdapter.UpdateMethod.insert)
+        accountsDbAdapter.insert(account)
 
         assertThat(accountsDbAdapter.getTransactionCount(account.uid)).isOne()
         assertThat(accountsDbAdapter.getTransactionCount(SIMPLE_ACCOUNT_UID)).isOne()
         assertThat(splitsDbAdapter.getSplitsForTransaction(transaction.uid)).hasSize(2)
 
-        onView(withText(R.string.title_edit_account))
-            .perform(click())
+        clickViewText(R.string.title_edit_account)
 
-        onView(withId(R.id.menu_save)).perform(click())
+        clickViewId(R.id.menu_save)
         assertThat(accountsDbAdapter.getTransactionCount(SIMPLE_ACCOUNT_UID)).isOne()
-        assertThat(splitsDbAdapter.fetchSplitsForAccount(SIMPLE_ACCOUNT_UID).count).isOne()
+        assertThat(splitsDbAdapter.fetchSplitsForAccount(SIMPLE_ACCOUNT_UID)?.count).isOne()
         assertThat(splitsDbAdapter.getSplitsForTransaction(transaction.uid)).hasSize(2)
     }
 
@@ -355,10 +351,9 @@ class AccountsActivityTest : GnuAndroidTest() {
                 withParent(hasDescendant(withText(SIMPLE_ACCOUNT_NAME))),
                 withId(R.id.options_menu)
             )
-        ).perform(click())
+        ).performClick()
 
-        onView(withText(R.string.title_delete_account))
-            .perform(click())
+        clickViewText(R.string.title_delete_account)
 
         assertThat(accountsDbAdapter.recordsCount).isOne()
 
@@ -381,18 +376,16 @@ class AccountsActivityTest : GnuAndroidTest() {
                 withParent(hasDescendant(withText(SIMPLE_ACCOUNT_NAME))),
                 withId(R.id.options_menu)
             )
-        ).perform(click())
-        onView(withText(R.string.title_delete_account))
-            .perform(click())
+        ).performClick()
+        clickViewText(R.string.title_delete_account)
 
         onView(
             allOf(
                 withParent(withId(R.id.accounts_options)),
                 withId(R.id.radio_delete)
             )
-        ).perform(click())
-        onView(withText(R.string.alert_dialog_ok_delete))
-            .perform(click())
+        ).performClick()
+        clickViewText(R.string.alert_dialog_ok_delete)
 
         assertThat(accountExists(SIMPLE_ACCOUNT_UID)).isFalse()
         assertThat(accountExists(CHILD_ACCOUNT_UID)).isFalse()
@@ -404,9 +397,9 @@ class AccountsActivityTest : GnuAndroidTest() {
         val subAccount = Account("Child account")
         subAccount.parentUID = SIMPLE_ACCOUNT_UID
 
-        val tranferAcct = Account("Other account")
-        accountsDbAdapter.addRecord(subAccount, DatabaseAdapter.UpdateMethod.insert)
-        accountsDbAdapter.addRecord(tranferAcct, DatabaseAdapter.UpdateMethod.insert)
+        val transferAccount = Account("Other account")
+        accountsDbAdapter.insert(subAccount)
+        accountsDbAdapter.insert(transferAccount)
 
         assertThat(accountsDbAdapter.recordsCount).isEqualTo(accountCount + 2)
 
@@ -417,22 +410,36 @@ class AccountsActivityTest : GnuAndroidTest() {
                 withParent(hasDescendant(withText(SIMPLE_ACCOUNT_NAME))),
                 withId(R.id.options_menu)
             )
-        ).perform(click())
-        onView(withText(R.string.title_delete_account))
-            .perform(click())
+        ).performClick()
+        clickViewText(R.string.title_delete_account)
+        sleep(1000) // wait for data to load
 
-        /* FIXME: 17.08.2016 This enabled check fails during some test runs-not reliable, investigate why */
+        /* FIXME: 17.08.2016 This enabled check fails during some test runs - not reliable, investigate why */
         onView(allOf(withParent(withId(R.id.accounts_options)), withId(R.id.radio_move)))
-            .check(matches(isEnabled())).perform(click())
+            .check(matches(isEnabled()))
+            .performClick()
+        onView(
+            allOf(
+                withParent(withId(R.id.accounts_options)),
+                withId(R.id.target_accounts_spinner)
+            )
+        ).check(matches(isEnabled()))
+            .performClick()
+        onData(
+            allOf(
+                `is`(instanceOf<Any>(SpinnerItem::class.java)),
+                `is`(SpinnerItem(transferAccount))
+            )
+        ).inRoot(isPlatformPopup())
+            .performClick()
 
-        onView(withText(R.string.alert_dialog_ok_delete))
-            .perform(click())
+        clickViewId(BUTTON_POSITIVE)
 
         assertThat(accountExists(SIMPLE_ACCOUNT_UID)).isFalse()
         assertThat(accountExists(subAccount.uid)).isTrue()
 
         val newParentUID = accountsDbAdapter.getParentAccountUID(subAccount.uid)
-        assertThat(newParentUID).isEqualTo(tranferAcct.uid)
+        assertThat(newParentUID).isEqualTo(transferAccount.uid)
     }
 
     /**
@@ -442,11 +449,10 @@ class AccountsActivityTest : GnuAndroidTest() {
      * @return `true` if the account exists, `false` otherwise
      */
     private fun accountExists(accountUID: String): Boolean {
-        try {
-            accountsDbAdapter.getID(accountUID)
-            return true
-        } catch (e: IllegalArgumentException) {
-            return false
+        return try {
+            accountsDbAdapter.getRecordOrNull(accountUID) != null
+        } catch (_: IllegalArgumentException) {
+            false
         }
     }
 
@@ -493,7 +499,7 @@ class AccountsActivityTest : GnuAndroidTest() {
     private fun refreshAccountsList() {
         try {
             activityRule.runOnUiThread { accountsActivity.refresh() }
-            sleep(1000)
+            sleep(2000)
         } catch (throwable: Throwable) {
             System.err.println("Failed to refresh accounts")
         }
@@ -507,10 +513,7 @@ class AccountsActivityTest : GnuAndroidTest() {
         val hiddenAccount = Account(PARENT_ACCOUNT_NAME)
         hiddenAccount.setUID(PARENT_ACCOUNT_UID)
         hiddenAccount.isHidden = true
-        accountsDbAdapter.addRecord(
-            hiddenAccount,
-            DatabaseAdapter.UpdateMethod.insert
-        )
+        accountsDbAdapter.insert(hiddenAccount)
         assertThat(accountsDbAdapter.recordsCount).isEqualTo(3)
 
         refreshAccountsList()
@@ -518,13 +521,13 @@ class AccountsActivityTest : GnuAndroidTest() {
             .check(doesNotExist())
 
         // Show hidden accounts.
-        onView(withId(R.id.menu_hidden)).perform(click())
+        clickViewId(R.id.menu_hidden)
         sleep(500) // wait for animations to finish
         onView(allOf(withText(PARENT_ACCOUNT_NAME)))
             .check(matches(isDisplayed()))
 
         // Hide hidden accounts.
-        onView(withId(R.id.menu_hidden)).perform(click())
+        clickViewId(R.id.menu_hidden)
         onView(allOf(withText(PARENT_ACCOUNT_NAME)))
             .check(doesNotExist())
     }
@@ -537,19 +540,13 @@ class AccountsActivityTest : GnuAndroidTest() {
         val hiddenAccount = Account(PARENT_ACCOUNT_NAME)
         hiddenAccount.setUID(PARENT_ACCOUNT_UID)
         hiddenAccount.isHidden = true
-        accountsDbAdapter.addRecord(
-            hiddenAccount,
-            DatabaseAdapter.UpdateMethod.insert
-        )
+        accountsDbAdapter.insert(hiddenAccount)
         assertThat(accountsDbAdapter.recordsCount).isEqualTo(3)
 
         val hiddenAccountChild = Account("Child of Hidden")
         hiddenAccountChild.setUID(CHILD_ACCOUNT_UID)
         hiddenAccountChild.parentUID = PARENT_ACCOUNT_UID
-        accountsDbAdapter.addRecord(
-            hiddenAccountChild,
-            DatabaseAdapter.UpdateMethod.insert
-        )
+        accountsDbAdapter.insert(hiddenAccountChild)
         assertThat(accountsDbAdapter.recordsCount).isEqualTo(4)
 
         refreshAccountsList()
@@ -557,15 +554,15 @@ class AccountsActivityTest : GnuAndroidTest() {
             .check(doesNotExist())
 
         // Show hidden accounts.
-        onView(withId(R.id.menu_hidden))
-            .perform(click())
-        sleep(500) // wait for animations to finish
+        clickViewId(R.id.menu_hidden)
+        sleep(1500) // wait for animations to finish
         onView(allOf(withText(PARENT_ACCOUNT_NAME)))
             .check(matches(isDisplayed()))
 
         // Show children accounts.
-        onView(allOf(withText(PARENT_ACCOUNT_NAME)))
-            .perform(click())
+        clickViewText(PARENT_ACCOUNT_NAME)
+        // Show the sub-accounts
+        clickViewText(R.string.section_header_subaccounts)
         onView(allOf(withText("Child of Hidden")))
             .check(matches(isDisplayed()))
 
@@ -576,15 +573,13 @@ class AccountsActivityTest : GnuAndroidTest() {
             .check(matches(isDisplayed()))
 
         // Hide the accounts
-        onView(withId(R.id.menu_hidden))
-            .perform(click())
-        sleep(500) // wait for animations to finish
+        clickViewId(R.id.menu_hidden)
+        sleep(1500) // wait for animations to finish
         onView(allOf(withText(PARENT_ACCOUNT_NAME)))
             .check(doesNotExist())
     }
 
     companion object {
-        private const val ACCOUNTS_CURRENCY_CODE = "USD"
         private const val SIMPLE_ACCOUNT_NAME = "Simple account"
         private const val SIMPLE_ACCOUNT_UID = "simple-account"
         private const val CHILD_ACCOUNT_UID = "child-account"
@@ -602,12 +597,13 @@ class AccountsActivityTest : GnuAndroidTest() {
         @BeforeClass
         @JvmStatic
         fun prepTest() {
+            configureDevice()
             preventFirstRunDialogs()
 
-            accountsDbAdapter = AccountsDbAdapter.getInstance()
+            accountsDbAdapter = AccountsDbAdapter.instance
             transactionsDbAdapter = accountsDbAdapter.transactionsDbAdapter
             splitsDbAdapter = transactionsDbAdapter.splitsDbAdapter
-            assertThat(accountsDbAdapter.isOpen()).isTrue()
+            assertThat(accountsDbAdapter.isOpen).isTrue()
         }
 
         /**

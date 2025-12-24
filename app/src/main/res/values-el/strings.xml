@@ -165,9 +165,9 @@
     <!-- Default title for color picker dialog [CHAR LIMIT=30] -->
     <string name="color_picker_default_title">Επιλογή χρώματος</string>
     <!-- Content description for a color square. -->
-    <string name="color_swatch_description">Color <xliff:g example="14" id="color_index">%1$d</xliff:g></string>
+    <string name="color_swatch_description">Color <xliff:g example="14" id="color_index">%1$s</xliff:g></string>
     <!-- Content description for a selected color square. -->
-    <string name="color_swatch_description_selected">Color <xliff:g example="14" id="color_index">%1$d</xliff:g> selected</string>
+    <string name="color_swatch_description_selected">Color <xliff:g example="14" id="color_index">%1$s</xliff:g> selected</string>
     <string name="label_account_color_and_type">Χρώμα Λογαριασμού &amp; Τύπος</string>
     <string name="label_delete_sub_accounts">Διαγραφή υπο-λογαριασμών</string>
     <string name="title_recent_accounts">Πρόσφατοι</string>
@@ -254,7 +254,7 @@
     <string name="password">Συνθηματικό</string>
     <string name="owncloud_server_invalid">Ο διακομιστής ownCloud δεν βρέθηκε</string>
     <string name="owncloud_user_invalid">Λανθασμένο όνομα χρήστη/κωδικός ownCloud</string>
-    <string name="owncloud_dir_invalid">Μη έγκυροι χαρακτήρες: \\ &lt; &gt; : \&quot; | * ?</string>
+    <string name="owncloud_dir_invalid">Μη έγκυροι χαρακτήρες: \\ / &lt; &gt; : \&quot; | * ?</string>
     <string name="owncloud_server_ok">Διακομιστής ownCloud ΟΚ</string>
     <string name="owncloud_user_ok">Όνομα χρήστη/κωδικός ownCloud OK</string>
     <string name="owncloud_dir_ok">Όνομα φακέλου OK</string>
@@ -484,4 +484,6 @@
     <string name="title_progress_processing_prices">Επεξεργασία τιμών</string>
     <string name="title_progress_processing_schedules">Επεξεργασία χρονοδιαγραμμάτων</string>
     <string name="title_progress_processing_transactions">Επεξεργασία συναλλαγών</string>
+    <!-- msgid "Number" -->
+    <string name="number">Αριθμός</string>
 </resources>

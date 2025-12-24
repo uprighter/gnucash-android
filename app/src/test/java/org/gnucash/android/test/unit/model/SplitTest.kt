@@ -2,7 +2,6 @@ package org.gnucash.android.test.unit.model
 
 import org.assertj.core.api.Assertions.assertThat
 import org.gnucash.android.model.Commodity
-import org.gnucash.android.model.Commodity.Companion.getInstance
 import org.gnucash.android.model.Money
 import org.gnucash.android.model.Money.Companion.createZeroInstance
 import org.gnucash.android.model.Split
@@ -25,7 +24,7 @@ class SplitTest : GnuCashTest() {
         assertThat(split.value.isNegative).isFalse()
         assertThat(split.quantity.isNegative).isFalse()
 
-        split.setValue(Money("-3", "USD"))
+        split.value = Money("-3", "USD")
         split.quantity = Money("-4", "EUR")
         assertThat(split.value.isNegative).isFalse()
         assertThat(split.quantity.isNegative).isFalse()
@@ -34,7 +33,7 @@ class SplitTest : GnuCashTest() {
     @Test
     fun testAddingSplitToTransaction() {
         val split = Split(createZeroInstance(Commodity.DEFAULT_COMMODITY), "Test")
-        assertThat(split.transactionUID).isEmpty()
+        assertThat(split.transactionUID).isNullOrEmpty()
 
         val transaction = Transaction("Random")
         transaction.addSplit(split)
@@ -44,14 +43,14 @@ class SplitTest : GnuCashTest() {
 
     @Test
     fun testCloning() {
-        val split = Split(Money(BigDecimal.TEN, getInstance("EUR")), "random-account")
+        val split = Split(Money(BigDecimal.TEN, Commodity.getInstance("EUR")), "random-account")
         split.transactionUID = "terminator-trx"
         split.type = TransactionType.CREDIT
 
-        val clone1 = Split(split, false)
+        val clone1 = split.copy(false)
         assertThat(clone1).isEqualTo(split)
 
-        val clone2 = Split(split, true)
+        val clone2 = split.copy(true)
         assertThat(clone2.uid).isNotEqualTo(split.uid)
         assertThat(split.isEquivalentTo(clone2)).isTrue()
     }
@@ -75,7 +74,7 @@ class SplitTest : GnuCashTest() {
 
     @Test
     fun shouldGenerateValidCsv() {
-        val split = Split(Money(BigDecimal.TEN, getInstance("EUR")), "random-account")
+        val split = Split(Money(BigDecimal.TEN, Commodity.getInstance("EUR")), "random-account")
         split.transactionUID = "terminator-trx"
         split.type = TransactionType.CREDIT
 
