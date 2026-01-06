@@ -59,6 +59,7 @@ import org.gnucash.android.util.set
 import timber.log.Timber
 import java.io.IOException
 import java.sql.Timestamp
+import java.util.UUID
 
 /**
  * Manages persistence of [Account]s in the database
@@ -608,6 +609,55 @@ class AccountsDbAdapter(
             }
             return uid
         }
+
+    /**
+     * Duplicates an account and all its sub-accounts.
+     * The transactions are NOT duplicated.
+     * The new account name will have the suffix "_2".
+     *
+     * @param accountUID GUID of the account to duplicate
+     */
+    fun duplicateAccount(accountUID: String) {
+        val account = getRecord(accountUID)
+        duplicateAccountRecursively(account, account.parentUID, true)
+    }
+
+    private fun duplicateAccountRecursively(
+        sourceAccount: Account,
+        parentUID: String?,
+        isRootDuplicate: Boolean
+    ) {
+        // Create new account
+        val newAccount = Account(sourceAccount.name, sourceAccount.commodity)
+        newAccount.setUID(UUID.randomUUID().toString())
+        newAccount.description = sourceAccount.description
+        newAccount.accountType = sourceAccount.accountType
+        newAccount.parentUID = parentUID
+        newAccount.color = sourceAccount.color
+        newAccount.isFavorite = sourceAccount.isFavorite
+        newAccount.isHidden = sourceAccount.isHidden
+        newAccount.isPlaceholder = sourceAccount.isPlaceholder
+        newAccount.isTemplate = sourceAccount.isTemplate
+        // We probably don't want to copy other fields like note, or created_at (auto set)
+
+        if (isRootDuplicate) {
+            newAccount.name = sourceAccount.name + "_2"
+        } else {
+            newAccount.name = sourceAccount.name
+        }
+
+        // Insert new account
+        addRecord(newAccount, UpdateMethod.Insert)
+
+        // Recursively duplicate sub-accounts
+        val subAccountsCursor = fetchSubAccounts(sourceAccount.uid, true)
+        subAccountsCursor?.use { cursor ->
+            while (cursor.moveToNext()) {
+                val subAccount = buildModelInstance(cursor)
+                duplicateAccountRecursively(subAccount, newAccount.uid, false)
+            }
+        }
+    }
 
     /**
      * Finds an account unique ID by its full name

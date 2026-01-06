@@ -293,6 +293,8 @@
     <string name="msg_wizard_welcome_page">Before you dive in,\nlet\'s setup a few things first\n\nTo continue, press Next</string>
     <string name="title_split_editor">Split Editor</string>
     <string name="toast_error_check_split_amounts">Check that all splits have valid amounts before saving!</string>
+    <string name="title_imbalance">Imbalance</string>
+    <string name="imbalance_message">The transaction is imbalanced by %1$s. Please fix the imbalance before saving.</string>
     <string name="label_error_invalid_expression">Invalid expression!</string>
     <string name="toast_scheduled_recurring_transaction">Scheduled recurring transaction</string>
     <string name="title_transfer_funds">Transfer Funds</string>
@@ -327,6 +329,7 @@
     <string name="toast_no_compatible_apps_to_receive_export">No compatible apps to receive the exported transactions!</string>
     <string name="menu_move_transaction">Move…</string>
     <string name="menu_duplicate_transaction">Duplicate</string>
+    <string name="menu_duplicate_transaction_to_now">Duplicate to Now</string>
     <string name="title_cash_flow_report">Cash Flow</string>
     <string name="title_budgets">Budgets</string>
     <string name="title_use_compact_list">Enable compact view</string>
@@ -595,4 +598,7 @@
         <item>"Dark Gray 4"</item>
         <item>"Black"</item>
     </string-array>
+    <string name="menu_duplicate_accounts">Duplicate Accounts</string>
+    <string name="title_confirm_duplicate">Confirm Duplication</string>
+    <string name="msg_confirm_duplicate">Are you sure you want to duplicate this account and all its sub-accounts?</string>
 </resources>

@@ -325,7 +325,12 @@ class TransactionsListFragment : MenuFragment(),
                 }
 
                 R.id.menu_duplicate -> {
-                    duplicateTransaction(transactionUID)
+                    duplicateTransaction(transactionUID, false)
+                    true
+                }
+
+                R.id.menu_duplicate_to_now -> {
+                    duplicateTransaction(transactionUID, true)
                     true
                 }
 
@@ -431,11 +436,13 @@ class TransactionsListFragment : MenuFragment(),
         }
     }
 
-    private fun duplicateTransaction(transactionUID: String) {
+    private fun duplicateTransaction(transactionUID: String, toNow: Boolean) {
         try {
             val transaction = transactionsDbAdapter.getRecord(transactionUID)
             val duplicate = transaction.copy()
-            duplicate.time = System.currentTimeMillis()
+            if (toNow) {
+                duplicate.time = System.currentTimeMillis()
+            }
             transactionsDbAdapter.insert(duplicate)
             refresh()
         } catch (e: SQLException) {

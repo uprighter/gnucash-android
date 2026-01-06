@@ -26,11 +26,14 @@ import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuInflater
 import android.view.MenuItem
+import android.view.DragEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.AdapterView
 import android.widget.EditText
 import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.Spinner
 import android.widget.TextView
 import androidx.annotation.ColorInt
@@ -128,6 +131,8 @@ class SplitEditorFragment : MenuFragment() {
         imbalanceWatcher = BalanceTextWatcher(binding)
         colorBalanceZero = binding.imbalanceTextview.currentTextColor
 
+        binding.splitListLayout.setOnDragListener(SplitDragListener())
+
         accountNameAdapter = QualifiedAccountNameAdapter(context, viewLifecycleOwner)
             .load { adapter ->
                 account = adapter.getAccountDb(accountUID)
@@ -138,6 +143,81 @@ class SplitEditorFragment : MenuFragment() {
                 }
                 loadSplits(binding)
             }
+    }
+
+    inner class SplitDragListener : View.OnDragListener {
+        private var originalTransition: android.animation.LayoutTransition? = null
+
+        override fun onDrag(v: View, event: DragEvent): Boolean {
+            val view = event.localState as View
+            val container = v as LinearLayout // The container listening for drags
+
+            when (event.action) {
+                DragEvent.ACTION_DRAG_STARTED -> {
+                    originalTransition = container.layoutTransition
+                    container.layoutTransition = null // Disable animations during drag to prevent crash
+                    view.visibility = View.INVISIBLE
+                    return true
+                }
+                DragEvent.ACTION_DRAG_ENTERED -> return true
+                DragEvent.ACTION_DRAG_EXITED -> return true
+                DragEvent.ACTION_DROP -> {
+                    view.visibility = View.VISIBLE
+                    view.alpha = 1.0f
+                    // Transformation is restored in ENDED
+                    return true
+                }
+                DragEvent.ACTION_DRAG_LOCATION -> {
+                    val targetView = findChildViewUnder(v as ViewGroup, event.x, event.y)
+                    
+                    // Auto-scroll logic
+                    val y = event.y
+                    val height = v.height
+                    val scrollZone = height * 0.1f // Top and bottom 10%
+                    
+                    if (y < scrollZone) {
+                        // Scroll up
+                        (v.parent as? ScrollView)?.smoothScrollBy(0, -20)
+                    } else if (y > height - scrollZone) {
+                        // Scroll down
+                        (v.parent as? ScrollView)?.smoothScrollBy(0, 20)
+                    }
+
+                    if (targetView != null && targetView != view) {
+                        val fromIndex = splitViewHolders.indexOfFirst { it.itemView == view }
+                        val toIndex = splitViewHolders.indexOfFirst { it.itemView == targetView }
+                        
+                        if (fromIndex >= 0 && toIndex >= 0 && fromIndex != toIndex) {
+                            // Since layout transitions are disabled, remove/add works synchronously
+                            container.removeView(view) 
+                            container.addView(view, toIndex)
+                            
+                            val item = splitViewHolders.removeAt(fromIndex)
+                            splitViewHolders.add(toIndex, item)
+                        }
+                    }
+                    return true
+                }
+                DragEvent.ACTION_DRAG_ENDED -> {
+                    view.visibility = View.VISIBLE
+                    view.alpha = 1.0f
+                    container.layoutTransition = originalTransition // Restore animations
+                    return true
+                }
+            }
+            return false
+        }
+
+        
+        private fun findChildViewUnder(root: ViewGroup, x: Float, y: Float): View? {
+            for (i in 0 until root.childCount) {
+                val child = root.getChildAt(i)
+                if (y >= child.top && y <= child.bottom) {
+                    return child
+                }
+            }
+            return null
+        }
     }
 
     private fun loadSplits(binding: FragmentSplitEditorBinding) {
@@ -167,6 +247,30 @@ class SplitEditorFragment : MenuFragment() {
             //aha! there are some splits. Let's load those instead
             loadSplitViews(splitList)
             imbalanceWatcher?.notifyChanged()
+        }
+
+        // Focus the split corresponding to the selected account
+        binding.root.post {
+            val selectedAccountUID = requireArguments().getString(UxArgument.SELECTED_ACCOUNT_UID)
+            if (!selectedAccountUID.isNullOrEmpty()) {
+                val adapter = accountNameAdapter
+                if (adapter != null) {
+                    for (viewHolder in splitViewHolders) {
+                        val position = viewHolder.accountsSpinner.selectedItemPosition
+                        if (position != Spinner.INVALID_POSITION) {
+                            val splitAccount = adapter.getAccount(position)
+                            if (splitAccount != null && splitAccount.uid == selectedAccountUID) {
+                                viewHolder.splitAmountEditText.requestFocus()
+                                viewHolder.splitAmountEditText.let {
+                                    val imm = requireContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
+                                    imm?.showSoftInput(it, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+                                }
+                                break
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -250,6 +354,10 @@ class SplitEditorFragment : MenuFragment() {
         val splitCurrencyTextView: TextView = binding.splitCurrencySymbol
         val splitUidTextView: TextView = binding.splitUid
         val splitTypeSwitch: TransactionTypeSwitch = binding.btnSplitType
+        val dragHandle: ImageView = binding.btnSplitDrag
+        val copyUpButton: ImageView = binding.btnCopyUp
+        val copyDownButton: ImageView = binding.btnCopyDown
+        val balanceButton: ImageView = binding.btnBalance
 
         var quantity: Money? = null
             private set
@@ -270,6 +378,120 @@ class SplitEditorFragment : MenuFragment() {
                 imbalanceWatcher?.notifyChanged()
             }
             splitAmountEditText.addTextChangedListener(imbalanceWatcher)
+
+            // Drag and Drop
+            dragHandle.setOnTouchListener { _, event ->
+                if (event.action == android.view.MotionEvent.ACTION_DOWN) {
+                    val data = android.content.ClipData.newPlainText("", "")
+                    val shadowBuilder = object : View.DragShadowBuilder(itemView) {
+                        override fun onProvideShadowMetrics(outShadowSize: android.graphics.Point, outShadowTouchPoint: android.graphics.Point) {
+                            super.onProvideShadowMetrics(outShadowSize, outShadowTouchPoint)
+                            // Anchor the shadow to the drag handle (left side) rather than center of the view.
+                            // Set touch point to the center of the drag handle
+                            val handleWidth = dragHandle.width
+                            val handleHeight = dragHandle.height
+                            // We assume the handle is vertically centered in the item view roughly, 
+                            // but simpler to just use half the shadow height for Y if we want to stay safe,
+                            // or better, use the handle's location.
+                            // Since handle is child of horizontal Layout, its top relative to itemView might be 0 or centered.
+                            // Let's us handle.x + width/2, and handle.y + height/2 relative to itemView?
+                            // Actually itemView is the parent's parent (LinearLayout -> LinearLayout -> ImageView)? NO.
+                            // item_split_entry.xml: LinearLayout (horizontal) -> [ImageView(handle), LinearLayout(vertical)...]
+                            // So dragHandle is a direct child of itemView.
+                            outShadowTouchPoint.set(handleWidth / 2, outShadowSize.y / 2)
+                        }
+                    }
+                    androidx.core.view.ViewCompat.startDragAndDrop(itemView, data, shadowBuilder, itemView, 0)
+                    true
+                } else {
+                    false
+                }
+            }
+
+            // New Buttons
+            copyUpButton.setOnClickListener {
+                val position = splitViewHolders.indexOf(this)
+                if (position > 0) {
+                    val prevSplit = splitViewHolders[position - 1]
+                    val prevAmount = prevSplit.splitAmountEditText.value
+                    if (prevAmount != null) {
+                        splitAmountEditText.setValue(prevAmount, false)
+                        splitTypeSwitch.isChecked = prevSplit.splitTypeSwitch.isChecked
+                    }
+                }
+            }
+
+            copyDownButton.setOnClickListener {
+                val position = splitViewHolders.indexOf(this)
+                if (position < splitViewHolders.size - 1) {
+                    val nextSplit = splitViewHolders[position + 1]
+                    val nextAmount = nextSplit.splitAmountEditText.value
+                    if (nextAmount != null) {
+                        splitAmountEditText.setValue(nextAmount, false)
+                        splitTypeSwitch.isChecked = nextSplit.splitTypeSwitch.isChecked
+                    }
+                }
+            }
+
+            balanceButton.setOnClickListener {
+                val accountNameAdapter = accountNameAdapter!!
+                var currentImbalance = BigDecimal.ZERO
+                val position = accountsSpinner.selectedItemPosition
+                if (position >= 0) {
+                    val account = accountNameAdapter.getAccount(position)
+                    if (account != null) {
+                         // Calculate imbalance EXCLUDING this split
+                        for (otherHolder in splitViewHolders) {
+                            if (otherHolder == this) continue
+                            val amount = otherHolder.amountValue.abs()
+                            val otherPosition = otherHolder.accountsSpinner.selectedItemPosition
+                            if (otherPosition < 0) continue
+                            val otherAccount = accountNameAdapter.getAccount(otherPosition) ?: continue
+                            val hasDebitNormalBalance = otherAccount.accountType.hasDebitNormalBalance
+
+                            currentImbalance += if (otherHolder.splitTypeSwitch.isChecked) {
+                                if (hasDebitNormalBalance) amount else -amount
+                            } else {
+                                if (hasDebitNormalBalance) -amount else amount
+                            }
+                        }
+                        // Now set this split to negate the balance
+                        // If imbalance is positive (Debit > Credit), we need Credit (which is positive for Credit accounts, negative for Debit accounts... wait)
+                        // Imbalance calc:
+                        // DEBIT_NORMAL: Debit (+), Credit (-)
+                        // CREDIT_NORMAL: Debit (-), Credit (+)
+                        // We want Total Imbalance + This Split Effect = 0
+                        // This Split Effect = -Total Imbalance
+                        // If This Account is DEBIT_NORMAL:
+                        //   If -Imbalance > 0 -> Debit
+                        //   If -Imbalance < 0 -> Credit (use abs value)
+                        // If This Account is CREDIT_NORMAL:
+                        //   If -Imbalance > 0 -> Credit
+                        //   If -Imbalance < 0 -> Debit (use abs value)
+                        
+                        val targetAmount = currentImbalance.abs()
+                        val originalType = splitTypeSwitch.isChecked
+                        
+                        // 1. Set the amount to the magnitude of the imbalance
+                        if (splitAmountEditText.value != targetAmount) {
+                            splitAmountEditText.setValue(targetAmount, false)
+                        }
+
+                        // 2. Check if the transaction is now balanced with the current type
+                        // We need to re-compute the FULL imbalance now that we've updated the amount
+                        // computeImbalance reads from the views, so it will see the new amount
+                        var newImbalance = computeImbalance()
+
+                        // 3. If not balanced, toggle the type
+                        if (newImbalance.compareTo(BigDecimal.ZERO) != 0) {
+                            splitTypeSwitch.isChecked = !originalType
+                            
+                            // (Optional) double check, but strict adherence to request is "try toggle"
+                            // newImbalance = computeImbalance()
+                        }
+                    }
+                }
+            }
         }
 
         override fun transferComplete(value: Money, amount: Money) {
@@ -383,6 +605,21 @@ class SplitEditorFragment : MenuFragment() {
             return
         }
 
+        // Check for imbalance
+        val imbalance = computeImbalance()
+        if (imbalance.compareTo(BigDecimal.ZERO) != 0) {
+            val account = this.account!!
+            val commodity = account.commodity
+             val formattedImbalance = Money(imbalance, commodity).formattedString()
+             androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                .setTitle(R.string.title_imbalance)
+                .setMessage(getString(R.string.imbalance_message, formattedImbalance))
+                .setNegativeButton(android.R.string.cancel) { dialog, _ -> dialog.dismiss() }
+                .setPositiveButton(android.R.string.ok) { dialog, _ -> dialog.dismiss() } // User just dismisses to fix manually
+                .show()
+            return
+        }
+
         if (isMultiCurrencyTransaction && !currencyConversionDone) {
             onSaveAttempt = true
             if (startTransferFunds()) {
@@ -400,6 +637,26 @@ class SplitEditorFragment : MenuFragment() {
             .putParcelableArrayListExtra(UxArgument.SPLIT_LIST, splits)
         activity.setResult(Activity.RESULT_OK, data)
         activity.finish()
+    }
+
+    private fun computeImbalance(): BigDecimal {
+        val accountNameAdapter = accountNameAdapter ?: return BigDecimal.ZERO
+        var imbalance = BigDecimal.ZERO
+
+        for (viewHolder in splitViewHolders) {
+            val amount = viewHolder.amountValue.abs()
+            val position = viewHolder.accountsSpinner.selectedItemPosition
+            if (position < 0) continue
+            val account = accountNameAdapter.getAccount(position) ?: continue
+            val hasDebitNormalBalance = account.accountType.hasDebitNormalBalance
+
+            imbalance += if (viewHolder.splitTypeSwitch.isChecked) {
+                if (hasDebitNormalBalance) amount else -amount
+            } else {
+                if (hasDebitNormalBalance) -amount else amount
+            }
+        }
+        return imbalance
     }
 
     /**
@@ -441,23 +698,7 @@ class SplitEditorFragment : MenuFragment() {
         }
 
         fun notifyChanged() {
-            val accountNameAdapter = accountNameAdapter!!
-            var imbalance = BigDecimal.ZERO
-
-            for (viewHolder in splitViewHolders) {
-                val amount = viewHolder.amountValue.abs()
-                val position = viewHolder.accountsSpinner.selectedItemPosition
-                if (position < 0) return
-                val account = accountNameAdapter.getAccount(position) ?: return
-                val hasDebitNormalBalance = account.accountType.hasDebitNormalBalance
-
-                imbalance += if (viewHolder.splitTypeSwitch.isChecked) {
-                    if (hasDebitNormalBalance) amount else -amount
-                } else {
-                    if (hasDebitNormalBalance) -amount else amount
-                }
-            }
-
+            val imbalance = computeImbalance()
             val account = this@SplitEditorFragment.account!!
             val commodity = account.commodity
             binding.imbalanceTextview.displayBalance(
@@ -466,6 +707,7 @@ class SplitEditorFragment : MenuFragment() {
             )
         }
     }
+
 
     /**
      * Listens to changes in the transfer account and updates the currency symbol, the label of the

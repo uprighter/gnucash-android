@@ -412,6 +412,17 @@ class AccountsListFragment : MenuFragment(),
             val refresh = result.getBoolean(Refreshable.EXTRA_REFRESH)
             if (refresh) refreshActivity()
         }
+        if (DuplicationConfirmationDialog.TAG == requestKey) {
+            val refresh = result.getBoolean(Refreshable.EXTRA_REFRESH)
+            if (refresh) refresh()
+        }
+    }
+
+    fun tryDuplicateAccounts(accountUID: String) {
+        val fm = parentFragmentManager
+        val fragment = DuplicationConfirmationDialog.newInstance(accountUID)
+        fm.setFragmentResultListener(DuplicationConfirmationDialog.TAG, this, this)
+        fragment.show(fm, DuplicationConfirmationDialog.TAG)
     }
 
     fun setShowHiddenAccounts(isVisible: Boolean) {
@@ -558,6 +569,11 @@ class AccountsListFragment : MenuFragment(),
 
                 R.id.menu_delete -> {
                     tryDeleteAccount(activity, accountUID)
+                    return true
+                }
+
+                R.id.menu_duplicate_accounts -> {
+                    tryDuplicateAccounts(accountUID)
                     return true
                 }
 

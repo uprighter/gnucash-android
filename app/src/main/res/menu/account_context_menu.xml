@@ -31,4 +31,11 @@
         android:title="@string/title_delete_account"
         app:showAsAction="always" />
 
+    <item
+        android:id="@+id/menu_duplicate_accounts"
+        android:icon="@drawable/ic_copy"
+        android:orderInCategory="3"
+        android:title="@string/menu_duplicate_accounts"
+        app:showAsAction="never" />
+
 </menu>

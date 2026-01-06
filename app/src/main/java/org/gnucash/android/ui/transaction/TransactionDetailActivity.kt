@@ -98,6 +98,9 @@ class TransactionDetailActivity : PasscodeLockActivity(), FragmentResultListener
             if (split.type == TransactionType.DEBIT) binding.splitDebit else binding.splitCredit
         @ColorInt val colorBalanceZero = balanceView.currentTextColor
         balanceView.displayBalance(split.getFormattedQuantity(account), colorBalanceZero)
+
+        binding.splitMemo.text = split.memo
+        binding.splitMemo.isVisible = !split.memo.isNullOrEmpty()
     }
 
     private fun bind(binding: RowBalanceBinding, accountUID: String, timeMillis: Long) {
